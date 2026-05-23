@@ -32,7 +32,7 @@ body {
     height: 100%;
     z-index: -1;
     background: radial-gradient(circle at 80% 20%, #1e1b4b 0%, transparent 40%),
-                radial-gradient(circle at 20% 80%, #1e1b4b 0%, transparent 40%);
+        radial-gradient(circle at 20% 80%, #1e1b4b 0%, transparent 40%);
 }
 
 .app-container {
@@ -93,7 +93,8 @@ h1 span {
     backdrop-filter: blur(10px);
 }
 
-.drop-zone:hover, .drop-zone.active {
+.drop-zone:hover,
+.drop-zone.active {
     border-color: var(--accent-color);
     background: rgba(23, 28, 38, 0.9);
     box-shadow: 0 0 30px rgba(79, 70, 229, 0.1);
@@ -226,11 +227,34 @@ pre {
     margin-bottom: 16px;
 }
 
-@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-@keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes spin {
+    0% {
+        transform: rotate(0deg);
+    }
 
-.hidden { display: none !important; }
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.hidden {
+    display: none !important;
+}
 
 @media (max-width: 768px) {
-    .results-grid { grid-template-columns: 1fr; }
+    .results-grid {
+        grid-template-columns: 1fr;
+    }
 }
