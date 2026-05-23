@@ -8,7 +8,8 @@ from app.services.document_intelligence import (
     PerspectiveCorrector,
     OCREngine,
     VotingEngine,
-    InputClassifier
+    InputClassifier,
+    LayoutLMService
 )
 
 logger = logging.getLogger(__name__)
@@ -24,11 +25,12 @@ class OCRService:
         self.corrector = PerspectiveCorrector()
         self.ocr = OCREngine(lang='en')
         self.voting = VotingEngine()
+        self.layoutlm = LayoutLMService()
 
     def extract_structured_data(self, image_bytes: bytes) -> dict:
         """
         Full production-grade extraction flow:
-        Classify -> Preprocess -> Correct -> OCR -> Vote -> Normalize.
+        Classify -> Preprocess -> Correct -> OCR -> Vote -> Semantic Mapping (LayoutLM).
         """
         try:
             # 1. Convert bytes to OpenCV format
@@ -52,7 +54,6 @@ class OCRService:
                 bbox = res["bbox"] # [tl, tr, br, bl]
                 
                 # Normalize bounding box for LayoutLMv3 (0-1000)
-                # Note: Coordinate mapping from 'corrected' back to 'normalized'
                 tl = bbox[0]
                 br = bbox[2]
                 
@@ -64,10 +65,23 @@ class OCRService:
                 words.append(text)
                 boxes.append([x1, y1, x2, y2])
             
+            # 4. Semantic Entity Classification (Phase 3)
+            entities = []
+            receipt_data = {}
+            if words:
+                entities = self.layoutlm.predict_entities(corrected, words, boxes)
+                receipt_data = self.layoutlm.parse_receipt_entities(entities)
+            
             return {
-                "words": words,
-                "boxes": boxes,
-                "image_size": {"width": orig_w, "height": orig_h}
+                "filename": "upload.jpg",
+                "status": "success",
+                "data": {
+                    "words": words,
+                    "boxes": boxes,
+                    "entities": entities,
+                    "receipt_info": receipt_data,
+                    "image_size": {"width": orig_w, "height": orig_h}
+                }
             }
         except Exception as e:
             logger.error(f"Structured OCR extraction failed: {str(e)}")
