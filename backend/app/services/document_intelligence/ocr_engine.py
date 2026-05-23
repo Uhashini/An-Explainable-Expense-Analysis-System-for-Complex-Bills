@@ -1,158 +1,70 @@
-"""Phase 2: Document Intelligence Services - OCR Engine"""
+from paddleocr import PaddleOCR
+import numpy as np
+import logging
+from typing import List, Dict, Any, Union
+import os
 
-import io
-from typing import Tuple, List, Dict, Optional
-from PIL import Image
-import pytesseract
-from app.core.config import settings
-from app.core.exceptions import OCRException
-from app.utils.logger import logger
-
+logger = logging.getLogger(__name__)
 
 class OCREngine:
-    """Tesseract-based OCR engine for text and bounding box extraction."""
+    """
+    Production-grade OCR service using PaddleOCR as the primary backbone.
+    Optimized for multi-language receipts and complex layouts (tables).
+    """
 
-    def __init__(self):
-        """Initialize OCR engine."""
-        if settings.TESSERACT_PATH:
-            pytesseract.pytesseract.pytesseract_cmd = settings.TESSERACT_PATH
-        logger.info("OCR Engine initialized")
-
-    def extract_text(self, image_path: str) -> str:
-        """Extract text from receipt image using Tesseract.
-        
-        Args:
-            image_path: Path to receipt image
-            
-        Returns:
-            Extracted text from image
-            
-        Raises:
-            OCRException: If OCR processing fails
+    def __init__(self, lang: str = 'en', use_angle_cls: bool = True):
+        """
+        Initializes the PaddleOCR engine.
+        - lang: Language code (e.g., 'en', 'ch', 'fr').
+        - use_angle_cls: Enables text orientation detection (useful for rotated receipts).
         """
         try:
-            image = Image.open(image_path)
-            text = pytesseract.image_to_string(image)
-            logger.info(f"Successfully extracted text from {image_path}")
-            return text
+            # Note: The first time this runs, it will download the model weights (~100MB)
+            self.engine = PaddleOCR(use_angle_cls=use_angle_cls, lang=lang, show_log=False)
+            logger.info(f"PaddleOCR initialized with language: {lang}")
         except Exception as e:
-            logger.error(f"OCR extraction failed: {e}")
-            raise OCRException(f"Failed to extract text from image: {e}")
+            logger.error(f"Failed to initialize PaddleOCR: {e}")
+            raise
 
-    def extract_text_with_boxes(self, image_path: str) -> Tuple[str, List[Dict]]:
-        """Extract text and bounding boxes from receipt image.
-        
-        Args:
-            image_path: Path to receipt image
-            
-        Returns:
-            Tuple of (extracted_text, bounding_boxes)
-            bounding_boxes: List of dicts with keys: text, x0, y0, x1, y1, confidence
-            
-        Raises:
-            OCRException: If OCR processing fails
+    def extract_text(self, image: Union[str, np.ndarray]) -> List[Dict[str, Any]]:
+        """
+        Extracts structured text data from an image.
+        Returns a list of dictionaries containing text, confidence, and bounding box.
         """
         try:
-            image = Image.open(image_path)
+            # Perform OCR inference
+            result = self.engine.ocr(image, cls=True)
             
-            # Extract text
-            text = pytesseract.image_to_string(image)
-            
-            # Extract detailed data with bounding boxes
-            data = pytesseract.image_to_data(image, output_type=pytesseract.Output.DICT)
-            
-            # Process bounding boxes
-            bounding_boxes = []
-            for i in range(len(data['text'])):
-                if int(data['conf'][i]) > 0:  # Only confident detections
-                    bbox = {
-                        'text': data['text'][i],
-                        'x0': int(data['left'][i]),
-                        'y0': int(data['top'][i]),
-                        'x1': int(data['left'][i]) + int(data['width'][i]),
-                        'y1': int(data['top'][i]) + int(data['height'][i]),
-                        'confidence': int(data['conf'][i]) / 100.0
-                    }
-                    bounding_boxes.append(bbox)
-            
-            logger.info(f"Extracted {len(bounding_boxes)} bounding boxes from {image_path}")
-            return text, bounding_boxes
-            
-        except Exception as e:
-            logger.error(f"OCR box extraction failed: {e}")
-            raise OCRException(f"Failed to extract text and boxes from image: {e}")
+            # PaddleOCR returns a list of pages, each page is a list of [bbox, (text, confidence)]
+            if not result or result[0] is None:
+                return []
 
-    def extract_from_bytes(self, image_bytes: bytes) -> Tuple[str, List[Dict]]:
-        """Extract text and boxes from image bytes.
-        
-        Args:
-            image_bytes: Image data as bytes
+            structured_results = []
+            for line in result[0]:
+                bbox = line[0]
+                text, confidence = line[1]
+                
+                structured_results.append({
+                    "text": text,
+                    "confidence": float(confidence),
+                    "bbox": bbox,
+                    "width": abs(bbox[1][0] - bbox[0][0]),
+                    "height": abs(bbox[2][1] - bbox[0][1])
+                })
             
-        Returns:
-            Tuple of (extracted_text, bounding_boxes)
-        """
-        try:
-            image = Image.open(io.BytesIO(image_bytes))
-            
-            text = pytesseract.image_to_string(image)
-            data = pytesseract.image_to_data(image, output_type=pytesseract.Output.DICT)
-            
-            bounding_boxes = []
-            for i in range(len(data['text'])):
-                if int(data['conf'][i]) > 0:
-                    bbox = {
-                        'text': data['text'][i],
-                        'x0': int(data['left'][i]),
-                        'y0': int(data['top'][i]),
-                        'x1': int(data['left'][i]) + int(data['width'][i]),
-                        'y1': int(data['top'][i]) + int(data['height'][i]),
-                        'confidence': int(data['conf'][i]) / 100.0
-                    }
-                    bounding_boxes.append(bbox)
-            
-            return text, bounding_boxes
-            
+            return structured_results
         except Exception as e:
-            logger.error(f"OCR from bytes failed: {e}")
-            raise OCRException(f"Failed to extract from image bytes: {e}")
+            logger.error(f"OCR Inference error: {e}")
+            return []
 
-    def preprocess_image(self, image_path: str, output_path: Optional[str] = None) -> Image.Image:
-        """Preprocess image for better OCR accuracy.
-        
-        Applies: grayscale conversion, contrast enhancement, noise reduction
-        
-        Args:
-            image_path: Path to input image
-            output_path: Optional path to save preprocessed image
-            
-        Returns:
-            Preprocessed PIL Image
+    def get_full_text(self, results: List[Dict[str, Any]]) -> str:
         """
-        try:
-            from PIL import ImageEnhance, ImageFilter
-            
-            image = Image.open(image_path)
-            
-            # Convert to grayscale
-            image = image.convert('L')
-            
-            # Enhance contrast
-            enhancer = ImageEnhance.Contrast(image)
-            image = enhancer.enhance(2.0)
-            
-            # Enhance brightness
-            enhancer = ImageEnhance.Brightness(image)
-            image = enhancer.enhance(1.2)
-            
-            # Reduce noise
-            image = image.filter(ImageFilter.MedianFilter(size=3))
-            
-            if output_path:
-                image.save(output_path)
-                logger.info(f"Preprocessed image saved to {output_path}")
-            
-            return image
-            
-        except Exception as e:
-            logger.error(f"Image preprocessing failed: {e}")
-            raise OCRException(f"Failed to preprocess image: {e}")
+        Reconstructs the full text from structured results.
+        """
+        return "\n".join([item["text"] for item in results])
+
+    def filter_by_confidence(self, results: List[Dict[str, Any]], threshold: float = 0.5) -> List[Dict[str, Any]]:
+        """
+        Filters out low-confidence OCR results.
+        """
+        return [item for item in results if item["confidence"] >= threshold]
