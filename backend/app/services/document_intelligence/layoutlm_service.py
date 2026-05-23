@@ -2,6 +2,8 @@ import logging
 from typing import List, Dict, Any, Optional
 import numpy as np
 
+from .regex_parser import RegexParser
+
 logger = logging.getLogger(__name__)
 
 class LayoutLMService:
@@ -15,6 +17,7 @@ class LayoutLMService:
         Initializes the LayoutLMv3 processor and model lazily.
         """
         self.enabled = False
+        self.regex_fallback = RegexParser()
         try:
             from transformers import LayoutLMv3Processor, LayoutLMv3ForTokenClassification
             import torch
@@ -78,10 +81,15 @@ class LayoutLMService:
             logger.error(f"LayoutLM inference failed: {e}")
             return []
 
-    def parse_receipt_entities(self, entities: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def parse_receipt_entities(self, entities: List[Dict[str, Any]], words: List[str] = None, boxes: List[List[int]] = None) -> Dict[str, Any]:
         """
         Heuristic-based aggregation of LayoutLM token results into a structured receipt object.
+        If AI is disabled or empty, falls back to Regex recognition.
         """
+        if not entities and words and boxes:
+            logger.info("Semantic AI disabled/empty. Falling back to RegexParser.")
+            return self.regex_fallback.parse(words, boxes)
+
         parsed = {
             "merchant_name": "",
             "date": "",
@@ -91,8 +99,8 @@ class LayoutLMService:
 
         # Simplified greedy aggregation
         for ent in entities:
-            label = ent["entity"]
-            text = ent["text"]
+            label = ent.get("entity", "O")
+            text = ent.get("text", "")
             
             if "COMPANY" in label or "MERCHANT" in label:
                 parsed["merchant_name"] += f" {text}"
@@ -108,4 +116,13 @@ class LayoutLMService:
                     pass
         
         parsed["merchant_name"] = parsed["merchant_name"].strip()
+        
+        # Secondary Merge: If AI missed critical fields, use Regex to fill the gaps
+        if not parsed["merchant_name"] or parsed["total_amount"] == 0:
+            logger.info("AI results incomplete. Supplementing with RegexParser.")
+            regex_results = self.regex_fallback.parse(words, boxes)
+            if not parsed["merchant_name"]: parsed["merchant_name"] = regex_results["merchant_name"]
+            if not parsed["date"]: parsed["date"] = regex_results["date"]
+            if parsed["total_amount"] == 0: parsed["total_amount"] = regex_results["total_amount"]
+
         return parsed

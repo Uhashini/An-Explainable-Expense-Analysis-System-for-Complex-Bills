@@ -70,7 +70,7 @@ class OCRService:
             receipt_data = {}
             if words:
                 entities = self.layoutlm.predict_entities(corrected, words, boxes)
-                receipt_data = self.layoutlm.parse_receipt_entities(entities)
+                receipt_data = self.layoutlm.parse_receipt_entities(entities, words, boxes)
             
             return {
                 "filename": "upload.jpg",
