@@ -1,8 +1,13 @@
+import os
+# CRITICAL: These must be set BEFORE any paddle imports
+os.environ["FLAGS_enable_pir_api"] = "0"
+os.environ["FLAGS_use_onednn"] = "0"
+
 from paddleocr import PaddleOCR
 import numpy as np
 import logging
 from typing import List, Dict, Any, Union
-import os
+import paddle
 
 logger = logging.getLogger(__name__)
 
@@ -18,9 +23,10 @@ class OCREngine:
         - lang: Language code (e.g., 'en', 'ch', 'fr').
         - use_angle_cls: Enables text orientation detection (useful for rotated receipts).
         """
+        self.use_angle_cls = use_angle_cls
         try:
             # Note: The first time this runs, it will download the model weights (~100MB)
-            self.engine = PaddleOCR(use_angle_cls=use_angle_cls, lang=lang, show_log=False)
+            self.engine = PaddleOCR(use_angle_cls=use_angle_cls, lang=lang)
             logger.info(f"PaddleOCR initialized with language: {lang}")
         except Exception as e:
             logger.error(f"Failed to initialize PaddleOCR: {e}")
@@ -33,7 +39,7 @@ class OCREngine:
         """
         try:
             # Perform OCR inference
-            result = self.engine.ocr(image, cls=True)
+            result = self.engine.ocr(image)
             
             # PaddleOCR returns a list of pages, each page is a list of [bbox, (text, confidence)]
             if not result or result[0] is None:

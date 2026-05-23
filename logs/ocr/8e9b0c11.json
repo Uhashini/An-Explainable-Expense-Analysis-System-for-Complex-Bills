@@ -1,0 +1,24 @@
+{
+    "timestamp": "2026-05-23T09:08:01.315074",
+    "session_id": "8e9b0c11",
+    "input_type": "screenshot_or_scanned",
+    "performance": {
+        "latency_seconds": 115.452,
+        "avg_confidence": 0,
+        "field_count": 0
+    },
+    "decisions": {
+        "fallback_count": 0,
+        "voting_applied": true
+    },
+    "results": [],
+    "metadata": {
+        "quality": {
+            "resolution": "1716x998",
+            "format": "JPEG",
+            "mode": "RGB",
+            "is_high_res": false
+        },
+        "voting_applied": true
+    }
+}

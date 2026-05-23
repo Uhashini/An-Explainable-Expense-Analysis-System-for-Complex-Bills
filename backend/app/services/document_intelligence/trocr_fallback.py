@@ -1,8 +1,5 @@
-from transformers import TrOCRProcessor, VisionEncoderDecoderModel
-from PIL import Image
-import torch
 import logging
-from typing import List, Dict, Any, Union
+from typing import List, Dict, Any, Union, Optional
 import numpy as np
 
 logger = logging.getLogger(__name__)
@@ -15,10 +12,13 @@ class TrOCRFallback:
 
     def __init__(self, model_size: str = "base"):
         """
-        Initializes the TrOCR model.
-        - model_size: "small", "base", or "large". Defaults to "base".
+        Initializes the TrOCR model lazily.
         """
+        self.enabled = False
         try:
+            from transformers import TrOCRProcessor, VisionEncoderDecoderModel
+            import torch
+            
             model_name = f"microsoft/trocr-{model_size}-handwritten"
             self.processor = TrOCRProcessor.from_pretrained(model_name)
             self.model = VisionEncoderDecoderModel.from_pretrained(model_name)
@@ -26,28 +26,31 @@ class TrOCRFallback:
             # Use GPU if available
             self.device = "cuda" if torch.cuda.is_available() else "cpu"
             self.model.to(self.device)
+            self.torch = torch
             
             logger.info(f"TrOCR {model_size} initialized on {self.device}")
+            self.enabled = True
         except Exception as e:
-            logger.error(f"Failed to initialize TrOCR: {e}")
-            raise
+            logger.warning(f"TrOCR fallback disabled due to missing dependencies (torch/shm.dll): {e}")
 
-    def process_crop(self, image_crop: Union[Image.Image, np.ndarray]) -> str:
+    def process_crop(self, image_crop: Union[np.ndarray, Any]) -> str:
         """
         Processes a small image crop (e.g., a single line or word) for high precision.
         """
+        if not self.enabled:
+            return ""
+
         try:
+            from PIL import Image
             if isinstance(image_crop, np.ndarray):
                 image_crop = Image.fromarray(image_crop).convert("RGB")
-            elif isinstance(image_crop, Image.Image):
-                image_crop = image_crop.convert("RGB")
-
+            
             # Prepare image for model
             pixel_values = self.processor(images=image_crop, return_tensors="pt").pixel_values
             pixel_values = pixel_values.to(self.device)
 
             # Generate text
-            with torch.no_grad():
+            with self.torch.no_grad():
                 generated_ids = self.model.generate(pixel_values)
             
             generated_text = self.processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
@@ -60,6 +63,9 @@ class TrOCRFallback:
         """
         Iterates through OCR results and re-processes regions below the confidence threshold.
         """
+        if not self.enabled:
+            return ocr_results
+
         updated_results = []
         for res in ocr_results:
             if res["confidence"] < threshold:
