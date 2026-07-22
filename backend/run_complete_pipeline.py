@@ -66,8 +66,8 @@ try:
     
     for line in result:
         for item in line:
-            text = item[1]
-            confidence = item[2]
+            text = item[1][0]
+            confidence = item[1][1]
             bbox_points = item[0]
             
             xs = [p[0] for p in bbox_points]
@@ -139,7 +139,7 @@ if predictions and len(predictions) > 0:
     # Group by entity type
     entity_groups = {}
     for pred in predictions:
-        etype = pred.get('entity_type', 'UNKNOWN')
+        etype = pred.get('entity', 'UNKNOWN')
         if etype not in entity_groups:
             entity_groups[etype] = []
         entity_groups[etype].append(pred)

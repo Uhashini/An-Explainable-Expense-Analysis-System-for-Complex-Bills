@@ -60,8 +60,7 @@ try:
         for line in result:
             if line:
                 for item in line:
-                    if len(item) >= 2:
-                        text = str(item[1])
+                        text = str(item[1][0])
                         bbox_points = item[0]
                         
                         xs = [float(p[0]) for p in bbox_points]
@@ -123,7 +122,7 @@ print("\n\nEntity Extraction Results:\n")
 if predictions:
     entity_groups = {}
     for pred in predictions:
-        etype = pred.get('entity_type', 'UNKNOWN')
+        etype = pred.get('entity', 'UNKNOWN')
         if etype not in entity_groups:
             entity_groups[etype] = []
         entity_groups[etype].append(pred)

@@ -50,8 +50,8 @@ try:
     
     for line in result:
         for item in line:
-            text = item[1]  # Text
-            confidence = item[2]  # Confidence
+            text = item[1][0]  # Text
+            confidence = item[1][1]  # Confidence
             bbox_points = item[0]  # [[x1,y1], [x2,y2], [x3,y3], [x4,y4]]
             
             # Convert quadrilateral to rectangular bbox
@@ -129,7 +129,7 @@ if predictions:
     # Group by entity type
     entity_groups = {}
     for pred in predictions:
-        etype = pred.get('entity_type', 'UNKNOWN')
+        etype = pred.get('entity', 'UNKNOWN')
         if etype not in entity_groups:
             entity_groups[etype] = []
         entity_groups[etype].append(pred)
@@ -194,7 +194,7 @@ print(f"   ✅ Entities extracted: {len(predictions)}")
 
 if predictions:
     # Show main entity types
-    types = list(set([p.get('entity_type', 'UNKNOWN') for p in predictions]))
+    types = list(set([p.get('entity', 'UNKNOWN') for p in predictions]))
     print(f"   ✅ Entity types found: {', '.join(types[:5])}")
     if len(types) > 5:
         print(f"      ... and {len(types) - 5} more")

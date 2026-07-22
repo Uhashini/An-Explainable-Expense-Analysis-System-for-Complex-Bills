@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from app.api.v1.endpoints import receipts
+from app.api.v1.endpoints import receipts, demo
 import os
 
 app = FastAPI(
@@ -22,6 +22,7 @@ app.add_middleware(
 
 # Include Routers
 app.include_router(receipts.router, prefix="/api/v1/receipts", tags=["Receipts"])
+app.include_router(demo.router, prefix="/api/v1/demo", tags=["Demo"])
 
 # Serve Static Files
 static_path = os.path.join(os.getcwd(), "static")
