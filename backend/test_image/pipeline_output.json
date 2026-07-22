@@ -1,0 +1,19 @@
+{
+  "image_metadata": {
+    "size": [
+      1716,
+      998
+    ],
+    "mode": "RGB",
+    "format": "JPEG"
+  },
+  "ocr_results": {
+    "total_words": 0,
+    "words": [],
+    "sample_words_with_boxes": []
+  },
+  "entity_extraction": {
+    "total_entities_detected": 0,
+    "entities": []
+  }
+}

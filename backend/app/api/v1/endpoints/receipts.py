@@ -23,15 +23,10 @@ async def upload_receipt(file: UploadFile = File(...)):
         # Extract structured data using OCR service
         structured_data = ocr_service.extract_structured_data(contents)
         
-        return {
-            "filename": file.filename,
-            "status": "success",
-            "data": {
-                "words": structured_data["words"],
-                "boxes": structured_data["boxes"],
-                "image_size": structured_data["image_size"]
-            }
-        }
+        # Override filename for reporting
+        structured_data["filename"] = file.filename
+        
+        return structured_data
     except Exception as e:
         raise HTTPException(
             status_code=500, 

@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Receipt Pipeline Demo</title>
+    <link rel="stylesheet" href="/static/demo.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container">
+        <header>
+            <div class="header-content">
+                <h1>Expense Intelligence</h1>
+                <p>End-to-end receipt extraction powered by LayoutLMv3</p>
+            </div>
+            <a href="/" class="back-link">Back to Main App</a>
+        </header>
+
+        <main class="main-content">
+            <section class="upload-section">
+                <div class="upload-zone" id="uploadZone">
+                    <div class="upload-icon">📄</div>
+                    <h3>Upload a Receipt</h3>
+                    <p>Drag and drop or click to browse</p>
+                    <input type="file" id="fileInput" accept="image/*" hidden>
+                </div>
+                
+                <div class="image-preview-container hidden" id="previewContainer">
+                    <img id="imagePreview" alt="Receipt preview">
+                    <button id="processBtn" class="btn primary-btn">Process Receipt</button>
+                    <button id="resetBtn" class="btn outline-btn">Cancel</button>
+                </div>
+            </section>
+
+            <section class="pipeline-section hidden" id="pipelineSection">
+                <div class="pipeline-header">
+                    <h2>Pipeline Execution</h2>
+                    <div class="total-time" id="totalTime">Total: -- ms</div>
+                </div>
+
+                <div class="timeline">
+                    <!-- Step 1 -->
+                    <div class="timeline-step" id="step-classification">
+                        <div class="step-indicator">1</div>
+                        <div class="step-content">
+                            <div class="step-header">
+                                <h3>Input Classification</h3>
+                                <span class="step-time">-- ms</span>
+                            </div>
+                            <div class="step-details hidden">
+                                <div class="data-row">
+                                    <span class="label">Source:</span>
+                                    <span class="value" id="val-source">--</span>
+                                </div>
+                                <div class="data-row">
+                                    <span class="label">Confidence:</span>
+                                    <span class="value" id="val-source-conf">--</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Step 2 -->
+                    <div class="timeline-step" id="step-ocr">
+                        <div class="step-indicator">2</div>
+                        <div class="step-content">
+                            <div class="step-header">
+                                <h3>OCR Processing (PaddleOCR)</h3>
+                                <span class="step-time">-- ms</span>
+                            </div>
+                            <div class="step-details hidden">
+                                <div class="data-row">
+                                    <span class="label">Words Extracted:</span>
+                                    <span class="value" id="val-ocr-count">--</span>
+                                </div>
+                                <div class="code-preview" id="val-ocr-text">
+                                    // Extracted text preview...
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Step 3 -->
+                    <div class="timeline-step" id="step-layoutlm">
+                        <div class="step-indicator">3</div>
+                        <div class="step-content">
+                            <div class="step-header">
+                                <h3>Entity Extraction (LayoutLMv3)</h3>
+                                <span class="step-time">-- ms</span>
+                            </div>
+                            <div class="step-details hidden" id="val-layoutlm-entities">
+                                <!-- Entities will be injected here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="results-section hidden" id="resultsSection">
+                <h2>Extracted Information</h2>
+                <div class="summary-cards">
+                    <div class="summary-card">
+                        <span class="card-icon">🏢</span>
+                        <span class="card-label">Vendor</span>
+                        <h3 class="card-value" id="res-vendor">--</h3>
+                    </div>
+                    <div class="summary-card">
+                        <span class="card-icon">💰</span>
+                        <span class="card-label">Total Amount</span>
+                        <h3 class="card-value" id="res-total">--</h3>
+                    </div>
+                    <div class="summary-card">
+                        <span class="card-icon">📅</span>
+                        <span class="card-label">Date</span>
+                        <h3 class="card-value" id="res-date">--</h3>
+                    </div>
+                </div>
+                
+                <div class="raw-json-container">
+                    <h3>Raw JSON Output</h3>
+                    <pre><code id="rawJsonOutput">{}</code></pre>
+                </div>
+            </section>
+        </main>
+    </div>
+    <script src="/static/demo.js"></script>
+</body>
+</html>

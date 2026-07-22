@@ -138,3 +138,12 @@ dmypy.json
 
 # Cython debug symbols
 cython_debug/
+
+# Machine Learning Models
+*.safetensors
+*.pt
+*.pth
+*.bin
+layoutlmv3-finetuned/
+layoutlmv3-smoke-test/
+

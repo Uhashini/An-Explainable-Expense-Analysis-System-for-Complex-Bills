@@ -5,5 +5,15 @@ from .input_classifier import InputClassifier
 from .ocr_engine import OCREngine
 from .trocr_fallback import TrOCRFallback
 from .voting_engine import VotingEngine
+from .layoutlm_service import LayoutLMService
 
-__all__ = ["PreprocessingService", "PerspectiveCorrector", "PDFProcessor", "InputClassifier", "OCREngine", "TrOCRFallback", "VotingEngine"]
+__all__ = [
+    "PreprocessingService", 
+    "PerspectiveCorrector", 
+    "PDFProcessor", 
+    "InputClassifier", 
+    "OCREngine", 
+    "TrOCRFallback", 
+    "VotingEngine", 
+    "LayoutLMService"
+]
