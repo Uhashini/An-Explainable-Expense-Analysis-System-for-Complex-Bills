@@ -1,0 +1,26 @@
+RECOGNITION EXPERIMENT RESULTS
+----------------------------------------
+Samples: 10
+
+production baseline
+  Normalized CER: 31.41%
+  Normalized WER: 49.00%
+  Normalized accuracy: 57.50%
+  CER change vs baseline: +0.00%
+  Detection @ IoU 0.5: precision=73.48%, recall=51.87%, F1=60.82%
+
+denoise + sharpen
+  Normalized CER: 9.51%
+  Normalized WER: 30.00%
+  Normalized accuracy: 72.00%
+  CER change vs baseline: -21.90%
+  Detection @ IoU 0.5: precision=77.34%, recall=52.94%, F1=62.86%
+
+denoise + sharpen + lexicon
+  Normalized CER: 9.51%
+  Normalized WER: 30.00%
+  Normalized accuracy: 72.00%
+  CER change vs baseline: -21.90%
+  Detection @ IoU 0.5: precision=77.34%, recall=52.94%, F1=62.86%
+
+Adopt a variant only if normalized CER improves consistently on a larger held-out set.

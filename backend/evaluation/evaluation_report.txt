@@ -1,0 +1,20 @@
+OCR EVALUATION RESULTS
+----------------------------------------
+Total Samples                 : 5
+Evaluation images             : E:\6th sem\final yr project\CORD\test\image
+Evaluation annotations        : E:\6th sem\final yr project\CORD\test\json
+Production pipeline evaluated : yes (CLAHE -> perspective correction -> PaddleOCR -> LayoutLMv3)
+Perspective correction applied: 0/5 images
+Strict Word Error Rate         : 38.24%
+Strict Character Error Rate    : 10.50%
+Normalized Word Error Rate     : 29.00%
+Normalized Character Error Rate: 8.82%
+OCR Accuracy (normalized)     : 74.00%
+Detection @ IoU 0.5           : precision=74.63%, recall=50.00%, F1=59.88%
+Detection @ IoU 0.4           : precision=86.57%, recall=58.00%, F1=69.46%
+Detection @ IoU 0.3           : precision=91.04%, recall=61.00%, F1=73.05%
+Coordinate-scaling comparison (@ IoU 0.5):
+  Before (simulated 2x-coordinate bug): precision=11.94%, recall=8.00%, F1=9.58%
+  After  (scaled back before normalization): precision=74.63%, recall=50.00%, F1=59.88%
+Average Confidence            : 0.911
+Debug overlays                : E:\6th sem\final yr project\receipt\backend\evaluation\debug

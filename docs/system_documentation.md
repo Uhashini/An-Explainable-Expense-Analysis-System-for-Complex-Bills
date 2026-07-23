@@ -3,6 +3,150 @@
 This document describes the structure and execution details of each phase in the receipt analysis pipeline.
 
 ---
+# System Documentation
+
+## Overview
+
+The Document Intelligence Pipeline is designed to extract structured information from grocery receipt images captured using mobile devices or scanners. The pipeline integrates traditional computer vision techniques with deep learning models to transform unstructured receipt images into structured data suitable for downstream analytics.
+
+The system follows a modular architecture where each processing stage is encapsulated within an independent service. This design improves maintainability, scalability, and allows individual modules to be upgraded without affecting the overall workflow.
+
+---
+
+## System Architecture
+
+```
+Receipt Image
+      │
+      ▼
+Image Loading
+      │
+      ▼
+Image Preprocessing
+      │
+      ▼
+Geometric Correction
+      │
+      ▼
+OCR Engine (PaddleOCR)
+      │
+      ▼
+Bounding Box Normalization
+      │
+      ▼
+LayoutLMv3
+      │
+      ▼
+Receipt Entity Parsing
+      │
+      ▼
+Structured JSON Output
+```
+
+---
+
+## Pipeline Components
+
+### 1. Image Loading
+
+The uploaded image is decoded into an OpenCV matrix for subsequent processing.
+
+**Input**
+- JPEG Image
+- PNG Image
+
+**Output**
+- OpenCV Image (NumPy Array)
+
+---
+
+### 2. Image Preprocessing
+
+Enhances receipt quality before OCR.
+
+Main objectives:
+
+- Improve contrast
+- Reduce illumination variation
+- Improve readability
+
+---
+
+### 3. Geometric Correction
+
+Detects receipt boundaries and removes perspective distortion.
+
+Main objectives:
+
+- Correct skew
+- Correct rotation
+- Produce top-down receipt image
+
+---
+
+### 4. OCR
+
+Extracts textual content and corresponding bounding boxes using PaddleOCR.
+
+Outputs:
+
+- Words
+- Confidence
+- Bounding Boxes
+
+---
+
+### 5. LayoutLMv3
+
+Uses both textual and spatial information to classify receipt entities.
+
+Example entities:
+
+- Store Name
+- Date
+- Total
+- Item Name
+- Price
+
+---
+
+### 6. Receipt Parsing
+
+Groups predicted entities into structured receipt information.
+
+Example:
+
+```json
+{
+  "store_name": "DMart",
+  "date": "12/06/2026",
+  "total": "₹452.50"
+}
+```
+
+---
+
+## Processing Sequence
+
+1. Upload receipt image.
+2. Decode image.
+3. Enhance image quality.
+4. Correct perspective distortion.
+5. Extract text using OCR.
+6. Normalize OCR bounding boxes.
+7. Perform semantic entity recognition.
+8. Parse receipt information.
+9. Return structured JSON.
+
+---
+
+## Advantages
+
+- Modular architecture
+- High OCR accuracy
+- Handles mobile-captured receipts
+- Robust against uneven lighting
+- Supports semantic understanding through LayoutLMv3
 
 ## 🖼️ 1. Image Preprocessing
 

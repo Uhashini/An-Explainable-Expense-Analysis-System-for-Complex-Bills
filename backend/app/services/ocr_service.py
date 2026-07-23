@@ -27,7 +27,7 @@ class OCRService:
         self.voting = VotingEngine()
         self.layoutlm = LayoutLMService()
 
-    def extract_structured_data(self, image_bytes: bytes) -> dict:
+    def extract_structured_data(self, image_bytes: bytes,preprocess=True) -> dict:
         """
         Full production-grade extraction flow:
         Classify -> Preprocess -> Correct -> OCR -> Vote -> Semantic Mapping (LayoutLM).
@@ -39,12 +39,16 @@ class OCRService:
             orig_h, orig_w = img.shape[:2]
 
             # 2. Preprocess & Correct Perspective
-            enhanced = self.preprocessor.apply_clahe(img)
-            corrected = self.corrector.detect_and_correct(enhanced)
+            if preprocess:
+                enhanced = self.preprocessor.apply_clahe(img)
+                corrected = self.corrector.detect_and_correct(enhanced)
+            else:
+                corrected = img
             new_h, new_w = corrected.shape[:2]
 
             # 3. OCR Extraction
-            raw_results = self.ocr.extract_text(corrected)
+            ocr_input = self.preprocessor.denoise_and_sharpen(corrected) if preprocess else corrected
+            raw_results = self.ocr.extract_text(ocr_input)
             
             words = []
             boxes = []
@@ -57,10 +61,14 @@ class OCRService:
                 tl = bbox[0]
                 br = bbox[2]
                 
-                x1 = int(1000 * (tl[0] / new_w))
-                y1 = int(1000 * (tl[1] / new_h))
-                x2 = int(1000 * (br[0] / new_w))
-                y2 = int(1000 * (br[1] / new_h))
+                def clip(v):
+                    return max(0, min(1000, int(v)))
+
+                x1 = clip(1000 * tl[0] / new_w)
+                y1 = clip(1000 * tl[1] / new_h)
+                x2 = clip(1000 * br[0] / new_w)
+                y2 = clip(1000 * br[1] / new_h)
+                
                 
                 words.append(text)
                 boxes.append([x1, y1, x2, y2])

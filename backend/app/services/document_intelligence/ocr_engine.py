@@ -8,6 +8,7 @@ import numpy as np
 import logging
 from typing import List, Dict, Any, Union
 import paddle
+import cv2
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +27,20 @@ class OCREngine:
         self.use_angle_cls = use_angle_cls
         try:
             # Note: The first time this runs, it will download the model weights (~100MB)
-            self.engine = PaddleOCR(use_angle_cls=use_angle_cls, lang=lang)
+            self.engine = PaddleOCR(
+                use_angle_cls=True,
+                lang="en",
+
+                det_limit_side_len=960,
+
+                det_db_thresh=0.3,
+                det_db_box_thresh=0.6,
+                det_db_unclip_ratio=1.5,
+
+                use_dilation=False,
+
+                drop_score=0.5
+            )
             logger.info(f"PaddleOCR initialized with language: {lang}")
         except Exception as e:
             logger.error(f"Failed to initialize PaddleOCR: {e}")
@@ -39,7 +53,20 @@ class OCREngine:
         """
         try:
             # Perform OCR inference
-            result = self.engine.ocr(image)
+            scale = 1.0
+            if isinstance(image, np.ndarray):
+                h, w = image.shape[:2]
+
+            if max(h, w) < 1500:
+                scale = 2.0
+                image = cv2.resize(
+                    image,
+                    None,
+                    fx=scale,
+                    fy=scale,
+                    interpolation=cv2.INTER_CUBIC
+                )
+            result = self.engine.ocr(image,cls=self.use_angle_cls)
             
             # PaddleOCR returns a list of pages, each page is a list of [bbox, (text, confidence)]
             if not result or result[0] is None:
@@ -47,7 +74,10 @@ class OCREngine:
 
             structured_results = []
             for line in result[0]:
-                bbox = line[0]
+                # PaddleOCR reports coordinates in the resized image. Convert
+                # them back to the caller's image coordinate system so the
+                # production service can normalize using its original size.
+                bbox = [[point[0] / scale, point[1] / scale] for point in line[0]]
                 text, confidence = line[1]
                 
                 structured_results.append({
@@ -57,7 +87,12 @@ class OCREngine:
                     "width": abs(bbox[1][0] - bbox[0][0]),
                     "height": abs(bbox[2][1] - bbox[0][1])
                 })
-            
+            structured_results.sort(
+                key=lambda x: (
+                    x["bbox"][0][1],   # y
+                    x["bbox"][0][0]    # x
+                )
+            )
             return structured_results
         except Exception as e:
             logger.error(f"OCR Inference error: {e}")
