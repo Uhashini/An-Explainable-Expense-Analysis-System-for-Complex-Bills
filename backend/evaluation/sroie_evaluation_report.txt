@@ -1,0 +1,23 @@
+SROIE 2019 (ENGLISH GROCERY & RETAIL) OCR EVALUATION
+=======================================================
+Total Samples Evaluated       : 10
+Image Source Folder           : E:\6th sem\final yr project\SROIE2019\test\img
+Box Annotation Folder         : E:\6th sem\final yr project\SROIE2019\test\box
+Total Execution Time          : 163.89 seconds
+Production OCR Pipeline       : Active (PaddleOCR -> TokenCleaner)
+Perspective Correction        : Bypassed (Digital flatbed scans)
+
+--- TASK 1 & 2: OCR TEXT RECOGNITION METRICS ---
+Strict Word Error Rate         : 69.70%
+Strict Character Error Rate    : 33.80%
+Normalized Word Error Rate     : 30.66%
+Normalized Character Error Rate: 6.91%
+OCR Word Accuracy (Normalized) : 72.67%
+OCR Character Accuracy (Norm)  : 93.09%
+
+--- TASK 1 & 2: BOUNDING BOX DETECTION METRICS ---
+Detection @ IoU 0.5           : precision=70.37%, recall=63.23%, F1=66.61%
+Detection @ IoU 0.4           : precision=81.04%, recall=72.81%, F1=76.70%
+Detection @ IoU 0.3           : precision=86.24%, recall=77.48%, F1=81.62%
+
+Debug Overlays Saved To        : E:\6th sem\final yr project\receipt\backend\evaluation\sroie_debug

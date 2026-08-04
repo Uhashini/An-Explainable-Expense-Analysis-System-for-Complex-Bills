@@ -9,7 +9,8 @@ from app.services.document_intelligence import (
     OCREngine,
     VotingEngine,
     InputClassifier,
-    LayoutLMService
+    LayoutLMService,
+    TokenCleaner
 )
 
 logger = logging.getLogger(__name__)
@@ -72,6 +73,9 @@ class OCRService:
                 
                 words.append(text)
                 boxes.append([x1, y1, x2, y2])
+            
+            # Apply LayoutLMv3 token alignment and domain OCR error recovery
+            words, boxes = TokenCleaner.split_and_clean_tokens(words, boxes)
             
             # 4. Semantic Entity Classification (Phase 3)
             entities = []

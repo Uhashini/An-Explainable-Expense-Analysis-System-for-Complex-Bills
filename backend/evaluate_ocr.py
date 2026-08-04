@@ -150,14 +150,20 @@ def metric_summary(tp, fp, fn):
     return precision, recall, 2 * precision * recall / (precision + recall) if precision + recall else 0.0
 
 
-def run_evaluation(sample_limit=None):
+def run_evaluation(sample_limit=None, source="cord"):
     """Evaluate local data through the exact production extract_structured_data call."""
     evaluation_dir = Path(__file__).resolve().parent / "evaluation"
     debug_dir = evaluation_dir / "debug"
     debug_dir.mkdir(parents=True, exist_ok=True)
-    samples = load_local_samples()
+    if source == "local":
+        images_dir = evaluation_dir / "images"
+        jsons_dir = evaluation_dir / "jsons"
+    else:
+        images_dir = CORD_IMAGES_DIR
+        jsons_dir = CORD_JSONS_DIR
+    samples = load_local_samples(images_dir=images_dir, jsons_dir=jsons_dir)
     if not samples:
-        raise FileNotFoundError(f"No matching image/JSON pairs were found in {CORD_IMAGES_DIR} and {CORD_JSONS_DIR}.")
+        raise FileNotFoundError(f"No matching image/JSON pairs were found in {images_dir} and {jsons_dir}.")
 
     if sample_limit is not None:
         samples = samples[:sample_limit]
@@ -238,9 +244,9 @@ def run_evaluation(sample_limit=None):
     report = [
         "OCR EVALUATION RESULTS", "-" * 40,
         f"Total Samples                 : {len(samples)}",
-        f"Evaluation images             : {CORD_IMAGES_DIR}",
-        f"Evaluation annotations        : {CORD_JSONS_DIR}",
-        "Production pipeline evaluated : yes (CLAHE -> perspective correction -> PaddleOCR -> LayoutLMv3)",
+        f"Evaluation images             : {images_dir}",
+        f"Evaluation annotations        : {jsons_dir}",
+        "Production pipeline evaluated : yes (CLAHE -> perspective correction -> PaddleOCR -> LayoutLMv3 -> TokenCleaner)",
         f"Perspective correction applied: {correction_count}/{len(samples)} images",
         f"Strict Word Error Rate         : {strict_wer:.2%}",
         f"Strict Character Error Rate    : {strict_cer:.2%}",
@@ -270,5 +276,6 @@ import argparse
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Evaluate exact production OCR path.")
     parser.add_argument("--limit", type=int, default=None, help="Evaluate only the first N matching receipt pairs.")
+    parser.add_argument("--source", type=str, choices=["cord", "local"], default="cord", help="Choose dataset source: 'cord' for external CORD dataset or 'local' for backend/evaluation folder.")
     arguments = parser.parse_args()
-    run_evaluation(sample_limit=arguments.limit)
+    run_evaluation(sample_limit=arguments.limit, source=arguments.source)

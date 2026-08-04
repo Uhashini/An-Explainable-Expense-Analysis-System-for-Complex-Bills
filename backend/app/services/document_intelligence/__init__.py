@@ -6,6 +6,7 @@ from .ocr_engine import OCREngine
 from .trocr_fallback import TrOCRFallback
 from .voting_engine import VotingEngine
 from .layoutlm_service import LayoutLMService
+from .token_cleaner import TokenCleaner
 
 __all__ = [
     "PreprocessingService", 
@@ -15,5 +16,6 @@ __all__ = [
     "OCREngine", 
     "TrOCRFallback", 
     "VotingEngine", 
-    "LayoutLMService"
+    "LayoutLMService",
+    "TokenCleaner"
 ]
