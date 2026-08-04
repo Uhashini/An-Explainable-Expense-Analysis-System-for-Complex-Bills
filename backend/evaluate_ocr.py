@@ -20,9 +20,10 @@ CORD_JSONS_DIR = Path(r"E:\6th sem\final yr project\CORD\test\json")
 
 def normalize_text(text):
     """Create the secondary, formatting-tolerant text representation."""
-    text = re.sub(r"(?<=\d)(?=[A-Za-z])|(?<=[A-Za-z])(?=\d)", " ", text)
-    text = text.translate(str.maketrans("", "", string.punctuation))
-    return " ".join(text.lower().split())
+    text = re.sub(r"(?<=\d)(?=[A-Za-z])|(?<=[A-Za-z])(?=\d)", " ", text.lower())
+    text = re.sub(r"\b(rp|rm|usd|eur|gbp)\b", " ", text, flags=re.IGNORECASE)
+    text = re.sub(r"[^a-z0-9\s]", " ", text)
+    return " ".join(text.split())
 
 
 def box_iou(box_a, box_b):

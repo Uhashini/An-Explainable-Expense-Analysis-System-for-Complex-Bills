@@ -3,21 +3,21 @@ SROIE 2019 (ENGLISH GROCERY & RETAIL) OCR EVALUATION
 Total Samples Evaluated       : 10
 Image Source Folder           : E:\6th sem\final yr project\SROIE2019\test\img
 Box Annotation Folder         : E:\6th sem\final yr project\SROIE2019\test\box
-Total Execution Time          : 163.89 seconds
+Total Execution Time          : 96.00 seconds
 Production OCR Pipeline       : Active (PaddleOCR -> TokenCleaner)
 Perspective Correction        : Bypassed (Digital flatbed scans)
 
 --- TASK 1 & 2: OCR TEXT RECOGNITION METRICS ---
-Strict Word Error Rate         : 69.70%
-Strict Character Error Rate    : 33.80%
-Normalized Word Error Rate     : 30.66%
-Normalized Character Error Rate: 6.91%
-OCR Word Accuracy (Normalized) : 72.67%
-OCR Character Accuracy (Norm)  : 93.09%
+Strict Word Error Rate         : 69.94%
+Strict Character Error Rate    : 33.88%
+Normalized Word Error Rate     : 20.87%
+Normalized Character Error Rate: 6.01%
+OCR Word Accuracy (Normalized) : 81.05%
+OCR Character Accuracy (Norm)  : 93.99%
 
 --- TASK 1 & 2: BOUNDING BOX DETECTION METRICS ---
-Detection @ IoU 0.5           : precision=70.37%, recall=63.23%, F1=66.61%
-Detection @ IoU 0.4           : precision=81.04%, recall=72.81%, F1=76.70%
-Detection @ IoU 0.3           : precision=86.24%, recall=77.48%, F1=81.62%
+Detection @ IoU 0.5           : precision=69.29%, recall=60.61%, F1=64.66%
+Detection @ IoU 0.4           : precision=79.12%, recall=69.21%, F1=73.83%
+Detection @ IoU 0.3           : precision=86.42%, recall=75.59%, F1=80.65%
 
 Debug Overlays Saved To        : E:\6th sem\final yr project\receipt\backend\evaluation\sroie_debug

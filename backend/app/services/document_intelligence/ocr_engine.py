@@ -30,15 +30,11 @@ class OCREngine:
             self.engine = PaddleOCR(
                 use_angle_cls=True,
                 lang="en",
-
                 det_limit_side_len=960,
-
                 det_db_thresh=0.3,
                 det_db_box_thresh=0.6,
-                det_db_unclip_ratio=1.5,
-
+                det_db_unclip_ratio=1.3,
                 use_dilation=False,
-
                 drop_score=0.5
             )
             logger.info(f"PaddleOCR initialized with language: {lang}")
