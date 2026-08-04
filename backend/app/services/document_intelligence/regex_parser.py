@@ -39,18 +39,43 @@ class RegexParser:
 
     def _extract_merchant(self, words: List[str], boxes: List[List[int]]) -> str:
         """
-        Heuristic: Merchant name is usually in the top 15% of the receipt and has larger font.
+        Heuristic: Merchant name is in the top header area and consists of valid alphabetic text.
+        Filters out timestamps, prices, dates, decorative characters, and receipt keywords.
         """
         if not words: return ""
         
-        # Look at the first 5-10 words that are in the upper section (y < 250 in 0-1000 scale)
+        ignore_keywords = {"date", "time", "wed", "thu", "fri", "sat", "sun", "mon", "tue",
+                           "jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec",
+                           "receipt", "tax", "invoice", "cashier", "chk", "tbl", "guest", "tel", "phone", "gst", "reg"}
+        
         top_candidates = []
-        for i, box in enumerate(boxes):
-            if box[1] < 150: # Top 15%
-                top_candidates.append(words[i])
-            if len(top_candidates) > 5: break
-            
-        return " ".join(top_candidates).strip()
+        for i, (word, box) in enumerate(zip(words, boxes)):
+            if box[1] > 180: # Beyond top 18%
+                continue
+                
+            clean_word = word.strip()
+            # Skip decorative lines or purely non-alphanumeric noise (e.g. ***************)
+            if not re.search(r'[a-zA-Z]', clean_word) or set(clean_word).issubset(set("-*=_.,/#:$@!")):
+                continue
+                
+            # Skip currency symbols or price amounts ($4.66, 12.00)
+            if self.currency_pattern.search(clean_word) or any(char in clean_word for char in "$£€RpRM"):
+                continue
+                
+            # Skip dates or timestamps (06/01/2016)
+            if any(p.search(clean_word) for p in self.date_patterns) or re.search(r'\d{1,2}:\d{2}', clean_word):
+                continue
+                
+            # Skip common receipt metadata keywords or weight descriptors (0.778kg)
+            if clean_word.lower() in ignore_keywords or re.search(r'\d+kg|\d+g|\d+ml|\d+l|net', clean_word.lower()):
+                continue
+                
+            top_candidates.append(clean_word)
+            if len(top_candidates) >= 4:
+                break
+                
+        merchant_str = " ".join(top_candidates).strip()
+        return merchant_str if len(merchant_str) >= 2 else ""
 
     def _extract_date(self, words: List[str]) -> str:
         """

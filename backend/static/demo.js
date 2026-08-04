@@ -79,7 +79,6 @@ document.addEventListener('DOMContentLoaded', () => {
         formData.append('file', selectedFile);
 
         try {
-            // Fake animation progression while waiting for real response
             startFakeProgress();
             
             const response = await fetch('/api/v1/demo/process-receipt', {
@@ -91,7 +90,6 @@ document.addEventListener('DOMContentLoaded', () => {
             
             const data = await response.json();
             
-            // Show real results
             displayResults(data);
             
         } catch (error) {
@@ -112,7 +110,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function startFakeProgress() {
-        // Step 1 active
         const step1 = document.getElementById('step-classification');
         step1.classList.add('active');
     }
@@ -136,7 +133,7 @@ document.addEventListener('DOMContentLoaded', () => {
         step2.querySelector('.step-time').textContent = `${data.timings.ocr} s`;
         step2.querySelector('.step-details').classList.remove('hidden');
         document.getElementById('val-ocr-count').textContent = data.ocr.words_count;
-        document.getElementById('val-ocr-text').textContent = data.ocr.text || data.ocr.words_sample.join(' ');
+        document.getElementById('val-ocr-text').textContent = data.ocr.text || (data.ocr.words_sample ? data.ocr.words_sample.join(' ') : '');
 
         // Step 3: LayoutLM
         const step3 = document.getElementById('step-layoutlm');
@@ -148,7 +145,7 @@ document.addEventListener('DOMContentLoaded', () => {
         entitiesContainer.innerHTML = '';
         if (data.entities && data.entities.length > 0) {
             data.entities.forEach(ent => {
-                const type = ent.entity_type.replace('B-', '').replace('I-', '');
+                const type = (ent.entity_type || ent.entity || 'O').replace('B-', '').replace('I-', '');
                 const span = document.createElement('span');
                 span.className = `entity-tag tag-${type}`;
                 span.textContent = `${ent.text} [${type}]`;
@@ -158,11 +155,47 @@ document.addEventListener('DOMContentLoaded', () => {
             entitiesContainer.textContent = 'No entities extracted.';
         }
 
-        // Show Final Results
+        // Show Final Results & Summary Cards
         resultsSection.classList.remove('hidden');
-        document.getElementById('res-vendor').textContent = data.summary.vendor;
+        const vendorName = (data.summary.vendor !== "Unknown" && data.summary.vendor !== "") ? data.summary.vendor : "RECEIPT VENDOR";
+        document.getElementById('res-vendor').textContent = vendorName;
         document.getElementById('res-total').textContent = data.summary.total;
         document.getElementById('res-date').textContent = data.summary.date;
+
+        // Render Digital Receipt Reconstruction Table
+        document.getElementById('rec-vendor').textContent = vendorName;
+        document.getElementById('rec-date').textContent = data.summary.date;
+        document.getElementById('rec-total').textContent = data.summary.total;
+        
+        const tbody = document.getElementById('rec-items-body');
+        tbody.innerHTML = '';
+        if (data.summary.items && data.summary.items.length > 0) {
+            data.summary.items.forEach(item => {
+                const tr = document.createElement('tr');
+                const rateText = item.unit_price > 0 ? `$${Number(item.unit_price).toFixed(2)}` : '--';
+                tr.innerHTML = `
+                    <td>${item.quantity || 1}</td>
+                    <td class="item-name-col">${item.name || 'Item'} <span class="item-badge">menu.nm</span></td>
+                    <td>${rateText}</td>
+                    <td class="text-right font-bold">$${Number(item.total_price || 0).toFixed(2)}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        } else {
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 1.5rem; color: #6b7280;">No line items detected on this receipt</td></tr>';
+        }
+
+        // Render Discounts if any
+        const discArea = document.getElementById('rec-discounts-area');
+        if (data.summary.discounts && data.summary.discounts.length > 0) {
+            discArea.classList.remove('hidden');
+            discArea.innerHTML = '';
+            data.summary.discounts.forEach(d => {
+                discArea.innerHTML += `<span>🎁 ${d.name || 'Loyalty / Discount'}</span> <span>-$${Math.abs(d.amount).toFixed(2)}</span>`;
+            });
+        } else {
+            discArea.classList.add('hidden');
+        }
 
         document.getElementById('rawJsonOutput').textContent = JSON.stringify(data, null, 2);
     }

@@ -1,0 +1,94 @@
+================================================================================
+           LAYOUTLMV3 COMPREHENSIVE SPLITS EVALUATION REPORT
+================================================================================
+
+--------------------------------------------------------------------------------
+                  SPLIT EVALUATION: TRAIN (TRAINING SET) (Samples: 10)
+--------------------------------------------------------------------------------
+Overall Sequence Accuracy : 98.70%
+
+Classification Report by Category:
+                          precision    recall  f1-score   support
+
+                menu.cnt       1.00      1.00      1.00        26
+                 menu.nm       1.00      1.00      1.00        62
+              menu.price       1.00      1.00      1.00        27
+             menu.sub_nm       1.00      1.00      1.00         6
+          menu.unitprice       1.00      1.00      1.00         6
+sub_total.discount_price       1.00      1.00      1.00         2
+ sub_total.service_price       1.00      1.00      1.00         7
+sub_total.subtotal_price       1.00      1.00      1.00        19
+     sub_total.tax_price       1.00      1.00      1.00        18
+         total.cashprice       1.00      1.00      1.00        14
+       total.changeprice       1.00      1.00      1.00        15
+       total.menuqty_cnt       0.57      1.00      0.73         4
+      total.menutype_cnt       0.00      0.00      0.00         3
+       total.total_price       1.00      1.00      1.00        22
+
+               micro avg       0.99      0.99      0.99       231
+               macro avg       0.90      0.93      0.91       231
+            weighted avg       0.98      0.99      0.98       231
+
+
+--------------------------------------------------------------------------------
+                  SPLIT EVALUATION: VALIDATION (DEV SET) (Samples: 10)
+--------------------------------------------------------------------------------
+Overall Sequence Accuracy : 93.10%
+
+Classification Report by Category:
+                          precision    recall  f1-score   support
+
+                menu.cnt       1.00      0.93      0.97        15
+      menu.discountprice       1.00      0.60      0.75        10
+                 menu.nm       0.90      0.97      0.94        39
+              menu.price       1.00      1.00      1.00        15
+            menu.sub_cnt       1.00      1.00      1.00         1
+             menu.sub_nm       0.80      1.00      0.89         4
+          menu.sub_price       1.00      1.00      1.00         1
+          menu.unitprice       1.00      1.00      1.00         4
+              menu.vatyn       0.00      0.00      0.00         3
+sub_total.discount_price       1.00      1.00      1.00         2
+sub_total.subtotal_price       1.00      0.75      0.86        12
+     sub_total.tax_price       0.69      1.00      0.82         9
+         total.cashprice       1.00      1.00      1.00        18
+       total.changeprice       1.00      1.00      1.00        16
+   total.creditcardprice       1.00      1.00      1.00         2
+       total.menuqty_cnt       1.00      1.00      1.00         3
+       total.total_price       0.87      1.00      0.93        20
+
+               micro avg       0.93      0.93      0.93       174
+               macro avg       0.90      0.90      0.89       174
+            weighted avg       0.93      0.93      0.92       174
+
+
+--------------------------------------------------------------------------------
+                  SPLIT EVALUATION: TEST (TESTING SET) (Samples: 10)
+--------------------------------------------------------------------------------
+Overall Sequence Accuracy : 88.24%
+
+Classification Report by Category:
+                          precision    recall  f1-score   support
+
+                menu.cnt       1.00      1.00      1.00        12
+                 menu.nm       0.82      1.00      0.90        33
+                menu.num       0.50      1.00      0.67         1
+              menu.price       0.76      0.93      0.84        14
+            menu.sub_cnt       1.00      1.00      1.00         2
+             menu.sub_nm       1.00      0.77      0.87        13
+          menu.sub_price       1.00      0.50      0.67         4
+          menu.unitprice       0.75      1.00      0.86         3
+sub_total.discount_price       1.00      0.43      0.60         7
+sub_total.subtotal_price       0.95      0.95      0.95        21
+     sub_total.tax_price       1.00      1.00      1.00        11
+         total.cashprice       1.00      1.00      1.00        16
+       total.changeprice       1.00      1.00      1.00        10
+   total.creditcardprice       0.30      0.33      0.32         9
+       total.menuqty_cnt       1.00      1.00      1.00         8
+       total.total_price       0.94      0.80      0.86        20
+
+               micro avg       0.88      0.89      0.88       184
+               macro avg       0.88      0.86      0.85       184
+            weighted avg       0.90      0.89      0.88       184
+
+
+================================================================================

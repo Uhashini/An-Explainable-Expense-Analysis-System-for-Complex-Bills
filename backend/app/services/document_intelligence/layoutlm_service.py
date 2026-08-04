@@ -107,10 +107,18 @@ class LayoutLMService:
                 label = word_predictions[i]
                 
                 # Heuristic overrides for rare/confused categories
-                word_upper = word.upper()
+                word_upper = word.upper().strip()
                 
-                # Override to discount if the text contains discount keywords
-                if label in ["sub_total.subtotal_price", "O"] and any(kw in word_upper for kw in ["DISC", "DISCOUNT", "PROMO", "POTONGAN"]):
+                # 1. Override date tokens to 'receipt.date'
+                if re.match(r'^\d{2}[/-]\d{2}[/-]\d{2,4}$', word_upper) or re.match(r'^\d{4}[/-]\d{2}[/-]\d{2}$', word_upper):
+                    label = "receipt.date"
+                # 2. Override unit price expressions to 'menu.unitprice'
+                elif word_upper in ("NET", "@", "NET@") or any(u in word_upper for u in ["/KG", "/LB", "/G", "/EA", "/OZ"]) or word_upper.startswith("NET@"):
+                    label = "menu.unitprice"
+                # 3. Override loyalty and discount expressions
+                elif "LOYALTY" in word_upper:
+                    label = "loyalty_discount"
+                elif any(kw in word_upper for kw in ["DISC", "DISCOUNT", "PROMO", "POTONGAN", "SAVINGS"]):
                     label = "sub_total.discount_price"
                 # Override to discount if it's a negative amount starts with - or within ( )
                 elif label == "O" and (word.startswith("-") or (word.startswith("(") and word.endswith(")"))):
@@ -142,61 +150,93 @@ class LayoutLMService:
             "merchant_name": "",
             "date": "",
             "total_amount": 0.0,
-            "items": []
+            "items": [],
+            "discounts": []
         }
 
-        # CORD entity parsing logic
-        current_item = None
-        
-        for ent in entities:
-            label = ent.get("entity", "O")
-            text = ent.get("text", "")
+        # Y-axis spatial row clustering for line items
+        menu_tokens = [ent for ent in entities if ent.get("entity", "").startswith("menu.")]
+        if menu_tokens:
+            menu_tokens.sort(key=lambda e: ((e["bbox"][1] + e["bbox"][3]) / 2, e["bbox"][0]))
+            rows = []
+            for token in menu_tokens:
+                y_center = (token["bbox"][1] + token["bbox"][3]) / 2
+                matched = False
+                for row in rows:
+                    if abs(y_center - row["avg_y"]) < 28: # Within same horizontal text line
+                        row["tokens"].append(token)
+                        row["avg_y"] = sum((t["bbox"][1] + t["bbox"][3]) / 2 for t in row["tokens"]) / len(row["tokens"])
+                        matched = True
+                        break
+                if not matched:
+                    rows.append({"avg_y": y_center, "tokens": [token]})
             
-            # menu.nm = Item name, menu.cnt = Quantity, menu.price = Price
-            if label == "menu.nm":
-                if current_item is None:
-                    current_item = {"name": text, "quantity": 1, "unit_price": 0.0, "total_price": 0.0}
-                else:
-                    current_item["name"] += f" {text}"
-            elif label == "menu.cnt":
-                if current_item is not None:
-                    try:
-                        current_item["quantity"] = int(text)
-                    except ValueError:
-                        pass
-            elif label == "menu.price":
-                if current_item is not None:
-                    try:
-                        val = "".join(filter(lambda x: x.isdigit() or x in ".,", text))
-                        if val:
-                            current_item["total_price"] = float(val.replace(",", "."))
-                            # Set unit price as total_price / quantity if possible
-                            current_item["unit_price"] = current_item["total_price"] / max(1, current_item["quantity"])
-                            parsed["items"].append(current_item)
-                            current_item = None
-                    except:
-                        pass
-            elif label == "total.total_price":
-                try:
-                    val = "".join(filter(lambda x: x.isdigit() or x in ".,", text))
-                    if val:
-                        parsed["total_amount"] = float(val.replace(",", "."))
-                except:
-                    pass
-                    
-        # Append remaining item if any
-        if current_item is not None and current_item.get("name"):
-            parsed["items"].append(current_item)
+            for row in rows:
+                row_tokens = sorted(row["tokens"], key=lambda t: t["bbox"][0])
+                names, price_val, unit_price, qty = [], 0.0, 0.0, 1
+                for t in row_tokens:
+                    lbl, txt = t.get("entity"), t.get("text", "").strip()
+                    if lbl in ("menu.nm", "menu.sub_nm"):
+                        if txt not in ("$", "-", "@"): names.append(txt)
+                    elif lbl in ("menu.price", "menu.discountprice"):
+                        try:
+                            val_str = "".join(filter(lambda x: x.isdigit() or x in ".,", txt))
+                            if val_str: price_val = float(val_str.replace(",", "."))
+                        except ValueError: pass
+                    elif lbl == "menu.cnt":
+                        try: qty = int(re.sub(r'[^\d]', '', txt) or 1)
+                        except ValueError: pass
+                if names or price_val > 0:
+                    item_name = " ".join(names).strip() or "Item"
+                    if not any(char.isalpha() for char in item_name) and price_val == 0.0:
+                        continue
+                    if price_val > 0: unit_price = price_val / max(1, qty)
+                    parsed["items"].append({"name": item_name, "quantity": qty, "unit_price": unit_price, "total_price": price_val})
 
-        # CORD dataset does not label merchant name and date.
-        # We always run RegexParser to extract them from raw OCR tokens.
-        regex_results = self.regex_fallback.parse(words, boxes)
+        # Extract discounts and loyalty programs
+        disc_tokens = [ent for ent in entities if ent.get("entity", "") in ("loyalty_discount", "sub_total.discount_price", "discount")]
+        if disc_tokens:
+            disc_name = " ".join(t["text"] for t in disc_tokens if not t["text"].startswith("-") and not any(c.isdigit() for c in t["text"])).strip() or "Loyalty / Discount"
+            disc_val = 0.0
+            for t in disc_tokens:
+                if t["text"].startswith("-") or any(c.isdigit() for c in t["text"]):
+                    try:
+                        val_str = "".join(filter(lambda x: x.isdigit() or x in ".,", t["text"]))
+                        if val_str: disc_val = float(val_str.replace(",", "."))
+                    except ValueError: pass
+            if disc_val > 0 or disc_name:
+                parsed["discounts"].append({"name": disc_name, "amount": -abs(disc_val) if disc_val > 0 else 0.0})
+
+        # Extract total amount from total.total_price entities (excluding dates with slashes)
+        total_candidates = []
+        for ent in entities:
+            if ent.get("entity") == "total.total_price":
+                try:
+                    txt = ent.get("text", "")
+                    if "/" not in txt and "-" not in txt:
+                        val_str = "".join(filter(lambda x: x.isdigit() or x in ".,", txt))
+                        if val_str: total_candidates.append(float(val_str.replace(",", ".")))
+                except ValueError: pass
+        if total_candidates:
+            parsed["total_amount"] = max(total_candidates)
+
+        # Filter out line items before passing tokens to RegexParser for merchant name fallback
+        non_item_words, non_item_boxes = [], []
+        if len(entities) == len(words) == len(boxes):
+            for ent, w, b in zip(entities, words, boxes):
+                lbl = ent.get("entity", "O")
+                if not (lbl.startswith("menu.") or lbl.startswith("sub_total.") or lbl == "total.total_price"):
+                    non_item_words.append(w); non_item_boxes.append(b)
+        else:
+            non_item_words, non_item_boxes = words, boxes
+
+        regex_results = self.regex_fallback.parse(non_item_words if non_item_words else words, non_item_boxes if non_item_boxes else boxes)
         parsed["merchant_name"] = regex_results.get("merchant_name", "")
-        parsed["date"] = regex_results.get("date", "")
-        
-        # If AI didn't catch total_amount, use Regex parser fallback
+
+        full_regex = self.regex_fallback.parse(words, boxes)
+        parsed["date"] = full_regex.get("date", "")
         if parsed["total_amount"] == 0.0:
-            parsed["total_amount"] = regex_results.get("total_amount", 0.0)
+            parsed["total_amount"] = full_regex.get("total_amount", 0.0)
 
         return parsed
 

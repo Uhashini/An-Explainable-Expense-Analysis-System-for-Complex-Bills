@@ -80,8 +80,44 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             const result = await response.json();
+            const info = result.data.receipt_info || {};
 
-            // Format JSON with syntax highlighting logic (simple version)
+            // Populate Digital Receipt Table
+            const vendorName = (info.merchant_name && info.merchant_name !== "Unknown") ? info.merchant_name : "RECEIPT VENDOR";
+            document.getElementById('rec-vendor').textContent = vendorName;
+            document.getElementById('rec-date').textContent = info.date || '--';
+            document.getElementById('rec-total').textContent = Number(info.total_amount || 0).toFixed(2);
+            
+            const tbody = document.getElementById('rec-items-body');
+            tbody.innerHTML = '';
+            if (info.items && info.items.length > 0) {
+                info.items.forEach(item => {
+                    const tr = document.createElement('tr');
+                    const rateText = item.unit_price > 0 ? `$${Number(item.unit_price).toFixed(2)}` : '--';
+                    tr.innerHTML = `
+                        <td>${item.quantity || 1}</td>
+                        <td class="item-name-col">${item.name || 'Item'} <span class="item-badge">menu.nm</span></td>
+                        <td>${rateText}</td>
+                        <td class="text-right font-bold">$${Number(item.total_price || 0).toFixed(2)}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } else {
+                tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 1.5rem; color: #6b7280;">No line items detected on this receipt</td></tr>';
+            }
+
+            const discArea = document.getElementById('rec-discounts-area');
+            if (info.discounts && info.discounts.length > 0) {
+                discArea.classList.remove('hidden');
+                discArea.innerHTML = '';
+                info.discounts.forEach(d => {
+                    discArea.innerHTML += `<span>🎁 ${d.name || 'Loyalty / Discount'}</span> <span>-$${Math.abs(d.amount).toFixed(2)}</span>`;
+                });
+            } else {
+                discArea.classList.add('hidden');
+            }
+
+            // Format JSON with syntax highlighting logic
             jsonOutput.innerHTML = syntaxHighlight(result.data);
 
             // Scroll to results

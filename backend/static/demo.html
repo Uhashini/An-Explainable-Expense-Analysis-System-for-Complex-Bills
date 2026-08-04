@@ -117,6 +117,40 @@
                     </div>
                 </div>
                 
+                <div class="digital-receipt-card" id="digitalReceiptCard">
+                    <div class="receipt-header">
+                        <div class="receipt-icon">🧾</div>
+                        <h3 class="receipt-vendor" id="rec-vendor">MERCHANT NAME</h3>
+                        <div class="receipt-meta">
+                            <span class="meta-item">📅 <span id="rec-date">--</span></span>
+                        </div>
+                    </div>
+                    <div class="receipt-divider"></div>
+                    <div class="table-responsive">
+                        <table class="receipt-table">
+                            <thead>
+                                <tr>
+                                    <th>QTY</th>
+                                    <th>ITEM DESCRIPTION</th>
+                                    <th>RATE / UNIT PRICE</th>
+                                    <th class="text-right">AMOUNT ($)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="rec-items-body">
+                                <tr><td colspan="4" style="text-align: center; color: #6b7280;">No line items extracted</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div id="rec-discounts-area" class="receipt-discounts hidden">
+                    </div>
+                    <div class="receipt-divider"></div>
+                    <div class="receipt-footer">
+                        <span class="total-label">TOTAL AMOUNT DUE</span>
+                        <span class="total-value">$<span id="rec-total">0.00</span></span>
+                    </div>
+                    <div class="receipt-jagged-border"></div>
+                </div>
+
                 <div class="raw-json-container">
                     <h3>Raw JSON Output</h3>
                     <pre><code id="rawJsonOutput">{}</code></pre>

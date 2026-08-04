@@ -93,7 +93,9 @@ async def process_receipt_demo(file: UploadFile = File(...)):
         results["summary"] = {
             "vendor": receipt_info.get("merchant_name", "Unknown") or "Unknown",
             "total": f"{receipt_info.get('total_amount', 0.0):.2f}",
-            "date": receipt_info.get("date", "Unknown") or "Unknown"
+            "date": receipt_info.get("date", "Unknown") or "Unknown",
+            "items": receipt_info.get("items", []),
+            "discounts": receipt_info.get("discounts", [])
         }
         
         results["timings"]["total"] = round(
