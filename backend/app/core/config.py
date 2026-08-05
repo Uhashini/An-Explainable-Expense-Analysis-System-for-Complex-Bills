@@ -1,8 +1,8 @@
 """Configuration settings for the Smart Receipt Analysis system."""
 
+# pyrefly: ignore [missing-import]
 from pydantic_settings import BaseSettings
 from typing import Optional
-import os
 
 
 class Settings(BaseSettings):
@@ -11,28 +11,22 @@ class Settings(BaseSettings):
     # App Info
     APP_NAME: str = "Smart Receipt Analysis & Anomaly Detection"
     APP_VERSION: str = "0.1.0"
-    DEBUG: bool = os.getenv("DEBUG", "False").lower() == "true"
+    DEBUG: bool = False
 
     # Database Configuration
-    MONGO_URL: str = os.getenv("MONGO_URL", "mongodb://localhost:27017")
-    MONGO_DB: str = os.getenv("MONGO_DB", "receipt_db")
-    
-    NEO4J_URI: str = os.getenv("NEO4J_URI", "bolt://localhost:7687")
-    NEO4J_USER: str = os.getenv("NEO4J_USER", "neo4j")
-    NEO4J_PASSWORD: str = os.getenv("NEO4J_PASSWORD", "password")
-    
-    POSTGRES_URL: str = os.getenv(
-        "POSTGRES_URL", 
-        "postgresql://user:password@localhost:5432/receipt_db"
-    )
+    MONGO_URL: str = "mongodb://localhost:27017"
+    MONGO_DB: str = "receipt_db"
+
+    NEO4J_URI: str = "bolt://localhost:7687"
+    NEO4J_USER: str = "neo4j"
+    NEO4J_PASSWORD: str = "password"
+
+    POSTGRES_URL: str = "postgresql://user:password@localhost:5432/receipt_db"
 
     # Model Paths
-    TESSERACT_PATH: Optional[str] = os.getenv("TESSERACT_PATH")
-    LAYOUTLMV3_MODEL_PATH: str = os.getenv(
-        "LAYOUTLMV3_MODEL_PATH", 
-        "microsoft/layoutlmv3-base"
-    )
-    LAYOUTLMV3_CHECKPOINT: Optional[str] = os.getenv("LAYOUTLMV3_CHECKPOINT")
+    TESSERACT_PATH: Optional[str] = None
+    LAYOUTLMV3_MODEL_PATH: str = "microsoft/layoutlmv3-base"
+    LAYOUTLMV3_CHECKPOINT: Optional[str] = None
 
     # API Configuration
     API_V1_STR: str = "/api/v1"
@@ -54,6 +48,7 @@ class Settings(BaseSettings):
 
     class Config:
         env_file = ".env"
+        env_file_encoding = "utf-8"
         case_sensitive = True
 
 
