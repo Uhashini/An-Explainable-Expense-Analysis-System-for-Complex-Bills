@@ -35,8 +35,15 @@ class OCRService:
         """
         try:
             # 1. Convert bytes to OpenCV format
+            if not image_bytes or len(image_bytes) == 0:
+                raise ValueError("Received empty image bytes (length 0).")
+                
             nparr = np.frombuffer(image_bytes, np.uint8)
             img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+            
+            if img is None:
+                raise ValueError(f"OpenCV failed to decode the image. Received {len(image_bytes)} bytes. It might be corrupted or sent in an incorrect format.")
+                
             orig_h, orig_w = img.shape[:2]
 
             # 2. Preprocess & Correct Perspective
