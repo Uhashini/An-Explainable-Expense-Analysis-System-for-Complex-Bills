@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import {
   View, Text, TextInput, StyleSheet, TouchableOpacity,
   KeyboardAvoidingView, Platform, Alert,
@@ -70,7 +70,7 @@ export default function SignUpScreen({ navigation }) {
       return;
     }
 
-    navigation.replace('Main');
+    navigation.replace('PersonalInfo');
   };
 
   return (

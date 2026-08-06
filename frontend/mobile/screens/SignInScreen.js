@@ -31,7 +31,7 @@ export default function SignInScreen({ navigation }) {
       return;
     }
 
-    navigation.replace('Main');
+    navigation.replace('PersonalInfo');
   };
 
   return (

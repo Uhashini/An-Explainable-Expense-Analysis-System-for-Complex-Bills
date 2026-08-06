@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, Image, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import BackgroundLayout from '../components/BackgroundLayout';
 
 export default function LandingScreen({ navigation }) {
@@ -10,11 +11,9 @@ export default function LandingScreen({ navigation }) {
 
       {/* Cart Illustration */}
       <View style={styles.imageContainer}>
-        <Image
-          source={require('../assets/cart.png')}
-          style={styles.image}
-          resizeMode="contain"
-        />
+        <View style={styles.iconCircle}>
+          <Ionicons name="cart-outline" size={130} color="#8B1A1A" />
+        </View>
       </View>
 
       {/* Action Buttons */}
@@ -58,9 +57,13 @@ const styles = StyleSheet.create({
     width: '100%',
     paddingVertical: 8,
   },
-  image: {
-    width: 250,
-    height: 250,
+  iconCircle: {
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    backgroundColor: 'rgba(139, 26, 26, 0.08)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   buttonContainer: {
     width: '100%',

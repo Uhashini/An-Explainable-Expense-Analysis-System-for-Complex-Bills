@@ -1,26 +1,46 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { COLORS, FONTS } from '../theme';
 
-/**
- * @param {number} step  - current step (1-based)
- * @param {number} total - total number of steps
- */
-export default function ProgressBar({ step, total }) {
+export default function ProgressBar({ step, total = 5 }) {
   return (
     <View style={styles.container}>
-      <Text style={styles.label}>Step {step} of {total}</Text>
-      <View style={styles.track}>
-        {Array.from({ length: total }).map((_, i) => (
-          <View
-            key={i}
-            style={[
-              styles.segment,
-              i < step ? styles.filled : styles.empty,
-              i < total - 1 && { marginRight: 5 },
-            ]}
-          />
-        ))}
+      <View style={styles.stepperRow}>
+        {Array.from({ length: total }).map((_, index) => {
+          const stepNum = index + 1;
+          const isActive = stepNum === step;
+          const isCompleted = stepNum < step;
+
+          return (
+            <React.Fragment key={stepNum}>
+              {/* Step Circle */}
+              <View
+                style={[
+                  styles.circle,
+                  (isActive || isCompleted) ? styles.circleActive : styles.circleInactive,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.circleText,
+                    (isActive || isCompleted) ? styles.circleTextActive : styles.circleTextInactive,
+                  ]}
+                >
+                  {stepNum}
+                </Text>
+              </View>
+
+              {/* Connecting Line */}
+              {index < total - 1 && (
+                <View
+                  style={[
+                    styles.line,
+                    stepNum < step ? styles.lineActive : styles.lineInactive,
+                  ]}
+                />
+              )}
+            </React.Fragment>
+          );
+        })}
       </View>
     </View>
   );
@@ -29,29 +49,50 @@ export default function ProgressBar({ step, total }) {
 const styles = StyleSheet.create({
   container: {
     width: '100%',
-    marginBottom: 20,
+    paddingVertical: 12,
+    alignItems: 'center',
+    marginBottom: 16,
   },
-  label: {
-    fontFamily: FONTS.regular,
-    fontSize: 11,
-    color: COLORS.mutedText,
-    letterSpacing: 1,
-    marginBottom: 8,
-    textAlign: 'right',
-  },
-  track: {
+  stepperRow: {
     flexDirection: 'row',
-    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '85%',
   },
-  segment: {
+  circle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  circleActive: {
+    backgroundColor: '#7A3525',
+  },
+  circleInactive: {
+    backgroundColor: '#EFEAE2',
+    borderWidth: 1,
+    borderColor: '#E2DAD0',
+  },
+  circleText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  circleTextActive: {
+    color: '#FFFFFF',
+  },
+  circleTextInactive: {
+    color: '#7A3525',
+  },
+  line: {
     flex: 1,
-    height: 4,
-    borderRadius: 2,
+    height: 2,
+    marginHorizontal: 4,
   },
-  filled: {
-    backgroundColor: COLORS.primary,
+  lineActive: {
+    backgroundColor: '#7A3525',
   },
-  empty: {
-    backgroundColor: COLORS.divider,
+  lineInactive: {
+    backgroundColor: '#E2DAD0',
   },
 });
