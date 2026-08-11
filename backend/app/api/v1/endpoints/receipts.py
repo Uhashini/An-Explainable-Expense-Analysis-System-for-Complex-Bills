@@ -34,10 +34,12 @@ async def upload_receipt(file: UploadFile = File(...)):
         )
 
     try:
+        from fastapi.concurrency import run_in_threadpool
+        
         contents = await file.read()
 
-        # Full OCR + LayoutLM pipeline
-        result = ocr_service.extract_structured_data(contents)
+        # Full OCR + LayoutLM pipeline (run in threadpool to prevent blocking the async event loop)
+        result = await run_in_threadpool(ocr_service.extract_structured_data, contents)
 
         # Stamp the original filename
         result["filename"] = file.filename

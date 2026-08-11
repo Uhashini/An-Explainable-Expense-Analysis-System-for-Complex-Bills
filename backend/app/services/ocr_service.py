@@ -46,6 +46,14 @@ class OCRService:
                 
             orig_h, orig_w = img.shape[:2]
 
+            # Resize large images to dramatically speed up PaddleOCR on CPU
+            max_dim = 1200
+            if max(orig_h, orig_w) > max_dim:
+                scale = max_dim / max(orig_h, orig_w)
+                new_width = int(orig_w * scale)
+                new_height = int(orig_h * scale)
+                img = cv2.resize(img, (new_width, new_height), interpolation=cv2.INTER_AREA)
+
             # 2. Preprocess & Correct Perspective
             if preprocess:
                 enhanced = self.preprocessor.apply_clahe(img)

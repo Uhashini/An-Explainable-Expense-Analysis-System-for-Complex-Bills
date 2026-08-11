@@ -130,14 +130,13 @@ export default function ReceiptDetailsScreen({ route, navigation }) {
 
   const currentMode = ANALYSIS_MODES[activeMode];
 
-  // Map real data if available, otherwise fallback to empty/mock
-  // The backend wraps the response in a "data" object (i.e. responseData.data.receipt_info)
-  const info = receiptData?.data?.receipt_info || receiptData?.receipt_info; 
+  const isMock = !receiptData;
+  const info = receiptData?.data?.receipt_info || receiptData?.receipt_info || {};
   
-  const extractedItems = info?.items || ITEMS;
-  const merchantName = info?.merchant_name || 'Reliance Fresh';
-  const totalAmount = info?.total_amount || 1245.60;
-  const dateStr = info?.date || '20 July 2025';
+  const extractedItems = isMock ? ITEMS : (info.items || []);
+  const merchantName = isMock ? 'Reliance Fresh' : (info.merchant_name || 'Unknown Store');
+  const totalAmount = isMock ? 1245.60 : (info.total_amount || 0.0);
+  const dateStr = isMock ? '20 July 2025' : (info.date || 'Unknown Date');
 
   return (
     <ScreenLayout title="Receipt Details" navigation={navigation} showBack>
@@ -168,22 +167,28 @@ export default function ReceiptDetailsScreen({ route, navigation }) {
           <View style={[styles.tableRow, styles.tableHeader]}>
             <Text style={[styles.colItem,  styles.headerCell]}>Item</Text>
             <Text style={[styles.colQty,   styles.headerCell]}>Qty</Text>
+            <Text style={[styles.colRate,  styles.headerCell]}>Rate</Text>
             <Text style={[styles.colPrice, styles.headerCell]}>Price</Text>
             <Text style={[styles.colCal,   styles.headerCell]}>kcal</Text>
             <Text style={[styles.colProt,  styles.headerCell]}>Protein</Text>
           </View>
-          {extractedItems.map((item, i) => (
-            <View
-              key={i} // Using index because OCR might return duplicate names
-              style={[styles.tableRow, i % 2 === 1 && styles.tableRowAlt]}
-            >
-              <Text style={[styles.colItem,  styles.cellText]} numberOfLines={2}>{item.name}</Text>
-              <Text style={[styles.colQty,   styles.cellText]}>{item.quantity || item.qty || 1}</Text>
-              <Text style={[styles.colPrice, styles.cellText]}>₹{item.total_price || item.price || 0}</Text>
-              <Text style={[styles.colCal,   styles.cellText]}>{item.calories || '-'}</Text>
-              <Text style={[styles.colProt,  styles.cellText]}>{item.protein || '-'}</Text>
-            </View>
-          ))}
+          {extractedItems.map((item, i) => {
+            const price = item.total_price != null ? `₹${item.total_price}` : (item.price != null ? (String(item.price).startsWith('₹') ? item.price : `₹${item.price}`) : '₹0');
+            const rate = item.unit_price != null ? `₹${item.unit_price}` : (item.rate != null ? (String(item.rate).startsWith('₹') ? item.rate : `₹${item.rate}`) : '-');
+            return (
+              <View
+                key={i} // Using index because OCR might return duplicate names
+                style={[styles.tableRow, i % 2 === 1 && styles.tableRowAlt]}
+              >
+                <Text style={[styles.colItem,  styles.cellText]} numberOfLines={2}>{item.name}</Text>
+                <Text style={[styles.colQty,   styles.cellText]}>{item.quantity || item.qty || 1}</Text>
+                <Text style={[styles.colRate,  styles.cellText]}>{rate}</Text>
+                <Text style={[styles.colPrice, styles.cellText]}>{price}</Text>
+                <Text style={[styles.colCal,   styles.cellText]}>{item.calories || '-'}</Text>
+                <Text style={[styles.colProt,  styles.cellText]}>{item.protein || '-'}</Text>
+              </View>
+            );
+          })}
         </View>
 
         {/* ── Summary ── */}
@@ -387,11 +392,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: COLORS.primary,
   },
-  colItem:  { flex: 2.5 },
-  colQty:   { flex: 1, textAlign: 'center' },
-  colPrice: { flex: 1.2, textAlign: 'center' },
-  colCal:   { flex: 1, textAlign: 'center' },
-  colProt:  { flex: 1.2, textAlign: 'right' },
+  colItem:  { flex: 2 },
+  colQty:   { flex: 0.8, textAlign: 'center' },
+  colRate:  { flex: 1, textAlign: 'center' },
+  colPrice: { flex: 1, textAlign: 'center' },
+  colCal:   { flex: 0.9, textAlign: 'center' },
+  colProt:  { flex: 1, textAlign: 'right' },
 
   // Summary
   summaryCard: {

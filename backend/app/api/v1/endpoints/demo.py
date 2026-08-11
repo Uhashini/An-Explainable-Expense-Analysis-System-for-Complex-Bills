@@ -60,7 +60,8 @@ async def process_receipt_demo(file: UploadFile = File(...)):
         
         # 4. OCR Processing
         start_time = time.time()
-        structured_data = ocr_service.extract_structured_data(contents)
+        from fastapi.concurrency import run_in_threadpool
+        structured_data = await run_in_threadpool(ocr_service.extract_structured_data, contents)
         
         data_block = structured_data.get("data", {})
         words = data_block.get("words", [])

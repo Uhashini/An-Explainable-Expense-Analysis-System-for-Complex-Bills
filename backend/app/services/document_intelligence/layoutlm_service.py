@@ -183,6 +183,11 @@ class LayoutLMService:
                             val_str = "".join(filter(lambda x: x.isdigit() or x in ".,", txt))
                             if val_str: price_val = float(val_str.replace(",", "."))
                         except ValueError: pass
+                    elif lbl == "menu.unitprice":
+                        try:
+                            val_str = "".join(filter(lambda x: x.isdigit() or x in ".,", txt))
+                            if val_str: unit_price = float(val_str.replace(",", "."))
+                        except ValueError: pass
                     elif lbl == "menu.cnt":
                         try: qty = int(re.sub(r'[^\d]', '', txt) or 1)
                         except ValueError: pass
@@ -190,7 +195,7 @@ class LayoutLMService:
                     item_name = " ".join(names).strip() or "Item"
                     if not any(char.isalpha() for char in item_name) and price_val == 0.0:
                         continue
-                    if price_val > 0: unit_price = price_val / max(1, qty)
+                    # Remove the calculation here as the user wants it from the model output directly
                     parsed["items"].append({"name": item_name, "quantity": qty, "unit_price": unit_price, "total_price": price_val})
 
         # Extract discounts and loyalty programs
