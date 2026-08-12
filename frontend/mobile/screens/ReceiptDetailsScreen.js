@@ -238,7 +238,12 @@ export default function ReceiptDetailsScreen({ route, navigation }) {
                 onPress={handleItemPress}
                 activeOpacity={0.7}
               >
-                <Text style={[styles.colItem,  styles.cellText]} numberOfLines={2}>{item.matched_name || item.name}</Text>
+                <View style={styles.colItem}>
+                  <Text style={styles.cellText} numberOfLines={1}>{item.name}</Text>
+                  {item.matched_name && item.matched_name !== item.name && (
+                    <Text style={styles.matchedNameText} numberOfLines={1}>{item.matched_name}</Text>
+                  )}
+                </View>
                 <Text style={[styles.colQty,   styles.cellText]}>{item.quantity || item.qty || 1}</Text>
                 <Text style={[styles.colRate,  styles.cellText]}>{rate}</Text>
                 <Text style={[styles.colPrice, styles.cellText]}>{price}</Text>
@@ -464,6 +469,12 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.regular,
     fontSize: 12,
     color: COLORS.primary,
+  },
+  matchedNameText: {
+    fontFamily: FONTS.regular,
+    fontSize: 10,
+    color: 'rgba(153,8,8,0.5)',
+    marginTop: 2,
   },
   colItem:  { flex: 2 },
   colQty:   { flex: 0.8, textAlign: 'center' },
