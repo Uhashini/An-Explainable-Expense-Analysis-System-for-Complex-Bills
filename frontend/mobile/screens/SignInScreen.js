@@ -6,7 +6,8 @@ import {
 import BackgroundLayout from '../components/BackgroundLayout';
 import OrDivider from '../components/OrDivider';
 import SocialButton from '../components/SocialButton';
-import { getUser } from '../utils/authStorage';
+import { getUser, saveUser } from '../utils/authStorage';
+import { API_BASE_URL } from '../utils/apiConfig';
 import { COLORS, FONTS } from '../theme';
 
 export default function SignInScreen({ navigation }) {
@@ -20,18 +21,27 @@ export default function SignInScreen({ navigation }) {
       return;
     }
 
-    const storedUser = await getUser();
-    if (!storedUser) {
-      Alert.alert('No Account', 'No registered account found. Please sign up first.');
-      return;
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: email.trim().toLowerCase(),
+          password
+        })
+      });
+      const data = await response.json();
+      if (response.ok) {
+        await saveUser(data.user);
+        if (navigation.replace) {
+          navigation.replace('Main');
+        }
+      } else {
+        Alert.alert('Login Failed', data.detail || 'Invalid email or password.');
+      }
+    } catch (error) {
+      Alert.alert('Network Error', 'Could not connect to the server.');
     }
-
-    if (storedUser.email !== email.trim().toLowerCase() || storedUser.password !== password) {
-      Alert.alert('Invalid Credentials', 'Email or password is incorrect.');
-      return;
-    }
-
-    navigation.replace('Main');
   };
 
   return (

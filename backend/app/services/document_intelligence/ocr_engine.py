@@ -60,7 +60,7 @@ class OCREngine:
             if isinstance(image, np.ndarray):
                 h, w = image.shape[:2]
 
-            if max(h, w) < 1500:
+            if max(h, w) < 600:
                 scale = 2.0
                 image = cv2.resize(
                     image,

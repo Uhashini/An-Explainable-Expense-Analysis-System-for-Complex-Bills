@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import {
   View, Text, TextInput, StyleSheet, TouchableOpacity,
   KeyboardAvoidingView, Platform, Alert,
@@ -7,6 +7,7 @@ import BackgroundLayout from '../components/BackgroundLayout';
 import OrDivider from '../components/OrDivider';
 import SocialButton from '../components/SocialButton';
 import { saveUser } from '../utils/authStorage';
+import { API_BASE_URL } from '../utils/apiConfig';
 import { COLORS, FONTS } from '../theme';
 
 const checkReq = (password) => ({
@@ -59,18 +60,28 @@ export default function SignUpScreen({ navigation }) {
       return;
     }
 
-    const saved = await saveUser({
-      name: name.trim(),
-      email: email.trim().toLowerCase(),
-      password,
-    });
-
-    if (!saved) {
-      Alert.alert('Unable to save account', 'Please try again or restart the app.');
-      return;
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: name.trim(),
+          email: email.trim().toLowerCase(),
+          password
+        })
+      });
+      const data = await response.json();
+      if (response.ok) {
+        await saveUser({ id: data.user_id, name: name.trim(), email: email.trim().toLowerCase() });
+        if (navigation.replace) {
+          navigation.replace('PersonalInfo', { name: name.trim(), userId: data.user_id });
+        }
+      } else {
+        Alert.alert('Registration Failed', data.detail || 'Please try again.');
+      }
+    } catch (error) {
+      Alert.alert('Network Error', 'Could not connect to the server.');
     }
-
-    navigation.replace('Main');
   };
 
   return (

@@ -32,6 +32,7 @@ import SettingsScreen           from './screens/SettingsScreen';
 import HealthProfileScreen      from './screens/HealthProfileScreen';
 import ShoppingPreferencesScreen from './screens/ShoppingPreferencesScreen';
 import PersonalInformationScreen from './screens/PersonalInformationScreen';
+import FoodItemDetailsScreen      from './screens/FoodItemDetailsScreen';
 
 import { COLORS, FONTS } from './theme';
 
@@ -229,6 +230,11 @@ export default function App() {
           <Stack.Screen
             name="ReceiptDetails"
             component={ReceiptDetailsScreen}
+            options={{ animation: 'slide_from_right' }}
+          />
+          <Stack.Screen
+            name="FoodItemDetails"
+            component={FoodItemDetailsScreen}
             options={{ animation: 'slide_from_right' }}
           />
         </Stack.Navigator>

@@ -33,7 +33,7 @@ class RegexParser:
             "merchant_name": self._extract_merchant(words, boxes),
             "date": self._extract_date(words),
             "total_amount": self._extract_total(words, boxes),
-            "items": []
+            "items": self._extract_items(words, boxes)
         }
         return extracted
 
@@ -120,3 +120,78 @@ class RegexParser:
                         continue
         
         return max(prices) if prices else 0.0
+
+    def _extract_items(self, words: List[str], boxes: List[List[int]]) -> List[Dict[str, Any]]:
+        """
+        Groups words into horizontal lines and attempts to extract line items with prices.
+        """
+        if not words: return []
+        
+        # Group words by line based on y-coordinates
+        lines = []
+        for word, box in zip(words, boxes):
+            y_center = (box[1] + box[3]) / 2
+            matched = False
+            for line in lines:
+                if abs(line["avg_y"] - y_center) < 20: # Tolerance for same line
+                    line["words"].append({"text": word, "box": box})
+                    line["avg_y"] = sum((w["box"][1] + w["box"][3])/2 for w in line["words"]) / len(line["words"])
+                    matched = True
+                    break
+            if not matched:
+                lines.append({"avg_y": y_center, "words": [{"text": word, "box": box}]})
+                
+        # Sort lines vertically
+        lines.sort(key=lambda x: x["avg_y"])
+        
+        items = []
+        for line in lines:
+            # Sort words in the line horizontally
+            line["words"].sort(key=lambda x: x["box"][0])
+            line_text = [w["text"] for w in line["words"]]
+            
+            # Skip likely non-item lines
+            full_line_lower = " ".join(line_text).lower()
+            if any(kw in full_line_lower for kw in ["total", "subtotal", "tax", "cash", "change", "visa", "mastercard"]):
+                continue
+                
+            # Try to find price (usually the last or second to last token with numbers/decimals)
+            price_val = 0.0
+            name_tokens = []
+            qty = 1
+            
+            for token in line_text:
+                match = self.currency_pattern.search(token)
+                if match and len(token) <= 8 and not name_tokens: # if price comes first? unlikely
+                    pass
+                elif match:
+                    try:
+                        price_val = float(match.group().replace(",", "."))
+                    except:
+                        pass
+                else:
+                    # heuristic for quantity like '2x' or '3' at start
+                    if not name_tokens and re.match(r'^\d+x?$', token.lower()):
+                        try:
+                            qty_str = token.lower().replace('x', '')
+                            if qty_str: qty = int(qty_str)
+                        except:
+                            pass
+                    else:
+                        name_tokens.append(token)
+                        
+            # If we found a price and some name tokens, consider it an item
+            name = " ".join(name_tokens).strip()
+            # Clean up trailing weird chars in name
+            name = re.sub(r'[^\w\s]+$', '', name).strip()
+            
+            if name and price_val > 0 and len(name) > 2:
+                items.append({
+                    "name": name,
+                    "quantity": qty,
+                    "unit_price": price_val if qty <= 1 else round(price_val/qty, 2),
+                    "total_price": price_val
+                })
+                
+        return items
+

@@ -174,6 +174,7 @@ class LayoutLMService:
             for row in rows:
                 row_tokens = sorted(row["tokens"], key=lambda t: t["bbox"][0])
                 names, price_val, unit_price, qty = [], 0.0, 0.0, 1
+                rateunit = ""
                 for t in row_tokens:
                     lbl, txt = t.get("entity"), t.get("text", "").strip()
                     if lbl in ("menu.nm", "menu.sub_nm"):
@@ -187,16 +188,33 @@ class LayoutLMService:
                         try:
                             val_str = "".join(filter(lambda x: x.isdigit() or x in ".,", txt))
                             if val_str: unit_price = float(val_str.replace(",", "."))
+                            
+                            # Extract rateunit (e.g. from 12.00/kg or 12.00kg)
+                            unit_match = re.search(r'[A-Za-z]+', txt)
+                            if unit_match:
+                                rateunit = unit_match.group()
                         except ValueError: pass
                     elif lbl == "menu.cnt":
-                        try: qty = int(re.sub(r'[^\d]', '', txt) or 1)
-                        except ValueError: pass
+                        qty = txt  # Preserve string with units (e.g., 500g, 1kg)
+                        
+                        # Fallback for rateunit from count if not found in unitprice
+                        if not rateunit:
+                            unit_match = re.search(r'[A-Za-z]+', txt)
+                            if unit_match:
+                                rateunit = unit_match.group()
+                                
                 if names or price_val > 0:
                     item_name = " ".join(names).strip() or "Item"
                     if not any(char.isalpha() for char in item_name) and price_val == 0.0:
                         continue
-                    # Remove the calculation here as the user wants it from the model output directly
-                    parsed["items"].append({"name": item_name, "quantity": qty, "unit_price": unit_price, "total_price": price_val})
+                    
+                    parsed["items"].append({
+                        "name": item_name, 
+                        "quantity": qty, 
+                        "unit_price": unit_price, 
+                        "total_price": price_val,
+                        "rateunit": rateunit
+                    })
 
         # Extract discounts and loyalty programs
         disc_tokens = [ent for ent in entities if ent.get("entity", "") in ("loyalty_discount", "sub_total.discount_price", "discount")]
@@ -242,6 +260,11 @@ class LayoutLMService:
         parsed["date"] = full_regex.get("date", "")
         if parsed["total_amount"] == 0.0:
             parsed["total_amount"] = full_regex.get("total_amount", 0.0)
+
+        # Fallback for items if Semantic AI yielded no line items
+        if not parsed["items"]:
+            logger.info("Semantic AI yielded no items. Falling back to RegexParser for items.")
+            parsed["items"] = full_regex.get("items", [])
 
         return parsed
 

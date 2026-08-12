@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, Animated,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, Animated, Alert, ActivityIndicator
 } from 'react-native';
 import ScreenLayout from '../components/ScreenLayout';
 import { COLORS, FONTS } from '../theme';
+import { API_BASE_URL } from '../utils/apiConfig';
 
 // ─── Mock receipt data ──────────────────────────────────────────────────────
 const ITEMS = [
@@ -133,10 +134,52 @@ export default function ReceiptDetailsScreen({ route, navigation }) {
   const isMock = !receiptData;
   const info = receiptData?.data?.receipt_info || receiptData?.receipt_info || {};
   
-  const extractedItems = isMock ? ITEMS : (info.items || []);
+  const initialItems = isMock ? ITEMS : (info.items || []);
   const merchantName = isMock ? 'Reliance Fresh' : (info.merchant_name || 'Unknown Store');
   const totalAmount = isMock ? 1245.60 : (info.total_amount || 0.0);
   const dateStr = isMock ? '20 July 2025' : (info.date || 'Unknown Date');
+
+  const [extractedItems, setExtractedItems] = useState(initialItems);
+  const [foodDetailsLoaded, setFoodDetailsLoaded] = useState(isMock); // mock data already has details
+  const [isLoadingDetails, setIsLoadingDetails] = useState(false);
+
+  // Update state if new props come in
+  useEffect(() => {
+    if (!isMock) {
+      setExtractedItems(info.items || []);
+      setFoodDetailsLoaded(false);
+    }
+  }, [receiptData]);
+
+  const fetchFoodDetails = async () => {
+    if (extractedItems.length === 0) {
+      Alert.alert('No items', 'There are no items to fetch details for.');
+      return;
+    }
+
+    setIsLoadingDetails(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/receipts/match-products`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items: extractedItems }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.detail || `Server error ${response.status}`);
+      }
+
+      setExtractedItems(data.items);
+      setFoodDetailsLoaded(true);
+      Alert.alert('Success', 'Food details retrieved! Tap any item in the table to view its full details page.');
+    } catch (error) {
+      console.error('Error fetching food details:', error);
+      Alert.alert('Error', 'Failed to fetch food details. Please try again.');
+    } finally {
+      setIsLoadingDetails(false);
+    }
+  };
 
   return (
     <ScreenLayout title="Receipt Details" navigation={navigation} showBack>
@@ -174,19 +217,34 @@ export default function ReceiptDetailsScreen({ route, navigation }) {
           </View>
           {extractedItems.map((item, i) => {
             const price = item.total_price != null ? `₹${item.total_price}` : (item.price != null ? (String(item.price).startsWith('₹') ? item.price : `₹${item.price}`) : '₹0');
-            const rate = item.unit_price != null ? `₹${item.unit_price}` : (item.rate != null ? (String(item.rate).startsWith('₹') ? item.rate : `₹${item.rate}`) : '-');
+            let rate = item.unit_price != null ? `₹${item.unit_price}` : (item.rate != null ? (String(item.rate).startsWith('₹') ? item.rate : `₹${item.rate}`) : '-');
+            if (item.rateunit && rate !== '-') {
+              rate += `/${item.rateunit}`;
+            }
+            // Read nutrition from new nested response shape
+            const calories = item.nutrition?.calories_kcal ?? item.calories ?? '-';
+            const protein = item.nutrition?.protein_g != null ? `${item.nutrition.protein_g}g` : (item.protein || '-');
+            const handleItemPress = () => {
+              navigation.navigate('FoodItemDetails', { 
+                product_id: item.food_id || item.matched_product_id,
+                item_name: item.matched_name || item.name,
+                item_data: item
+              });
+            };
             return (
-              <View
+              <TouchableOpacity
                 key={i} // Using index because OCR might return duplicate names
                 style={[styles.tableRow, i % 2 === 1 && styles.tableRowAlt]}
+                onPress={handleItemPress}
+                activeOpacity={0.7}
               >
-                <Text style={[styles.colItem,  styles.cellText]} numberOfLines={2}>{item.name}</Text>
+                <Text style={[styles.colItem,  styles.cellText]} numberOfLines={2}>{item.matched_name || item.name}</Text>
                 <Text style={[styles.colQty,   styles.cellText]}>{item.quantity || item.qty || 1}</Text>
                 <Text style={[styles.colRate,  styles.cellText]}>{rate}</Text>
                 <Text style={[styles.colPrice, styles.cellText]}>{price}</Text>
-                <Text style={[styles.colCal,   styles.cellText]}>{item.calories || '-'}</Text>
-                <Text style={[styles.colProt,  styles.cellText]}>{item.protein || '-'}</Text>
-              </View>
+                <Text style={[styles.colCal,   styles.cellText]}>{calories}</Text>
+                <Text style={[styles.colProt,  styles.cellText]}>{protein}</Text>
+              </TouchableOpacity>
             );
           })}
         </View>
@@ -205,6 +263,21 @@ export default function ReceiptDetailsScreen({ route, navigation }) {
         </View>
 
         {/* ── Action Buttons ── */}
+        {!foodDetailsLoaded && (
+          <TouchableOpacity 
+            style={[styles.primaryButton, { backgroundColor: COLORS.accent }]} 
+            activeOpacity={0.85}
+            onPress={fetchFoodDetails}
+            disabled={isLoadingDetails}
+          >
+            {isLoadingDetails ? (
+              <ActivityIndicator color={COLORS.primary} />
+            ) : (
+              <Text style={[styles.primaryButtonText, { color: COLORS.primary }]}>Get Food Details</Text>
+            )}
+          </TouchableOpacity>
+        )}
+
         <TouchableOpacity style={styles.primaryButton} activeOpacity={0.85}>
           <Text style={styles.primaryButtonText}>Save Receipt</Text>
         </TouchableOpacity>

@@ -1,10 +1,11 @@
-﻿import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, Image } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, Image, Alert } from 'react-native';
 import BackgroundLayout from '../components/BackgroundLayout';
 import ProgressBar from '../components/ProgressBar';
 import PreferenceChip from '../components/PreferenceChip';
 import GoalCard from '../components/GoalCard';
 import ReviewCard from '../components/ReviewCard';
+import { API_BASE_URL } from '../utils/apiConfig';
 
 const green = '#22C55E';
 const heroIcons = [
@@ -31,7 +32,41 @@ export default function OnboardingFlowScreen({ navigation, route }) {
   const [data, setData] = useState({ fullName: route.params?.name || '', age: '', gender: '', height: '', weight: '', activity: '', food: '', allergies: [], conditions: [], goals: [], budget: '', stores: [], household: '', frequency: '', city: '' });
   const update = (key, value) => setData((d) => ({ ...d, [key]: value }));
   const required = step === 1 ? data.fullName && /^\d+$/.test(data.age) && data.gender && /^\d+(\.\d+)?$/.test(data.height) && /^\d+(\.\d+)?$/.test(data.weight) : step === 2 ? data.activity && data.food : step === 3 ? data.goals.length : step === 4 ? data.budget && data.household && data.frequency : true;
-  const go = () => step < 5 ? setStep(step + 1) : navigation.reset({ index: 0, routes: [{ name: 'Main' }] });
+  const go = async () => {
+    if (step < 5) {
+      setStep(step + 1);
+    } else {
+      try {
+        const response = await fetch(`${API_BASE_URL}/auth/onboarding`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            user_id: route.params?.userId,
+            height: data.height,
+            weight: data.weight,
+            activity_level: data.activity,
+            food_preference: data.food,
+            allergies: data.allergies.join(', '),
+            medical_conditions: data.conditions.join(', '),
+            goals: data.goals.join(', '),
+            household_size: data.household,
+            shopping_frequency: data.frequency,
+            city: data.city,
+          })
+        });
+        if (response.ok) {
+          if (navigation.reset) {
+            navigation.reset({ index: 0, routes: [{ name: 'Main' }] });
+          }
+        } else {
+          const result = await response.json();
+          Alert.alert('Error', result.detail || 'Failed to save onboarding data.');
+        }
+      } catch (error) {
+        Alert.alert('Error', 'Could not connect to the server.');
+      }
+    }
+  };
   const edit = (target) => setStep(target);
   return <BackgroundLayout><KeyboardAvoidingView style={{ flex: 1, width: '100%' }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}><ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}><ProgressBar step={step} total={5} /><View style={styles.hero}><View style={styles.icon}><Image source={heroIcons[step - 1]} style={styles.heroIcon} resizeMode="contain" /></View><Text style={styles.title}>{['Tell Us About You', 'Your Lifestyle', 'What are your goals?', 'Shopping Preferences', 'Review & Finish'][step - 1]}</Text><Text style={styles.subtitle}>{['This helps us provide smarter shopping insights.', 'Help us personalize nutrition recommendations.', 'Choose one or more goals.', 'Tell us about your grocery habits.', 'Verify your information before continuing.'][step - 1]}</Text></View>
   {step === 1 && <View><Label>FULL NAME</Label><Input value={data.fullName} onChangeText={(v) => update('fullName', v)} placeholder="Your full name" /><Label>AGE</Label><Input value={data.age} onChangeText={(v) => update('age', v)} placeholder="Your age" keyboardType="numeric" /><Label>GENDER</Label><Chips items={['Male', 'Female', 'Other', 'Prefer not to say']} value={data.gender ? [data.gender] : []} setValue={(v) => update('gender', v[0] || '')} /><Label>HEIGHT (CM)</Label><Input value={data.height} onChangeText={(v) => update('height', v)} placeholder="e.g. 170" keyboardType="decimal-pad" /><Label>WEIGHT (KG)</Label><Input value={data.weight} onChangeText={(v) => update('weight', v)} placeholder="e.g. 65" keyboardType="decimal-pad" /></View>}
