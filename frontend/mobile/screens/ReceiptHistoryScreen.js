@@ -1,18 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator
 } from 'react-native';
 import ScreenLayout from '../components/ScreenLayout';
 import { COLORS, FONTS } from '../theme';
+import { API_BASE_URL } from '../utils/apiConfig';
+import { getUser } from '../utils/authStorage';
 
 const CATEGORIES = ['All', 'Grocery', 'Fruits', 'Vegetables', 'Dairy', 'Snacks'];
-
-const RECEIPTS = [
-  { id: 1, store: 'Reliance Fresh',  tag: 'RF', date: '20 July 2025', amount: '₹1,245.60', items: 6  },
-  { id: 2, store: 'D-Mart',          tag: 'DM', date: '15 July 2025', amount: '₹823.40',   items: 8  },
-  { id: 3, store: 'More Supermarket',tag: 'MS', date: '12 July 2025', amount: '₹745.30',   items: 5  },
-  { id: 4, store: 'Reliance Smart',  tag: 'RS', date: '08 July 2025', amount: '₹980.20',   items: 9  },
-];
 
 function ReceiptCard({ receipt, onPress }) {
   return (
@@ -34,11 +29,52 @@ function ReceiptCard({ receipt, onPress }) {
 }
 
 export default function ReceiptHistoryScreen({ navigation }) {
-  const [search, setSearch]     = useState('');
+  const [search, setSearch] = useState('');
   const [category, setCategory] = useState('All');
+  const [receipts, setReceipts] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const filtered = RECEIPTS.filter((r) =>
-    r.store.toLowerCase().includes(search.toLowerCase())
+  useEffect(() => {
+    const fetchReceipts = async () => {
+      try {
+        const user = await getUser();
+        const userId = user?.id || user?.user_id;
+
+        if (!userId) {
+          setLoading(false);
+          return;
+        }
+
+        const response = await fetch(`${API_BASE_URL}/receipts/user/${userId}`);
+        const data = await response.json();
+
+        if (response.ok && data.status === 'success') {
+          const formatted = data.receipts.map(r => ({
+            id: r.receipt_id,
+            store: r.merchant_name,
+            tag: r.merchant_name ? r.merchant_name.substring(0, 2).toUpperCase() : 'RC',
+            date: r.date,
+            amount: `₹${parseFloat(r.total_amount).toFixed(2)}`,
+            items: r.items_count,
+          }));
+          setReceipts(formatted);
+        }
+      } catch (error) {
+        console.error("Error fetching receipts:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    const unsubscribe = navigation.addListener('focus', () => {
+      fetchReceipts();
+    });
+
+    return unsubscribe;
+  }, [navigation]);
+
+  const filtered = receipts.filter((r) =>
+    r.store && r.store.toLowerCase().includes(search.toLowerCase())
   );
 
   return (
@@ -87,12 +123,14 @@ export default function ReceiptHistoryScreen({ navigation }) {
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
         >
-          {filtered.length > 0 ? (
+          {loading ? (
+            <ActivityIndicator size="large" color={COLORS.primary} style={{ marginTop: 40 }} />
+          ) : filtered.length > 0 ? (
             filtered.map((r) => (
               <ReceiptCard
                 key={r.id}
                 receipt={r}
-                onPress={() => navigation.navigate('ReceiptDetails')}
+                onPress={() => navigation.navigate('ReceiptDetails', { receiptId: r.id })}
               />
             ))
           ) : (

@@ -89,8 +89,141 @@ async def match_products(request: MatchProductsRequest):
         return {"status": "success", "items": enriched_items}
         
     except Exception as e:
+        error_msg = str(e)
+        if "Connection refused" in error_msg:
+            detail = "Database connection refused. Your Neon PostgreSQL database might be asleep. Please go to your Neon console to wake it up."
+        else:
+            detail = f"Error matching products: {error_msg}"
+            
         raise HTTPException(
             status_code=500,
-            detail=f"Error matching products: {str(e)}",
+            detail=detail,
         )
 
+from sqlalchemy.orm import Session
+from fastapi import Depends
+from app.database.postgres_client import get_db, UserProfile, Receipt, ReceiptItem
+from typing import Optional
+
+class ReceiptItemCreate(BaseModel):
+    name: str
+    matched_food_id: Optional[int] = None
+    quantity: Optional[str] = None
+    rate: Optional[str] = None
+    price: Optional[str] = None
+
+class ReceiptCreate(BaseModel):
+    user_id: int
+    merchant_name: Optional[str] = None
+    date: Optional[str] = None
+    total_amount: Optional[float] = None
+    items: List[ReceiptItemCreate]
+
+@router.post("/save", tags=["Receipts"])
+def save_receipt(data: ReceiptCreate, db: Session = Depends(get_db)):
+    user = db.query(UserProfile).filter(UserProfile.user_id == data.user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    receipt = Receipt(
+        user_id=data.user_id,
+        merchant_name=data.merchant_name,
+        date=data.date,
+        total_amount=data.total_amount
+    )
+    db.add(receipt)
+    db.commit()
+    db.refresh(receipt)
+    
+    for item in data.items:
+        db_item = ReceiptItem(
+            receipt_id=receipt.receipt_id,
+            name=item.name,
+            matched_food_id=item.matched_food_id,
+            quantity=item.quantity,
+            rate=item.rate,
+            price=item.price
+        )
+        db.add(db_item)
+        
+    db.commit()
+    return {"status": "success", "message": "Receipt saved successfully", "receipt_id": receipt.receipt_id}
+
+@router.get("/user/{user_id}", tags=["Receipts"])
+def get_user_receipts(user_id: int, db: Session = Depends(get_db)):
+    user = db.query(UserProfile).filter(UserProfile.user_id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    # Fetch receipts for the user, ordered by most recent first
+    receipts = db.query(Receipt).filter(Receipt.user_id == user_id).order_by(Receipt.receipt_id.desc()).all()
+    
+    result = []
+    for r in receipts:
+        # Count items for each receipt
+        item_count = db.query(ReceiptItem).filter(ReceiptItem.receipt_id == r.receipt_id).count()
+        
+        result.append({
+            "receipt_id": r.receipt_id,
+            "merchant_name": r.merchant_name or "Unknown Store",
+            "date": r.date or "Unknown Date",
+            "total_amount": r.total_amount or 0.0,
+            "items_count": item_count
+        })
+        
+    return {"status": "success", "receipts": result}
+
+from sqlalchemy.orm import joinedload
+from app.database.postgres_client import FoodItem, Nutrition
+
+@router.get("/{receipt_id}", tags=["Receipts"])
+def get_receipt(receipt_id: int, db: Session = Depends(get_db)):
+    receipt = db.query(Receipt).filter(Receipt.receipt_id == receipt_id).first()
+    if not receipt:
+        raise HTTPException(status_code=404, detail="Receipt not found")
+        
+    items = db.query(ReceiptItem).filter(ReceiptItem.receipt_id == receipt_id).all()
+    
+    formatted_items = []
+    for item in items:
+        item_data = {
+            "item_id": item.item_id,
+            "name": item.name,
+            "matched_product_id": item.matched_food_id,
+            "food_id": item.matched_food_id,
+            "quantity": item.quantity,
+            "unit_price": item.rate,
+            "total_price": item.price,
+        }
+        
+        if item.matched_food_id:
+            food = db.query(FoodItem).options(joinedload(FoodItem.nutrition)).filter(FoodItem.food_id == item.matched_food_id).first()
+            if food:
+                item_data["matched_name"] = food.display_name or food.canonical_name
+                item_data["category"] = food.category
+                
+                if food.nutrition:
+                    item_data["nutrition"] = {
+                        "calories_kcal": float(food.nutrition.calories_kcal) if food.nutrition.calories_kcal else None,
+                        "protein_g": float(food.nutrition.protein_g) if food.nutrition.protein_g else None,
+                        "carbohydrates_g": float(food.nutrition.carbohydrates_g) if food.nutrition.carbohydrates_g else None,
+                        "fat_g": float(food.nutrition.fat_g) if food.nutrition.fat_g else None,
+                    }
+                    
+        formatted_items.append(item_data)
+        
+    return {
+        "status": "success",
+        "data": {
+            "receipt_info": {
+                "receipt_id": receipt.receipt_id,
+                "merchant_name": receipt.merchant_name,
+                "date": receipt.date,
+                "total_amount": receipt.total_amount,
+                "items": formatted_items
+            }
+        }
+    }
+    db.commit()
+    db.refresh(receipt)
+    return {"status": "success", "message": "Receipt updated", "merchant_name": receipt.merchant_name}

@@ -90,3 +90,68 @@ def onboarding(data: OnboardingData, db: Session = Depends(get_db)):
         db.add(new_onboarding)
         db.commit()
         return {"message": "Onboarding data saved successfully"}
+
+@router.get("/me/{user_id}")
+def get_user_profile(user_id: int, db: Session = Depends(get_db)):
+    db_user = db.query(UserProfile).filter(UserProfile.user_id == user_id).first()
+    if not db_user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    onboarding = db.query(UserOnboarding).filter(UserOnboarding.user_id == user_id).first()
+    
+    return {
+        "user_id": db_user.user_id,
+        "name": db_user.name,
+        "email": db_user.email,
+        "age": db_user.age,
+        "gender": db_user.gender,
+        "onboarding": {
+            "height": onboarding.height if onboarding else None,
+            "weight": onboarding.weight if onboarding else None,
+            "activity_level": onboarding.activity_level if onboarding else None,
+            "food_preference": onboarding.food_preference if onboarding else None,
+            "allergies": onboarding.allergies if onboarding else None,
+            "medical_conditions": onboarding.medical_conditions if onboarding else None,
+            "goals": onboarding.goals if onboarding else None,
+            "household_size": onboarding.household_size if onboarding else None,
+            "shopping_frequency": onboarding.shopping_frequency if onboarding else None,
+            "city": onboarding.city if onboarding else None,
+        } if onboarding else None
+    }
+
+class UserProfileUpdate(BaseModel):
+    name: Optional[str] = None
+    age: Optional[str] = None # Using str since some inputs might be sent as string
+    gender: Optional[str] = None
+    height: Optional[str] = None
+    weight: Optional[str] = None
+
+@router.put("/me/{user_id}")
+def update_user_profile(user_id: int, data: UserProfileUpdate, db: Session = Depends(get_db)):
+    db_user = db.query(UserProfile).filter(UserProfile.user_id == user_id).first()
+    if not db_user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    if data.name is not None:
+        db_user.name = data.name
+    if data.age is not None:
+        try:
+            db_user.age = int(data.age)
+        except ValueError:
+            pass
+    if data.gender is not None:
+        db_user.gender = data.gender
+        
+    onboarding = db.query(UserOnboarding).filter(UserOnboarding.user_id == user_id).first()
+    if onboarding:
+        if data.height is not None:
+            onboarding.height = data.height
+        if data.weight is not None:
+            onboarding.weight = data.weight
+    else:
+        if data.height is not None or data.weight is not None:
+            new_onboarding = UserOnboarding(user_id=user_id, height=data.height, weight=data.weight)
+            db.add(new_onboarding)
+            
+    db.commit()
+    return {"message": "Profile updated successfully"}

@@ -103,6 +103,24 @@ class AlternativeRecommendation(Base):
     recommendation_type = Column(String(13))
     recommendation_reason = Column(Text)
 
+class Receipt(Base):
+    __tablename__ = "receipt"
+    receipt_id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("userprofile.user_id", ondelete="CASCADE"), nullable=False)
+    merchant_name = Column(String(255))
+    date = Column(String(50))
+    total_amount = Column(Float)
+    
+class ReceiptItem(Base):
+    __tablename__ = "receiptitem"
+    item_id = Column(Integer, primary_key=True, index=True)
+    receipt_id = Column(Integer, ForeignKey("receipt.receipt_id", ondelete="CASCADE"), nullable=False)
+    name = Column(String(255))
+    matched_food_id = Column(Integer, ForeignKey("fooditem.food_id"), nullable=True)
+    quantity = Column(String(50))
+    rate = Column(String(50))
+    price = Column(String(50))
+
 # Legacy Product model (kept for SQLite backwards compatibility)
 class Product(Base):
     __tablename__ = "product"
@@ -120,5 +138,5 @@ def get_db():
     finally:
         db.close()
 
-# Automatically create tables (safe if they already exist)
-Base.metadata.create_all(bind=engine)
+def init_db():
+    Base.metadata.create_all(bind=engine)

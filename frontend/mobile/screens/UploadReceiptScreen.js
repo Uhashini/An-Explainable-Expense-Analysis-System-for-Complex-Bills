@@ -72,7 +72,7 @@ export default function UploadReceiptScreen({ navigation }) {
 
     try {
       const formData = new FormData();
-      
+
       if (Platform.OS === 'web') {
         const blobResponse = await fetch(pickedImage);
         const blob = await blobResponse.blob();
@@ -91,7 +91,7 @@ export default function UploadReceiptScreen({ navigation }) {
 
       // Import API_BASE_URL locally to avoid breaking if it's missing at top level
       const { API_BASE_URL } = require('../utils/apiConfig');
-      
+
       const response = await fetch(`${API_BASE_URL}/receipts/upload`, {
         method: 'POST',
         body: formData,
@@ -105,7 +105,7 @@ export default function UploadReceiptScreen({ navigation }) {
       }
 
       // Navigate to ReceiptDetails with the actual extracted backend data
-      navigation.navigate('ReceiptDetails', { 
+      navigation.navigate('ReceiptDetails', {
         imageUri: pickedImage,
         receiptData: responseData,
       });
@@ -143,9 +143,9 @@ export default function UploadReceiptScreen({ navigation }) {
               <TouchableOpacity style={styles.retakeBtn} onPress={handleRetake} activeOpacity={0.8}>
                 <Text style={styles.retakeBtnText}>Retake / Change</Text>
               </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.proceedBtn, isUploading && { opacity: 0.7 }]} 
-                onPress={handleProceed} 
+              <TouchableOpacity
+                style={[styles.proceedBtn, isUploading && { opacity: 0.7 }]}
+                onPress={handleProceed}
                 activeOpacity={0.85}
                 disabled={isUploading}
               >
