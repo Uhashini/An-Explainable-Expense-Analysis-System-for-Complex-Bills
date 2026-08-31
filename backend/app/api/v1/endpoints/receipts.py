@@ -47,7 +47,21 @@ async def upload_receipt(file: UploadFile = File(...)):
         # Stamp the original filename
         result["filename"] = file.filename
 
-        # (Matching removed here to separate the concerns as requested)
+        # Insert into RawReceipt database table
+        try:
+            import json
+            from app.database.postgres_client import RawReceipt, get_db
+            # We don't have db as a dependency since it was missed in the route definition, let's create a local session
+            db_gen = get_db()
+            db = next(db_gen)
+            raw_receipt = RawReceipt(
+                ocr_payload=json.dumps(result)
+            )
+            db.add(raw_receipt)
+            db.commit()
+            db_gen.close()
+        except Exception as db_err:
+            print(f"Warning: Failed to save raw receipt to database: {db_err}")
 
         return result
 

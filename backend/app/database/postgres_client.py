@@ -131,6 +131,19 @@ class Product(Base):
     nutritional_info = Column(String(255))
     calories = Column(Integer)
 
+class RawReceipt(Base):
+    __tablename__ = "rawreceipts"
+    raw_id = Column(Integer, primary_key=True, index=True)
+    ocr_payload = Column(Text)
+
+class AnalysisResult(Base):
+    __tablename__ = "analysisresults"
+    analysis_id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer)
+    receipt_id = Column(Integer, nullable=True)
+    trend_data = Column(Text)
+    price_deviations = Column(Text)
+
 def get_db():
     db = SessionLocal()
     try:

@@ -23,19 +23,68 @@ _GARBAGE_NAMES = {
 }
 
 
+# Indian Grocery Brand and Abbreviation Mapping
+_BRAND_STRIP_LIST = [
+    "gowardhan", "aul", "goodzife", "goodlife", "double horse", "amul", 
+    "britannia", "parle", "haldiram", "mtr", "aashirvaad", "kissan", "maggi",
+    "yippee", "patanjali", "dabur", "himalaya", "fortune", "tata", "gemini"
+]
+
+_ABBREV_MAPPING = {
+    "ic cr": "ice cream",
+    "juic": "juice",
+    "chee": "cheese",
+    "chilly": "pepper",
+    "hysrid": "hybrid",
+    "idiy": "rice noodles",
+    "kdsesrt": "",
+    "hkawrice": "rice",
+}
+
+_CATEGORY_HINTS = {
+    "cow": "milk",
+    "tide": "detergent",
+    "surf": "detergent",
+    "ariel": "detergent",
+    "pepsodent": "toothpaste",
+    "colgate": "toothpaste",
+    "baginoroast": "roasted beans"
+}
+
 def _normalize(name: str) -> str:
     """
-    Normalize a receipt item name for better fuzzy matching:
+    Normalize a receipt item name for better fuzzy matching using a Rule Engine:
     - Lowercase
+    - Expand known OCR abbreviations
+    - Strip known Indian grocery brand names
+    - Add category hints (e.g., cow -> milk)
     - Strip common receipt qualifiers (GREEN, CAVENDISH, BRUSHED, etc.)
     - Remove non-alphanumeric chars
-    - Collapse whitespace
     """
     name = name.lower().strip()
+    
+    # 1. Expand Abbreviations
+    for abbr, expansion in _ABBREV_MAPPING.items():
+        if abbr in name:
+            name = name.replace(abbr, expansion)
+            
+    # 2. Add Category Hints
+    for hint, addition in _CATEGORY_HINTS.items():
+        if hint in name and addition not in name:
+            name = f"{name} {addition}"
+            
+    # 3. Strip Brands
+    for brand in _BRAND_STRIP_LIST:
+        if brand in name:
+            name = name.replace(brand, "")
+            
+    # 4. Strip non-alphanumeric and receipt qualifiers
     name = re.sub(r"[^a-z\s]", "", name)
     tokens = [t for t in name.split() if t not in _STRIP_WORDS]
+    
     if not tokens:
-        tokens = name.split()
+        tokens = name.split() # Fallback if everything was stripped
+        
     return " ".join(tokens).strip()
 
 
@@ -79,15 +128,24 @@ class ProductMatcher:
         logger.info("ProductMatcher initialization complete.")
 
     def _load_fallback_items(self):
-        """Load items for in-memory RapidFuzz matching (SQLite fallback)."""
-        from rapidfuzz import process, fuzz
-        self._fuzz_process = process
-        self._fuzz = fuzz
+        """Load items for in-memory Semantic NLP matching."""
+        try:
+            from sentence_transformers import SentenceTransformer, util
+            self.util = util
+            logger.info("Loading SentenceTransformer (all-MiniLM-L6-v2)...")
+            # Load the lightweight semantic model
+            self.model = SentenceTransformer('all-MiniLM-L6-v2')
+        except ImportError:
+            logger.error("sentence_transformers not installed! Cannot use Semantic Matching.")
+            return
 
         db = SessionLocal()
         try:
             self._fallback_items = db.query(FoodItem).all()
             self._fallback_names = [_normalize(f.canonical_name) for f in self._fallback_items]
+            logger.info(f"Computing embeddings for {len(self._fallback_names)} food items...")
+            self._fallback_embeddings = self.model.encode(self._fallback_names, convert_to_tensor=True)
+            logger.info("Embeddings cached successfully.")
         finally:
             db.close()
 
@@ -110,7 +168,7 @@ class ProductMatcher:
         if self.use_pg_trgm:
             return self._match_pg_trgm(item_name, normalized_query, similarity_threshold)
         else:
-            return self._match_rapidfuzz(item_name, normalized_query)
+            return self._match_semantic(item_name, normalized_query)
 
     def _match_pg_trgm(self, original_name: str, normalized_query: str, threshold: float):
         """
@@ -179,27 +237,32 @@ class ProductMatcher:
         finally:
             db.close()
 
-    def _match_rapidfuzz(self, original_name: str, normalized_query: str, threshold: float = 55.0):
-        """Fallback: in-memory RapidFuzz matching for SQLite."""
-        if not self._fallback_items:
+    def _match_semantic(self, original_name: str, normalized_query: str, threshold: float = 0.4):
+        """Fallback: in-memory Semantic NLP matching."""
+        if not self._fallback_items or not hasattr(self, 'model'):
             return None
 
-        match_result = self._fuzz_process.extractOne(
-            normalized_query,
-            self._fallback_names,
-            scorer=self._fuzz.WRatio
-        )
-        if match_result:
-            matched_name, score, idx = match_result
-            if score >= threshold:
-                food = self._fallback_items[idx]
-                logger.info(f"RapidFuzz match (score={score:.0f}): '{original_name}' → '{food.canonical_name}'")
-                return {
-                    "food_id": food.food_id,
-                    "matched_name": food.canonical_name,
-                    "display_name": food.display_name,
-                    "category": food.category,
-                }
+        # Encode the query
+        query_embedding = self.model.encode(normalized_query, convert_to_tensor=True)
+        
+        # Compute cosine similarity against all food items
+        cos_scores = self.util.cos_sim(query_embedding, self._fallback_embeddings)[0]
+        
+        import torch
+        best_match_idx = torch.argmax(cos_scores).item()
+        best_match_score = cos_scores[best_match_idx].item()
+        
+        if best_match_score >= threshold:
+            food = self._fallback_items[best_match_idx]
+            logger.info(f"Semantic match (score={best_match_score:.2f}): '{original_name}' -> '{food.canonical_name}'")
+            return {
+                "food_id": food.food_id,
+                "matched_name": food.canonical_name,
+                "display_name": food.display_name,
+                "category": food.category,
+            }
+            
+        logger.debug(f"No semantic match for '{original_name}' (best score: {best_match_score:.2f})")
         return None
 
     @staticmethod
