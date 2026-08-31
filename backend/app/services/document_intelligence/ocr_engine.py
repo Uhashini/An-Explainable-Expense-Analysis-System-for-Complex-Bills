@@ -2,6 +2,8 @@ import os
 # CRITICAL: These must be set BEFORE any paddle imports
 os.environ["FLAGS_enable_pir_api"] = "0"
 os.environ["FLAGS_use_onednn"] = "0"
+os.environ["FLAGS_use_mkldnn"] = "0"
+os.environ["PADDLE_DISABLE_ONEDNN"] = "1"
 
 from paddleocr import PaddleOCR
 import numpy as np
@@ -30,11 +32,16 @@ class OCREngine:
             self.engine = PaddleOCR(
                 use_angle_cls=True,
                 lang="en",
+                enable_mkldnn=False,
+
                 det_limit_side_len=960,
+
                 det_db_thresh=0.3,
                 det_db_box_thresh=0.6,
-                det_db_unclip_ratio=1.3,
+                det_db_unclip_ratio=1.5,
+
                 use_dilation=False,
+
                 drop_score=0.5
             )
             logger.info(f"PaddleOCR initialized with language: {lang}")
@@ -53,7 +60,7 @@ class OCREngine:
             if isinstance(image, np.ndarray):
                 h, w = image.shape[:2]
 
-            if max(h, w) < 1500:
+            if max(h, w) < 600:
                 scale = 2.0
                 image = cv2.resize(
                     image,
