@@ -102,7 +102,7 @@ export default function PersonalInformationScreen({ navigation }) {
             {renderField('Height', 'height')}
             {renderField('Weight', 'weight')}
 
-            {isEditing ? (
+            {isEditing && (
               <View style={styles.buttonRow}>
                 <TouchableOpacity style={[styles.button, styles.cancelButton]} onPress={() => { setIsEditing(false); fetchProfile(); }} disabled={saving}>
                   <Text style={[styles.buttonText, { color: COLORS.primary }]}>Cancel</Text>
@@ -111,14 +111,16 @@ export default function PersonalInformationScreen({ navigation }) {
                   {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Save</Text>}
                 </TouchableOpacity>
               </View>
-            ) : (
-              <TouchableOpacity style={styles.button} activeOpacity={0.85} onPress={() => setIsEditing(true)}>
-                <Text style={styles.buttonText}>Edit Information</Text>
-              </TouchableOpacity>
             )}
           </>
         )}
       </ScrollView>
+      
+      {!loading && !isEditing && (
+        <TouchableOpacity style={styles.fab} activeOpacity={0.85} onPress={() => setIsEditing(true)}>
+          <Text style={styles.fabIcon}>✎</Text>
+        </TouchableOpacity>
+      )}
     </ScreenLayout>
   );
 }
@@ -180,5 +182,26 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.bold,
     fontSize: 14,
     color: COLORS.surface,
+  },
+  fab: {
+    position: 'absolute',
+    bottom: 30,
+    right: 30,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: COLORS.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  fabIcon: {
+    fontSize: 24,
+    color: '#fff',
+    lineHeight: 28,
   },
 });

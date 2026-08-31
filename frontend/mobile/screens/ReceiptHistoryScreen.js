@@ -7,8 +7,6 @@ import { COLORS, FONTS } from '../theme';
 import { API_BASE_URL } from '../utils/apiConfig';
 import { getUser } from '../utils/authStorage';
 
-const CATEGORIES = ['All', 'Grocery', 'Fruits', 'Vegetables', 'Dairy', 'Snacks'];
-
 function ReceiptCard({ receipt, onPress }) {
   return (
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.8}>
@@ -30,7 +28,6 @@ function ReceiptCard({ receipt, onPress }) {
 
 export default function ReceiptHistoryScreen({ navigation }) {
   const [search, setSearch] = useState('');
-  const [category, setCategory] = useState('All');
   const [receipts, setReceipts] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -98,25 +95,6 @@ export default function ReceiptHistoryScreen({ navigation }) {
             </TouchableOpacity>
           )}
         </View>
-
-        {/* Category Filters */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filtersRow}
-        >
-          {CATEGORIES.map((cat) => (
-            <TouchableOpacity
-              key={cat}
-              style={[styles.filterChip, category === cat && styles.filterChipActive]}
-              onPress={() => setCategory(cat)}
-            >
-              <Text style={[styles.filterText, category === cat && styles.filterTextActive]}>
-                {cat}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
 
         {/* List */}
         <ScrollView
@@ -196,34 +174,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: COLORS.mutedText,
     padding: 4,
-  },
-
-  // Filters
-  filtersRow: {
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-    gap: 8,
-  },
-  filterChip: {
-    paddingVertical: 6,
-    paddingHorizontal: 14,
-    borderRadius: 20,
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#ede8e0',
-  },
-  filterChipActive: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
-  },
-  filterText: {
-    fontFamily: FONTS.semiBold,
-    fontSize: 12,
-    color: COLORS.mutedText,
-    letterSpacing: 0.3,
-  },
-  filterTextActive: {
-    color: '#fff',
   },
 
   // Cards

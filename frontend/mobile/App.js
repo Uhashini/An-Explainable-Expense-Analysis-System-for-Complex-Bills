@@ -13,39 +13,40 @@ import ProfileIcon from './assets/icons/profile.svg';
 import { useFonts, PlusJakartaSans_400Regular, PlusJakartaSans_600SemiBold, PlusJakartaSans_700Bold } from '@expo-google-fonts/plus-jakarta-sans';
 
 // â”€â”€ Auth Screens â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-import LandingScreen       from './screens/LandingScreen';
-import SignInScreen        from './screens/SignInScreen';
-import SignUpScreen        from './screens/SignUpScreen';
+import LandingScreen from './screens/LandingScreen';
+import SignInScreen from './screens/SignInScreen';
+import SignUpScreen from './screens/SignUpScreen';
 
 // â”€â”€ Onboarding Screens â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-import PersonalInfoScreen  from './screens/OnboardingFlowScreen';
-import GoalsScreen         from './screens/GoalsScreen';
+import PersonalInfoScreen from './screens/OnboardingFlowScreen';
+import GoalsScreen from './screens/GoalsScreen';
 
 // â”€â”€ Main App Screens â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-import DashboardScreen          from './screens/DashboardScreen';
-import ReceiptHistoryScreen     from './screens/ReceiptHistoryScreen';
-import UploadReceiptScreen      from './screens/UploadReceiptScreen';
-import SpendingAnalyticsScreen  from './screens/SpendingAnalyticsScreen';
-import ReceiptDetailsScreen     from './screens/ReceiptDetailsScreen';
-import ProfileScreen            from './screens/ProfileScreen';
-import SettingsScreen           from './screens/SettingsScreen';
-import HealthProfileScreen      from './screens/HealthProfileScreen';
+import DashboardScreen from './screens/DashboardScreen';
+import ReceiptHistoryScreen from './screens/ReceiptHistoryScreen';
+import UploadReceiptScreen from './screens/UploadReceiptScreen';
+import SpendingAnalyticsScreen from './screens/SpendingAnalyticsScreen';
+import ReceiptDetailsScreen from './screens/ReceiptDetailsScreen';
+import ProfileScreen from './screens/ProfileScreen';
+import SettingsScreen from './screens/SettingsScreen';
+import HealthProfileScreen from './screens/HealthProfileScreen';
 import ShoppingPreferencesScreen from './screens/ShoppingPreferencesScreen';
 import PersonalInformationScreen from './screens/PersonalInformationScreen';
-import FoodItemDetailsScreen      from './screens/FoodItemDetailsScreen';
+import FoodItemDetailsScreen from './screens/FoodItemDetailsScreen';
+import EditGoalsScreen from './screens/EditGoalsScreen';
 
 import { COLORS, FONTS } from './theme';
 
 const Stack = createNativeStackNavigator();
-const Tab   = createBottomTabNavigator();
+const Tab = createBottomTabNavigator();
 
 // â”€â”€â”€ Tab Icons â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const TAB_ICONS = {
-  Home:     HomeIcon,
+  Home: HomeIcon,
   Receipts: ReceiptIcon,
-  Scan:     CameraIcon,
+  Scan: CameraIcon,
   Insights: InsightsIcon,
-  Profile:  ProfileIcon,
+  Profile: ProfileIcon,
 };
 
 // â”€â”€â”€ Custom Tab Bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -56,8 +57,8 @@ function CustomTabBar({ state, descriptors, navigation }) {
     <View style={[tabStyles.bar, { paddingBottom: insets.bottom || 8 }]}>
       {state.routes.map((route, index) => {
         const isFocused = state.index === index;
-        const isScan    = route.name === 'Scan';
-        const icon      = TAB_ICONS[route.name];
+        const isScan = route.name === 'Scan';
+        const icon = TAB_ICONS[route.name];
 
         const onPress = () => {
           const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
@@ -172,11 +173,11 @@ function MainTabs() {
       tabBar={(props) => <CustomTabBar {...props} />}
       screenOptions={{ headerShown: false }}
     >
-      <Tab.Screen name="Home"     component={DashboardScreen} />
+      <Tab.Screen name="Home" component={DashboardScreen} />
       <Tab.Screen name="Receipts" component={ReceiptHistoryScreen} />
-      <Tab.Screen name="Scan"     component={UploadReceiptScreen} />
+      <Tab.Screen name="Scan" component={UploadReceiptScreen} />
       <Tab.Screen name="Insights" component={SpendingAnalyticsScreen} />
-      <Tab.Screen name="Profile"  component={ProfileScreen} />
+      <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
   );
 }
@@ -211,20 +212,21 @@ export default function App() {
           }}
         >
           {/* â”€â”€ Auth â”€â”€ */}
-          <Stack.Screen name="Landing"       component={LandingScreen} />
-          <Stack.Screen name="SignIn"        component={SignInScreen} />
-          <Stack.Screen name="SignUp"        component={SignUpScreen} />
+          <Stack.Screen name="Landing" component={LandingScreen} />
+          <Stack.Screen name="SignIn" component={SignInScreen} />
+          <Stack.Screen name="SignUp" component={SignUpScreen} />
 
           {/* â”€â”€ Onboarding â”€â”€ */}
-          <Stack.Screen name="PersonalInfo"  component={PersonalInfoScreen} />
-          <Stack.Screen name="Goals"         component={GoalsScreen} />
+          <Stack.Screen name="PersonalInfo" component={PersonalInfoScreen} />
+          <Stack.Screen name="Goals" component={GoalsScreen} />
+          <Stack.Screen name="EditGoals" component={EditGoalsScreen} />
           <Stack.Screen name="PersonalInformation" component={PersonalInformationScreen} />
           <Stack.Screen name="HealthProfile" component={HealthProfileScreen} />
           <Stack.Screen name="ShoppingPreferences" component={ShoppingPreferencesScreen} />
-          <Stack.Screen name="Settings"      component={SettingsScreen} />
+          <Stack.Screen name="Settings" component={SettingsScreen} />
 
           {/* â”€â”€ Main App (Tab Navigator) â”€â”€ */}
-          <Stack.Screen name="Main"          component={MainTabs} />
+          <Stack.Screen name="Main" component={MainTabs} />
 
           {/* â”€â”€ Detail screens pushed on top of tabs â”€â”€ */}
           <Stack.Screen

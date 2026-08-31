@@ -16,7 +16,7 @@ const MENU = [
     id: 'goals',
     title: 'Goals',
     subtitle: 'Save money, eat healthy, gain muscle',
-    screen: 'Goals',
+    screen: 'EditGoals',
   },
   {
     id: 'health',
