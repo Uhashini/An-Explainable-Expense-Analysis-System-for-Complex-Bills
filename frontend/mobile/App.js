@@ -26,6 +26,7 @@ import DashboardScreen from './screens/DashboardScreen';
 import ReceiptHistoryScreen from './screens/ReceiptHistoryScreen';
 import UploadReceiptScreen from './screens/UploadReceiptScreen';
 import SpendingAnalyticsScreen from './screens/SpendingAnalyticsScreen';
+import AIInsightsScreen from './screens/AIInsightsScreen';
 import ReceiptDetailsScreen from './screens/ReceiptDetailsScreen';
 import ProfileScreen from './screens/ProfileScreen';
 import SettingsScreen from './screens/SettingsScreen';
@@ -165,6 +166,19 @@ const tabStyles = StyleSheet.create({
   },
 });
 
+// â”€â”€â”€ Receipt Stack (Nested in Tabs) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+const ReceiptStack = createNativeStackNavigator();
+
+function ReceiptStackNavigator() {
+  return (
+    <ReceiptStack.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
+      <ReceiptStack.Screen name="ReceiptHistory" component={ReceiptHistoryScreen} />
+      <ReceiptStack.Screen name="ReceiptDetails" component={ReceiptDetailsScreen} />
+      <ReceiptStack.Screen name="AIInsights" component={AIInsightsScreen} />
+    </ReceiptStack.Navigator>
+  );
+}
+
 // â”€â”€â”€ Main Tab Navigator â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function MainTabs() {
   return (
@@ -174,7 +188,7 @@ function MainTabs() {
       screenOptions={{ headerShown: false }}
     >
       <Tab.Screen name="Home" component={DashboardScreen} />
-      <Tab.Screen name="Receipts" component={ReceiptHistoryScreen} />
+      <Tab.Screen name="Receipts" component={ReceiptStackNavigator} />
       <Tab.Screen name="Scan" component={UploadReceiptScreen} />
       <Tab.Screen name="Insights" component={SpendingAnalyticsScreen} />
       <Tab.Screen name="Profile" component={ProfileScreen} />
@@ -229,11 +243,6 @@ export default function App() {
           <Stack.Screen name="Main" component={MainTabs} />
 
           {/* â”€â”€ Detail screens pushed on top of tabs â”€â”€ */}
-          <Stack.Screen
-            name="ReceiptDetails"
-            component={ReceiptDetailsScreen}
-            options={{ animation: 'slide_from_right' }}
-          />
           <Stack.Screen
             name="FoodItemDetails"
             component={FoodItemDetailsScreen}

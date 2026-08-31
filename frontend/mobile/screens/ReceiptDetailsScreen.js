@@ -537,6 +537,17 @@ export default function ReceiptDetailsScreen({ route, navigation }) {
             </Text>
           </TouchableOpacity>
 
+          {/* ── Advanced AI Analytics Button ── */}
+          <TouchableOpacity
+            style={[styles.primaryButton, { backgroundColor: '#fff8f0', borderColor: '#f0d8b0', borderWidth: 1, marginTop: 12, marginBottom: 12 }]}
+            activeOpacity={0.85}
+            onPress={() => navigation.push('AIInsights', { receiptId })}
+          >
+            <Text style={[styles.primaryButtonText, { color: '#7a4800' }]}>
+              📊 View AI Spending Analytics
+            </Text>
+          </TouchableOpacity>
+
           {/* ── Receipt Analysis CTA ── */}
           <TouchableOpacity
             style={styles.analysisButton}

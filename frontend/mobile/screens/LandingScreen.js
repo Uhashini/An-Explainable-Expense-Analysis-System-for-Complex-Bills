@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, Image, StyleSheet, TouchableOpacity } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import BackgroundLayout from '../components/BackgroundLayout';
 
 export default function LandingScreen({ navigation }) {

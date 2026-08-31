@@ -16,3 +16,4 @@ passlib[bcrypt]==1.7.4
 pgvector==0.2.1
 sentence-transformers==2.5.1
 torch
+email-validator
