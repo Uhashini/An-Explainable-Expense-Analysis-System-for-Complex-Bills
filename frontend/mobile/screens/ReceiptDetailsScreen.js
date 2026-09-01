@@ -541,10 +541,13 @@ export default function ReceiptDetailsScreen({ route, navigation }) {
           <TouchableOpacity
             style={[styles.primaryButton, { backgroundColor: '#fff8f0', borderColor: '#f0d8b0', borderWidth: 1, marginTop: 12, marginBottom: 12 }]}
             activeOpacity={0.85}
-            onPress={() => navigation.push('AIInsights', { receiptId, totalAmount, items: extractedItems })}
+            onPress={() => navigation.push('AIInsights', {
+              receiptId,
+              receiptData: { receipt_info: { items: extractedItems, total_amount: totalAmount } }
+            })}
           >
             <Text style={[styles.primaryButtonText, { color: '#7a4800' }]}>
-              📊 View Spending Insights
+              📊 View AI Spending Analytics
             </Text>
           </TouchableOpacity>
 

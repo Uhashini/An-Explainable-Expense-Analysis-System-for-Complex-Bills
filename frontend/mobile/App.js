@@ -239,10 +239,20 @@ export default function App() {
           <Stack.Screen name="ShoppingPreferences" component={ShoppingPreferencesScreen} />
           <Stack.Screen name="Settings" component={SettingsScreen} />
 
-          {/* â”€â”€ Main App (Tab Navigator) â”€â”€ */}
+          {/* ——— Main App (Tab Navigator) ——— */}
           <Stack.Screen name="Main" component={MainTabs} />
 
-          {/* â”€â”€ Detail screens pushed on top of tabs â”€â”€ */}
+          {/* ——— Detail screens pushed on top of tabs ——— */}
+          <Stack.Screen
+            name="ReceiptDetails"
+            component={ReceiptDetailsScreen}
+            options={{ animation: 'slide_from_right' }}
+          />
+          <Stack.Screen
+            name="AIInsights"
+            component={AIInsightsScreen}
+            options={{ animation: 'slide_from_right' }}
+          />
           <Stack.Screen
             name="FoodItemDetails"
             component={FoodItemDetailsScreen}

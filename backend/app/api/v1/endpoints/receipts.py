@@ -47,21 +47,21 @@ async def upload_receipt(file: UploadFile = File(...)):
         # Stamp the original filename
         result["filename"] = file.filename
 
-        # Insert into RawReceipt database table
-        try:
-            import json
-            from app.database.postgres_client import RawReceipt, get_db
-            # We don't have db as a dependency since it was missed in the route definition, let's create a local session
-            db_gen = get_db()
-            db = next(db_gen)
-            raw_receipt = RawReceipt(
-                ocr_payload=json.dumps(result)
-            )
-            db.add(raw_receipt)
-            db.commit()
-            db_gen.close()
-        except Exception as db_err:
-            print(f"Warning: Failed to save raw receipt to database: {db_err}")
+        # Auto-match extracted items against database food & nutrition items
+        items = result.get("data", {}).get("receipt_info", {}).get("items", [])
+        for item in items:
+            item_name = item.get("name", "")
+            match = product_matcher.match_item(item_name)
+            if match:
+                item["food_id"] = match.get("food_id")
+                item["matched_name"] = match.get("matched_name")
+                item["display_name"] = match.get("display_name")
+                item["category"] = match.get("category")
+                item["subcategory"] = match.get("subcategory")
+                item["serving_size"] = match.get("serving_size")
+                item["serving_unit"] = match.get("serving_unit")
+                item["nutrition"] = match.get("nutrition")
+                item["health"] = match.get("health")
 
         return result
 
