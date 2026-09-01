@@ -1375,6 +1375,12 @@ const styles = StyleSheet.create({
     color: COLORS.mutedText,
   },
   metricLabel: {
+    fontFamily: FONTS.semiBold,
+    fontSize: 11,
+    color: COLORS.mutedText,
+    marginTop: 4,
+  },
+
   extravagantDivider: {
     display: 'none',
   },
