@@ -322,16 +322,32 @@ export default function AIInsightsScreen({ route, navigation }) {
       case 'Gain Muscles':
         return (
           <View style={styles.card}>
-            <Text style={styles.title}>Muscle Gain Insights</Text>
-            <Text style={styles.subtitle}>Analyzing Receipt #{receiptId || 'N/A'}</Text>
-            
+            <View style={styles.cardHeader}>
+              <View>
+                <Text style={styles.title}>Muscle Gain Insights</Text>
+                <Text style={styles.subtitle}>Full protein intelligence dashboard</Text>
+              </View>
+            </View>
+
+            {/* Preview metrics from receipt */}
             <View style={styles.insightItem}>
               <Text style={styles.insightIcon}>💪</Text>
               <View style={styles.insightTextContainer}>
-                <Text style={styles.insightTitle}>Protein Score</Text>
-                <Text style={styles.insightDesc}>AI will calculate the total protein yield from this grocery haul.</Text>
+                <Text style={styles.insightTitle}>Protein Analysis (GM-01 to GM-05)</Text>
+                <Text style={styles.insightDesc}>
+                  View your complete protein analysis — availability, quality, cost efficiency,
+                  smart recommendations, and purchasing trend — all powered by your real receipt history.
+                </Text>
               </View>
             </View>
+
+            <TouchableOpacity
+              style={styles.gainMuscleNavBtn}
+              activeOpacity={0.85}
+              onPress={() => navigation.navigate('GainMuscle')}
+            >
+              <Text style={styles.gainMuscleNavBtnText}>Open Gain Muscle Dashboard →</Text>
+            </TouchableOpacity>
           </View>
         );
       default:
@@ -568,5 +584,24 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     marginTop: 10,
-  }
+  },
+  gainMuscleNavBtn: {
+    width: '100%',
+    paddingVertical: 14,
+    borderRadius: 50,
+    backgroundColor: COLORS.primary,
+    alignItems: 'center',
+    marginTop: 16,
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  gainMuscleNavBtnText: {
+    fontFamily: FONTS.bold,
+    fontSize: 13,
+    color: '#fff',
+    letterSpacing: 0.5,
+  },
 });

@@ -35,6 +35,7 @@ import ShoppingPreferencesScreen from './screens/ShoppingPreferencesScreen';
 import PersonalInformationScreen from './screens/PersonalInformationScreen';
 import FoodItemDetailsScreen from './screens/FoodItemDetailsScreen';
 import EditGoalsScreen from './screens/EditGoalsScreen';
+import GainMuscleScreen from './screens/GainMuscleScreen';
 
 import { COLORS, FONTS } from './theme';
 
@@ -246,6 +247,11 @@ export default function App() {
           <Stack.Screen
             name="FoodItemDetails"
             component={FoodItemDetailsScreen}
+            options={{ animation: 'slide_from_right' }}
+          />
+          <Stack.Screen
+            name="GainMuscle"
+            component={GainMuscleScreen}
             options={{ animation: 'slide_from_right' }}
           />
         </Stack.Navigator>
