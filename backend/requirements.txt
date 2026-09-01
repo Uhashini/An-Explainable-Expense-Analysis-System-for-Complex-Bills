@@ -17,3 +17,6 @@ pgvector==0.2.1
 sentence-transformers==2.5.1
 torch
 email-validator
+statsmodels
+scikit-learn
+pandas

@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Dimensions, Platform } from 'react-native';
+import Svg, { Path, Circle, Defs, LinearGradient, Stop, G, Text as SvgText, Rect, Line } from 'react-native-svg';
 import ScreenLayout from '../components/ScreenLayout';
 import { COLORS, FONTS } from '../theme';
+import { Feather } from '@expo/vector-icons';
 import { API_BASE_URL } from '../utils/apiConfig';
 import { getUser } from '../utils/authStorage';
 
@@ -16,6 +18,8 @@ export default function AIInsightsScreen({ route, navigation }) {
   const [loading, setLoading] = useState(false);
   const [nutritionData, setNutritionData] = useState(null);
   const [savedReceiptsList, setSavedReceiptsList] = useState([]);
+  const [analyticsData, setAnalyticsData] = useState(null);
+  const [selectedPoint, setSelectedPoint] = useState(null);
 
   const { receiptId, receiptData } = route.params || {};
 
@@ -287,6 +291,10 @@ export default function AIInsightsScreen({ route, navigation }) {
         { id: 5, number: 5, isLatest: true, storeName: 'Store Bengaluru', dateStr: 'Today', amountStr: `₹${data.calories ? '793.12' : '450'}`, itemCount: 13, scoreVal: data.basketScore || 86, grade: 'Grade A', gradeColor: '#2E7D32', gradeBg: '#E8F5E9' },
       ];
     }
+
+        // Monthly history chart calcs
+        const monthlyHistory = trend?.monthly_history || [];
+        const maxMonthVal = monthlyHistory.length > 0 ? Math.max(...monthlyHistory.map(m => Math.max(m.amount, m.trend_val || m.amount)), 1) : 1;
 
     const firstScore = creativeReceiptCards[0]?.scoreVal || 58;
     const latestScore = creativeReceiptCards[creativeReceiptCards.length - 1]?.scoreVal || 86;
@@ -855,21 +863,309 @@ export default function AIInsightsScreen({ route, navigation }) {
     switch (activeMode) {
       case 'Save Money':
         return (
-          <View style={styles.card}>
-            <Text style={styles.title}>Money Saving Insights</Text>
-            <Text style={styles.subtitle}>Analyzing Receipt #{receiptId || 'N/A'}</Text>
-            <View style={styles.insightItem}>
-              <Text style={styles.insightIcon}>📉</Text>
-              <View style={styles.insightTextContainer}>
-                <Text style={styles.insightTitle}>Price Deviation</Text>
-                <Text style={styles.insightDesc}>AI will compare prices in this receipt against your historical average.</Text>
+          <View style={styles.cardContainer}>
+            <View style={styles.cardHeader}>
+              <View>
+                <Text style={styles.title}>Money Saving Insights</Text>
+                <Text style={styles.subtitle}>Analyzing Receipt #{receiptId || 'N/A'}</Text>
               </View>
             </View>
-            <View style={styles.insightItem}>
-              <Text style={styles.insightIcon}>🚨</Text>
-              <View style={styles.insightTextContainer}>
-                <Text style={styles.insightTitle}>Category Overspending</Text>
-                <Text style={styles.insightDesc}>AI Anomaly detection flags unusual spending in categories like Snacks or Beverages.</Text>
+            
+            {/* SM-04: Spending Trend */}
+            <View style={styles.insightItemExtravagant}>
+              <View style={styles.insightHeaderExtravagant}>
+                <View style={styles.iconBox}>
+                  {isOver ? <Feather name="trending-up" size={20} color="#e74c3c" /> : <Feather name="trending-down" size={20} color="#27ae60" />}
+                </View>
+                <Text style={styles.insightTitleExtravagant}>Monthly Spending Trend</Text>
+              </View>
+              
+              {trend ? (
+                <>
+                  <Text style={styles.insightDescExtravagant}>
+                    Comparing this receipt's total <Text style={{ fontFamily: FONTS.bold, color: COLORS.primary }}>(₹{trend.current_spending})</Text> against your rolling historical average <Text style={{ fontFamily: FONTS.bold, color: COLORS.primary }}>(₹{trend.previous_average})</Text>.
+                  </Text>
+
+                  {/* SVG Donut Gauge */}
+                  <View style={{ alignItems: 'center', marginVertical: 24, position: 'relative' }}>
+                    <Svg width={180} height={180} viewBox="0 0 180 180">
+                      <Defs>
+                        <LinearGradient id="gradOver" x1="0%" y1="0%" x2="100%" y2="100%">
+                          <Stop offset="0%" stopColor="#ff4d4d" />
+                          <Stop offset="100%" stopColor="#c0392b" />
+                        </LinearGradient>
+                        <LinearGradient id="gradUnder" x1="0%" y1="0%" x2="100%" y2="100%">
+                          <Stop offset="0%" stopColor="#4cd137" />
+                          <Stop offset="100%" stopColor="#27ae60" />
+                        </LinearGradient>
+                      </Defs>
+                      
+                      {/* Background Track */}
+                      <Circle cx="90" cy="90" r={radius} stroke="#f0f0f0" strokeWidth={strokeWidth} fill="none" />
+                      
+                      {/* Historical Average Track */}
+                      <Circle 
+                        cx="90" cy="90" r={radius} 
+                        stroke="#dcdde1" strokeWidth={strokeWidth} fill="none" 
+                        strokeDasharray={circumference} strokeDashoffset={avgDashoffset}
+                        strokeLinecap="round" transform="rotate(-90 90 90)"
+                      />
+                      
+                      {/* Current Spending Track */}
+                      <Circle 
+                        cx="90" cy="90" r={radius} 
+                        stroke={isOver ? "url(#gradOver)" : "url(#gradUnder)"} 
+                        strokeWidth={strokeWidth - 2} fill="none" 
+                        strokeDasharray={circumference} strokeDashoffset={currDashoffset}
+                        strokeLinecap="round" transform="rotate(-90 90 90)"
+                      />
+                    </Svg>
+                    <View style={styles.gaugeCenterText}>
+                      <Text style={[styles.gaugePercentage, { color: isOver ? '#c0392b' : '#27ae60' }]}>
+                        {isOver ? '+' : ''}{trend.change_percentage}%
+                      </Text>
+                      <Text style={styles.gaugeLabel}>{isOver ? 'Higher' : 'Lower'}</Text>
+                    </View>
+                  </View>
+                  
+                  <View style={styles.legendRow}>
+                    <View style={styles.legendItem}>
+                      <View style={[styles.legendDot, { backgroundColor: '#dcdde1' }]} />
+                      <Text style={styles.legendText}>Historical Avg</Text>
+                    </View>
+                    <View style={styles.legendItem}>
+                      <View style={[styles.legendDot, { backgroundColor: isOver ? '#e74c3c' : '#2ecc71' }]} />
+                      <Text style={styles.legendText}>Current Receipt</Text>
+                    </View>
+                  </View>
+
+                  {/* Monthly History Trend Line */}
+                  {monthlyHistory.length > 0 && (() => {
+                    const chartWidth = screenWidth - 80;
+                    const chartHeight = 100;
+                    const minMonthVal = Math.min(...monthlyHistory.map(m => Math.min(m.amount, m.trend_val || m.amount)), 0) * 0.8;
+                    const range = (maxMonthVal - minMonthVal) || 1;
+
+                    const points = monthlyHistory.map((m, idx) => {
+                      const x = (idx / (monthlyHistory.length - 1 || 1)) * chartWidth;
+                      const y = chartHeight - ((m.amount - minMonthVal) / range) * (chartHeight - 20);
+                      const expectedY = chartHeight - (((m.trend_val || m.amount) - minMonthVal) / range) * (chartHeight - 20);
+                      return { x, y, expectedY, amount: m.amount, month: m.month, isAnomaly: m.is_anomaly, trend_val: m.trend_val };
+                    });
+
+                    const linePath = points.map((p, idx) => `${idx === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
+                    const areaPath = `${linePath} L ${chartWidth} ${chartHeight} L 0 ${chartHeight} Z`;
+                    const expectedPath = points.map((p, idx) => `${idx === 0 ? 'M' : 'L'} ${p.x} ${p.expectedY}`).join(' ');
+
+                    const formatMonth = (ym) => {
+                      if (!ym) return '';
+                      const [year, month] = ym.split('-');
+                      const date = new Date(year, parseInt(month) - 1, 1);
+                      return date.toLocaleDateString('en-US', { month: 'short' });
+                    };
+
+                    return (
+                      <View style={{ marginTop: 32 }}>
+                        <Text style={[styles.insightTitleExtravagant, { fontSize: 14, marginBottom: 24, textAlign: 'center' }]}>Your Spending Trend</Text>
+                        
+                        <View style={{ height: chartHeight + 30, alignItems: 'center' }}>
+                          <Svg width={chartWidth} height={chartHeight} style={{ overflow: 'visible' }}>
+                            <Defs>
+                              <LinearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
+                                <Stop offset="0" stopColor={COLORS.primary} stopOpacity="0.2" />
+                                <Stop offset="1" stopColor={COLORS.primary} stopOpacity="0" />
+                              </LinearGradient>
+                            </Defs>
+                            
+                            {/* Area Fill for Actual Spending */}
+                            <Path d={areaPath} fill="url(#areaGradient)" />
+                            
+                            {/* STL Expected Trend Line (Gray Dotted) */}
+                            <Path d={expectedPath} fill="none" stroke="#b2bec3" strokeWidth="2" strokeDasharray="5, 5" />
+                            
+                            {/* Actual Spending Trend Line */}
+                            <Path d={linePath} fill="none" stroke={COLORS.primary} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                            
+                            {/* Data Points */}
+                            {points.map((p, idx) => {
+                              const dotColor = p.isAnomaly ? '#ff4d4d' : COLORS.primary;
+                              const dotSize = p.isAnomaly ? "7" : "5";
+                              const isSelected = selectedPoint && selectedPoint.month === p.month;
+                              return (
+                                <G key={idx} onPress={() => setSelectedPoint(isSelected ? null : p)}>
+                                  <Circle cx={p.x} cy={p.y} r="25" fill="transparent" /> {/* Large hit area */}
+                                  {isSelected && (
+                                    <Circle cx={p.x} cy={p.y} r="12" fill={dotColor} fillOpacity="0.2" />
+                                  )}
+                                  <Circle cx={p.x} cy={p.y} r={dotSize} fill="#fff" stroke={dotColor} strokeWidth={isSelected ? "3" : "2"} />
+                                  {!isSelected && (
+                                    <SvgText
+                                      x={p.x}
+                                      y={p.y - 12}
+                                      fontSize="10"
+                                      fill={dotColor}
+                                      textAnchor="middle"
+                                      fontWeight="bold"
+                                    >
+                                      ₹{Math.round(p.amount)}
+                                    </SvgText>
+                                  )}
+                                </G>
+                              );
+                            })}
+                          </Svg>
+                          
+                          {/* Tooltip Overlay */}
+                          {selectedPoint && (() => {
+                            const p = selectedPoint;
+                            // Ensure tooltip stays within bounds
+                            let leftPos = p.x - 60;
+                            if (leftPos < 0) leftPos = 0;
+                            if (leftPos + 120 > chartWidth) leftPos = chartWidth - 120;
+                            
+                            return (
+                              <View style={{
+                                position: 'absolute',
+                                left: leftPos,
+                                top: p.y - 70,
+                                backgroundColor: '#2d3436',
+                                padding: 8,
+                                borderRadius: 8,
+                                width: 120,
+                                shadowColor: '#000',
+                                shadowOffset: { width: 0, height: 2 },
+                                shadowOpacity: 0.2,
+                                shadowRadius: 4,
+                                elevation: 4,
+                                zIndex: 10,
+                              }}>
+                                <Text style={{ color: '#fff', fontSize: 10, fontFamily: FONTS.bold, textAlign: 'center', marginBottom: 4 }}>
+                                  {formatMonth(p.month)} Overview
+                                </Text>
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 2 }}>
+                                  <Text style={{ color: '#b2bec3', fontSize: 10, fontFamily: FONTS.regular }}>Normal:</Text>
+                                  <Text style={{ color: '#fff', fontSize: 10, fontFamily: FONTS.semiBold }}>₹{Math.round(p.trend_val || p.amount)}</Text>
+                                </View>
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                  <Text style={{ color: '#b2bec3', fontSize: 10, fontFamily: FONTS.regular }}>Actual:</Text>
+                                  <Text style={{ color: p.isAnomaly ? '#ff7675' : '#55efc4', fontSize: 10, fontFamily: FONTS.bold }}>₹{Math.round(p.amount)}</Text>
+                                </View>
+                              </View>
+                            );
+                          })()}
+                          
+                          {/* X-Axis Labels */}
+                          <View style={{ flexDirection: 'row', width: chartWidth, justifyContent: 'space-between', marginTop: 10 }}>
+                            {points.map((p, idx) => (
+                              <Text key={idx} style={{ fontSize: 11, color: COLORS.mutedText, fontFamily: FONTS.medium, width: 30, textAlign: 'center' }}>
+                                {formatMonth(p.month)}
+                              </Text>
+                            ))}
+                          </View>
+                        </View>
+                        
+                        {/* Legend / Info Box */}
+                        <View style={styles.emptyStateBox}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                            <Feather name="info" size={16} color={COLORS.primary} />
+                            <Text style={{ fontFamily: FONTS.semiBold, fontSize: 12, color: COLORS.primary, marginLeft: 6 }}>How to read this chart</Text>
+                          </View>
+                          <Text style={[styles.insightDesc, { fontSize: 11, textAlign: 'left', marginBottom: 4 }]}>
+                            • <Text style={{ fontFamily: FONTS.semiBold, color: '#b2bec3' }}>Gray dotted line:</Text> Your Normal Habit (what you usually spend).
+                          </Text>
+                          <Text style={[styles.insightDesc, { fontSize: 11, textAlign: 'left', marginBottom: 4 }]}>
+                            • <Text style={{ fontFamily: FONTS.semiBold, color: COLORS.primary }}>Red dot:</Text> A month where you spent noticeably more (or less) than normal.
+                          </Text>
+                        </View>
+                        
+                      </View>
+                    );
+                  })()}
+                </>
+              ) : (
+                <Text style={styles.insightDesc}>Not enough historical data to calculate a trend.</Text>
+              )}
+            </View>
+
+            {/* SM-05: Price Deviation */}
+            <View style={styles.insightItemExtravagant}>
+              <View style={styles.insightHeaderExtravagant}>
+                <View style={styles.iconBox}>
+                  <Feather name="tag" size={20} color="#f39c12" />
+                </View>
+                <Text style={styles.insightTitleExtravagant}>Price Deviation Analysis</Text>
+              </View>
+
+              {deviations.length > 0 ? (
+                <>
+                  <Text style={[styles.insightDescExtravagant, { marginBottom: 16 }]}>
+                    Here is how the prices of items in this receipt compare to what you normally pay:
+                  </Text>
+
+                  {/* Clean List View for Price Deviations */}
+                  <View style={{ marginTop: 8 }}>
+                    {deviations.map((dev, idx) => {
+                      const noHistory = dev.historical_average === null;
+                      const isHigh = dev.difference > 0;
+                      const diffColor = isHigh ? '#e74c3c' : '#27ae60';
+                      const diffBg = isHigh ? 'rgba(231, 76, 60, 0.1)' : 'rgba(39, 174, 96, 0.1)';
+
+                      return (
+                        <View key={idx} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderBottomWidth: idx === deviations.length - 1 ? 0 : 1, borderBottomColor: '#f1f2f6' }}>
+                          <View style={{ flex: 1, paddingRight: 10 }}>
+                            <Text style={{ fontFamily: FONTS.semiBold, fontSize: 13, color: COLORS.primary, marginBottom: 2 }}>{dev.item_name}</Text>
+                            {!noHistory && (
+                              <Text style={{ fontFamily: FONTS.regular, fontSize: 11, color: COLORS.mutedText }}>
+                                You usually pay: ₹{dev.historical_average.toFixed(2)}
+                              </Text>
+                            )}
+                          </View>
+                          
+                          <View style={{ alignItems: 'flex-end' }}>
+                            <Text style={{ fontFamily: FONTS.bold, fontSize: 14, color: COLORS.primary, marginBottom: 4 }}>
+                              ₹{dev.current_price.toFixed(2)}
+                            </Text>
+                            {noHistory ? (
+                              <View style={{ backgroundColor: '#f1f2f6', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
+                                <Text style={{ fontSize: 10, fontFamily: FONTS.semiBold, color: COLORS.mutedText }}>New Item</Text>
+                              </View>
+                            ) : (
+                              <View style={{ backgroundColor: diffBg, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, flexDirection: 'row', alignItems: 'center' }}>
+                                <Text style={{ fontSize: 10, fontFamily: FONTS.bold, color: diffColor }}>
+                                  {isHigh ? '▲ ' : '▼ '}{Math.abs(dev.change_percentage).toFixed(1)}%
+                                </Text>
+                              </View>
+                            )}
+                          </View>
+                        </View>
+                      );
+                    })}
+                  </View>
+                  
+                  {!hasSignificantDeviations && (
+                    <View style={styles.emptyStateBox}>
+                      <Text style={styles.emptyStateIcon}>✨</Text>
+                      <Text style={styles.insightDesc}>No significant price deviations found. You paid normal prices!</Text>
+                    </View>
+                  )}
+                </>
+              ) : (
+                <View style={styles.emptyStateBox}>
+                  <Text style={styles.insightDesc}>No recognizable items found to compare.</Text>
+                </View>
+              )}
+            </View>
+
+            {/* SM-06 placeholder */}
+            <View style={styles.insightItemExtravagant}>
+              <View style={styles.insightHeaderExtravagant}>
+                <View style={[styles.iconBox, { backgroundColor: '#f3e5f5' }]}>
+                  <Feather name="alert-triangle" size={20} color="#8e44ad" />
+                </View>
+                <Text style={styles.insightTitleExtravagant}>Category Overspending</Text>
+              </View>
+              <View style={styles.emptyStateBox}>
+                <Text style={styles.insightDesc}>Anomaly detection (Isolation Forest) will flag unusual spending in categories like Snacks or Dairy. (Coming Soon)</Text>
               </View>
             </View>
           </View>
@@ -947,14 +1243,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 14,
     padding: 4,
-    marginBottom: 16,
-    shadowColor: COLORS.primary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 2,
-    borderWidth: 1,
-    borderColor: 'rgba(153, 8, 8, 0.08)',
+    marginBottom: 18,
+    ...Platform.select({
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4 },
+      android: { elevation: 1 },
+      web: { boxShadow: '0px 1px 4px rgba(0,0,0,0.05)' }
+    }),
   },
   timeChip: {
     flex: 1,
@@ -1008,160 +1302,46 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 18,
     padding: 20,
-    borderLeftWidth: 6,
-    borderLeftColor: COLORS.primary,
-    shadowColor: COLORS.primary,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 3,
-    borderWidth: 1,
-    borderColor: 'rgba(153, 8, 8, 0.06)',
-  },
-  purposeHeader: {
-    marginBottom: 14,
-  },
-  badgeRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 6,
-  },
-  purposeBadge: {
-    fontFamily: FONTS.bold,
-    fontSize: 10,
-    color: COLORS.primary,
-    letterSpacing: 1.2,
-  },
-  gradePill: {
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#A5D6A7',
-  },
-  gradePillText: {
-    fontFamily: FONTS.bold,
-    fontSize: 10,
-  },
-  purposeTitle: {
-    fontFamily: FONTS.bold,
-    fontSize: 20,
-    color: '#2B1212',
-    marginBottom: 4,
-  },
-  purposeSub: {
-    fontFamily: FONTS.regular,
-    fontSize: 13,
-    color: COLORS.mutedText,
-    lineHeight: 19,
-  },
-  scoreRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F5F8FF',
-    padding: 14,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#D0E1FD',
-  },
-  scoreBadge: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    backgroundColor: COLORS.primary,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 12,
-    marginRight: 14,
-  },
-  scoreValue: {
-    fontFamily: FONTS.bold,
-    fontSize: 22,
-    color: '#fff',
-  },
-  scoreMax: {
-    fontFamily: FONTS.regular,
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.7)',
-  },
-  scoreTextContainer: {
-    flex: 1,
-  },
-  scoreTitle: {
-    fontFamily: FONTS.bold,
-    fontSize: 14,
-    color: COLORS.primary,
-  },
-  scoreDesc: {
-    fontFamily: FONTS.regular,
-    fontSize: 12,
-    color: COLORS.mutedText,
-  },
-  insightHighlightBox: {
-    flexDirection: 'row',
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 10,
-    alignItems: 'center',
-    borderWidth: 1,
-  },
-  insightIconCircle: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 14,
-  },
-  insightHighlightIcon: {
-    fontSize: 20,
-  },
-  insightHighlightText: {
-    flex: 1,
-  },
-  insightHighlightTitle: {
-    fontFamily: FONTS.bold,
-    fontSize: 14,
-    marginBottom: 2,
-  },
-  insightHighlightSub: {
-    fontFamily: FONTS.regular,
-    fontSize: 12,
-    color: '#4A3B32',
-    lineHeight: 17,
-  },
-  sectionHeaderTitle: {
-    fontFamily: FONTS.bold,
-    fontSize: 12,
-    color: COLORS.primary,
-    letterSpacing: 1.5,
-    marginTop: 8,
-    marginBottom: 10,
-  },
-  metricsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  metricCard: {
-    width: Platform.OS === 'web' ? '31.5%' : '48%',
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 16,
-    alignItems: 'flex-start',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-    borderTopWidth: 4,
-    borderWidth: 1,
-    borderColor: 'rgba(153, 8, 8, 0.05)',
+    ...Platform.select({
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 6 },
+      android: { elevation: 2 },
+      web: { boxShadow: '0px 2px 6px rgba(0,0,0,0.05)' }
+    }),
   },
   metricCardTop: {
     width: '100%',
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 24,
+  },
+  aiBadge: {
+    backgroundColor: 'rgba(231, 76, 60, 0.1)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(231, 76, 60, 0.3)',
+  },
+  aiBadgeText: {
+    fontFamily: FONTS.bold,
+    fontSize: 9,
+    color: '#e74c3c',
+    letterSpacing: 1,
+  },
+  insightItemExtravagant: {
+    marginBottom: 20,
+    backgroundColor: '#ffffff',
+    padding: 20,
+    borderRadius: 16,
+    ...Platform.select({
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10 },
+      android: { elevation: 3 },
+      web: { boxShadow: '0px 4px 10px rgba(0,0,0,0.05)' }
+    }),
+  },
+  insightHeaderExtravagant: {
+    flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 10,
   },
@@ -1195,6 +1375,23 @@ const styles = StyleSheet.create({
     color: COLORS.mutedText,
   },
   metricLabel: {
+  extravagantDivider: {
+    display: 'none',
+  },
+  gaugeCenterText: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  gaugePercentage: {
+    fontFamily: FONTS.bold,
+    fontSize: 28,
+  },
+  gaugeLabel: {
     fontFamily: FONTS.semiBold,
     fontSize: 12,
     color: COLORS.mutedText,
