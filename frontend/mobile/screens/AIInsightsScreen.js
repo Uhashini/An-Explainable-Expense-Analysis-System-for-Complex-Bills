@@ -11,7 +11,7 @@ const MODES = ['Save Money', 'Eat Healthy', 'Gain Muscles'];
 const HEALTHY_SUB_OPTIONS = ['Basic Nutrition Analysis', 'Health Intelligence'];
 
 export default function AIInsightsScreen({ route, navigation }) {
-  const [activeMode, setActiveMode] = useState('Eat Healthy');
+  const [activeMode, setActiveMode] = useState('Save Money');
   const [healthySubOption, setHealthySubOption] = useState('Basic Nutrition Analysis');
   const [timeRange, setTimeRange] = useState('Weekly'); // 'Weekly' | 'Monthly'
   const [comparisonViewMode, setComparisonViewMode] = useState('Cards'); // 'Cards' | 'Chart'
@@ -36,8 +36,8 @@ export default function AIInsightsScreen({ route, navigation }) {
   // Fetch ML Analytics for Save Money view
   useEffect(() => {
     const fetchAnalytics = async () => {
-      const items = receiptData?.items || [];
-      const totalAmount = receiptData?.total_amount;
+      const items = receiptData?.receipt_info?.items || receiptData?.items || route.params?.items || [];
+      const totalAmount = receiptData?.receipt_info?.total_amount ?? receiptData?.total_amount ?? route.params?.totalAmount;
       if (totalAmount === undefined || !items || items.length === 0) {
         setLoading(false);
         return;
