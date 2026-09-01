@@ -927,6 +927,11 @@ export default function AIInsightsScreen({ route, navigation }) {
           isOver = trend.current_spending > trend.previous_average;
         }
         
+        const radius = 65;
+        const strokeWidth = 14;
+        const circumference = 2 * Math.PI * radius;
+        const avgDashoffset = circumference - (circumference * avgPct);
+        const currDashoffset = circumference - (circumference * currPct);
         const screenWidth = Dimensions.get('window').width;
 
         // Monthly history chart calcs
