@@ -52,7 +52,7 @@ def analyze_receipt(req: AnalyticsRequest, db: Session = Depends(get_db)):
     items_data = [item.dict() for item in req.items]
     
     with ThreadPoolExecutor(max_workers=2) as executor:
-        future_trend = executor.submit(run_isolated, get_spending_trend, db, req.user_id, req.total_amount, req.receipt_id)
+        future_trend = executor.submit(run_isolated, get_spending_trend, db, req.user_id, req.total_amount, req.receipt_id, items_data)
         future_price = executor.submit(run_isolated, get_price_deviations, db, req.user_id, items_data, req.receipt_id)
         
         trend_data = future_trend.result()
@@ -113,7 +113,7 @@ def get_receipt_analytics(receipt_id: int, user_id: int, db: Session = Depends(g
 
     # 2. Parallel Processing
     with ThreadPoolExecutor(max_workers=2) as executor:
-        future_trend = executor.submit(run_isolated, get_spending_trend, db, user_id, receipt.total_amount or 0.0, receipt_id)
+        future_trend = executor.submit(run_isolated, get_spending_trend, db, user_id, receipt.total_amount or 0.0, receipt_id, items_data)
         future_price = executor.submit(run_isolated, get_price_deviations, db, user_id, items_data, receipt_id)
         
         trend_data = future_trend.result()

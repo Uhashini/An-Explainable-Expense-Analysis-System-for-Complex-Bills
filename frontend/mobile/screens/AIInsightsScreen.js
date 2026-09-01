@@ -915,6 +915,8 @@ export default function AIInsightsScreen({ route, navigation }) {
       case 'Save Money': {
         const trend = analyticsData?.trend;
         const deviations = analyticsData?.price_deviations || [];
+        const hasSignificantDeviations = deviations.some(d => Math.abs(d.change_percentage) > 5 && d.historical_average !== null);
+        const categoryAnomalies = analyticsData?.trend?.category_anomalies || [];
         
         let maxScale = 1;
         let avgPct = 0;
@@ -1230,18 +1232,41 @@ export default function AIInsightsScreen({ route, navigation }) {
                   <Text style={styles.insightDesc}>No recognizable items found to compare.</Text>
                 </View>
               )}
-            </View>
-
-            {/* SM-06 placeholder */}
-            <View style={styles.insightItemExtravagant}>
-              <View style={styles.insightHeaderExtravagant}>
-                <View style={[styles.iconBox, { backgroundColor: '#f3e5f5' }]}>
-                  <Feather name="alert-triangle" size={20} color="#8e44ad" />
+              {/* SM-06: Category Overspending */}
+              <View style={[styles.insightItemExtravagant, { borderColor: categoryAnomalies.length > 0 ? '#ffb8b8' : 'transparent', borderWidth: categoryAnomalies.length > 0 ? 1 : 0 }]}>
+                <View style={styles.insightHeaderExtravagant}>
+                  <View style={[styles.iconBox, { backgroundColor: categoryAnomalies.length > 0 ? '#ff7675' : '#f3e5f5' }]}>
+                    <Feather name="alert-triangle" size={20} color={categoryAnomalies.length > 0 ? '#fff' : "#8e44ad"} />
+                  </View>
+                  <Text style={styles.insightTitleExtravagant}>Category Overspending</Text>
                 </View>
-                <Text style={styles.insightTitleExtravagant}>Category Overspending</Text>
-              </View>
-              <View style={styles.emptyStateBox}>
-                <Text style={styles.insightDesc}>Anomaly detection (Isolation Forest) will flag unusual spending in categories like Snacks or Dairy. (Coming Soon)</Text>
+                
+                {categoryAnomalies.length > 0 ? (
+                  <>
+                    <Text style={[styles.insightDescExtravagant, { marginBottom: 8 }]}>
+                      Our ML model (Isolation Forest) detected unusual spending spikes in these categories compared to your history:
+                    </Text>
+                    <View style={{ marginTop: 12 }}>
+                      {categoryAnomalies.map((cat, idx) => (
+                        <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff5f5', padding: 12, borderRadius: 8, marginBottom: 8, borderWidth: 1, borderColor: '#ffe0e0' }}>
+                          <View style={{ flex: 1 }}>
+                            <Text style={{ fontFamily: FONTS.bold, fontSize: 14, color: '#d63031' }}>{cat.category}</Text>
+                            <Text style={{ fontFamily: FONTS.regular, fontSize: 12, color: '#636e72', marginTop: 2 }}>
+                              Actual: <Text style={{ fontFamily: FONTS.bold, color: '#d63031' }}>₹{cat.current_spending}</Text> 
+                              {"  "}|{"  "}Normal: <Text style={{ fontFamily: FONTS.semiBold, color: '#2d3436' }}>₹{cat.historical_average}</Text>
+                            </Text>
+                          </View>
+                          <Feather name="trending-up" size={20} color="#d63031" />
+                        </View>
+                      ))}
+                    </View>
+                  </>
+                ) : (
+                  <View style={styles.emptyStateBox}>
+                    <Text style={styles.emptyStateIcon}>✨</Text>
+                    <Text style={styles.insightDesc}>No category overspending detected this month. You're doing great!</Text>
+                  </View>
+                )}
               </View>
             </View>
           </View>
