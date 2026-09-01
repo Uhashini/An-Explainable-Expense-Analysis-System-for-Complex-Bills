@@ -292,10 +292,6 @@ export default function AIInsightsScreen({ route, navigation }) {
       ];
     }
 
-        // Monthly history chart calcs
-        const monthlyHistory = trend?.monthly_history || [];
-        const maxMonthVal = monthlyHistory.length > 0 ? Math.max(...monthlyHistory.map(m => Math.max(m.amount, m.trend_val || m.amount)), 1) : 1;
-
     const firstScore = creativeReceiptCards[0]?.scoreVal || 58;
     const latestScore = creativeReceiptCards[creativeReceiptCards.length - 1]?.scoreVal || 86;
     const scoreDiff = latestScore - firstScore;
@@ -861,7 +857,27 @@ export default function AIInsightsScreen({ route, navigation }) {
 
   const renderContent = () => {
     switch (activeMode) {
-      case 'Save Money':
+      case 'Save Money': {
+        const trend = analyticsData?.trend;
+        const deviations = analyticsData?.price_deviations || [];
+        
+        let maxScale = 1;
+        let avgPct = 0;
+        let currPct = 0;
+        let isOver = false;
+        if (trend) {
+          maxScale = Math.max(trend.previous_average, trend.current_spending) * 1.3;
+          avgPct = trend.previous_average / maxScale;
+          currPct = trend.current_spending / maxScale;
+          isOver = trend.current_spending > trend.previous_average;
+        }
+        
+        const screenWidth = Dimensions.get('window').width;
+
+        // Monthly history chart calcs
+        const monthlyHistory = trend?.monthly_history || [];
+        const maxMonthVal = monthlyHistory.length > 0 ? Math.max(...monthlyHistory.map(m => Math.max(m.amount, m.trend_val || m.amount)), 1) : 1;
+
         return (
           <View style={styles.cardContainer}>
             <View style={styles.cardHeader}>
@@ -1170,6 +1186,7 @@ export default function AIInsightsScreen({ route, navigation }) {
             </View>
           </View>
         );
+      }
       case 'Eat Healthy':
         return renderEatHealthyMode();
       case 'Gain Muscles':
