@@ -5,11 +5,18 @@ os.environ["FLAGS_use_onednn"] = "0"
 os.environ["FLAGS_use_mkldnn"] = "0"
 os.environ["PADDLE_DISABLE_ONEDNN"] = "1"
 
-from paddleocr import PaddleOCR
+try:
+    from paddleocr import PaddleOCR
+    import paddle
+    PADDLE_AVAILABLE = True
+except ImportError:
+    PaddleOCR = None
+    paddle = None
+    PADDLE_AVAILABLE = False
+
 import numpy as np
 import logging
 from typing import List, Dict, Any, Union
-import paddle
 import cv2
 
 logger = logging.getLogger(__name__)
@@ -27,6 +34,11 @@ class OCREngine:
         - use_angle_cls: Enables text orientation detection (useful for rotated receipts).
         """
         self.use_angle_cls = use_angle_cls
+        self.engine = None
+        if not PADDLE_AVAILABLE:
+            logger.warning("PaddleOCR is not installed. OCR extraction via PaddleOCR will be disabled.")
+            return
+
         try:
             # Note: The first time this runs, it will download the model weights (~100MB)
             self.engine = PaddleOCR(
@@ -47,7 +59,6 @@ class OCREngine:
             logger.info(f"PaddleOCR initialized with language: {lang}")
         except Exception as e:
             logger.error(f"Failed to initialize PaddleOCR: {e}")
-            raise
 
     def extract_text(self, image: Union[str, np.ndarray]) -> List[Dict[str, Any]]:
         """
