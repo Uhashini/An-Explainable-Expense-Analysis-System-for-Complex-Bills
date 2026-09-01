@@ -33,6 +33,61 @@ export default function AIInsightsScreen({ route, navigation }) {
     }
   }, [receiptId, receiptData]);
 
+  // Fetch ML Analytics for Save Money view
+  useEffect(() => {
+    const fetchAnalytics = async () => {
+      const items = receiptData?.items || [];
+      const totalAmount = receiptData?.total_amount;
+      if (totalAmount === undefined || !items || items.length === 0) {
+        setLoading(false);
+        return;
+      }
+      
+      try {
+        const user = await getUser();
+        const userId = user?.id || user?.user_id || 2;
+        if (!userId) return;
+
+        const cleanPrice = (val) => {
+          if (val == null) return null;
+          const cleaned = String(val).replace(/[^\d.]/g, '');
+          return cleaned ? parseFloat(cleaned) : null;
+        };
+
+        const payload = {
+          user_id: userId,
+          receipt_id: receiptId || null,
+          total_amount: cleanPrice(totalAmount) || 0.0,
+          items: items.map(item => ({
+            name: item.name || "Unknown",
+            price: cleanPrice(item.price) || 0.0,
+            total_price: cleanPrice(item.total_price),
+            matched_food_id: item.food_id || item.matched_product_id || null
+          }))
+        };
+
+        const response = await fetch(`${API_BASE_URL}/analytics/calculate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok && data.status === 'success') {
+          setAnalyticsData(data.data);
+        } else {
+          console.error("Backend error:", data);
+        }
+      } catch (err) {
+        console.error("Error fetching analytics:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchAnalytics();
+  }, [receiptId, receiptData]);
+
   const fetchUserSavedReceipts = async () => {
     try {
       const user = await getUser();
