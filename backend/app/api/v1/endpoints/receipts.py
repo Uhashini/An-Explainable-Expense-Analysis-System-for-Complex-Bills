@@ -1,8 +1,11 @@
+import logging
 from fastapi import APIRouter, UploadFile, File, HTTPException, Body
 from pydantic import BaseModel
 from typing import List, Dict, Any
 from app.services.ocr_service import ocr_service
 from app.services.product_matcher import product_matcher
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -50,25 +53,32 @@ async def upload_receipt(file: UploadFile = File(...)):
         # Auto-match extracted items against database food & nutrition items
         items = result.get("data", {}).get("receipt_info", {}).get("items", [])
         for item in items:
-            item_name = item.get("name", "")
-            match = product_matcher.match_item(item_name)
-            if match:
-                item["food_id"] = match.get("food_id")
-                item["matched_name"] = match.get("matched_name")
-                item["display_name"] = match.get("display_name")
-                item["category"] = match.get("category")
-                item["subcategory"] = match.get("subcategory")
-                item["serving_size"] = match.get("serving_size")
-                item["serving_unit"] = match.get("serving_unit")
-                item["nutrition"] = match.get("nutrition")
-                item["health"] = match.get("health")
+            try:
+                item_name = item.get("name", "")
+                if item_name:
+                    match = product_matcher.match_item(item_name)
+                    if match:
+                        item["food_id"] = match.get("food_id")
+                        item["matched_name"] = match.get("matched_name")
+                        item["display_name"] = match.get("display_name")
+                        item["category"] = match.get("category")
+                        item["subcategory"] = match.get("subcategory")
+                        item["serving_size"] = match.get("serving_size")
+                        item["serving_unit"] = match.get("serving_unit")
+                        item["nutrition"] = match.get("nutrition")
+                        item["health"] = match.get("health")
+            except Exception as match_err:
+                logger.warning(f"Failed to match item '{item.get('name')}': {match_err}")
 
         return result
 
     except Exception as e:
+        import traceback
+        traceback.print_exc()
+        logger.error(f"Error processing receipt: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=500,
-            detail=f"Error processing receipt: {str(e)}",
+            detail=f"Error processing receipt: {str(e)}\n{traceback.format_exc()}",
         )
 
 class MatchProductsRequest(BaseModel):

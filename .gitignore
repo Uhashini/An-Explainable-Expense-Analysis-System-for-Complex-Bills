@@ -63,6 +63,8 @@ venv.bak/
 *.swo
 
 # Project specific
+*.db
+backend/pantrix.db
 backend/test_output.json
 backend/validation_report.txt
 backend/test_image/ocr_output.json

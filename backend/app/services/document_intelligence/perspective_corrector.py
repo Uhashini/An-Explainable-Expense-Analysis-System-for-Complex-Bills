@@ -73,18 +73,19 @@ class PerspectiveCorrector:
                 screenCnt = approx
                 break
 
-        if screenCnt is not None:
-            # Check if the detected contour is large enough to be the actual receipt page.
-            # Accidental small contours will be rejected to avoid warping errors.
-            h, w = image.shape[:2]
-            img_area = h * w
-            contour_area = cv2.contourArea(screenCnt)
-            
-            if contour_area > 0.3 * img_area:
-                logger.info(f"Applying perspective correction for contour area: {contour_area:.0f} px ({contour_area/img_area:.1%})")
-                return self.four_point_transform(image, screenCnt.reshape(4, 2))
-            else:
-                logger.info(f"Skipping perspective correction. Detected contour area too small: {contour_area:.0f} px ({contour_area/img_area:.1%})")
+        try:
+            if screenCnt is not None:
+                h, w = image.shape[:2]
+                img_area = h * w
+                contour_area = cv2.contourArea(screenCnt)
+                
+                if contour_area > 0.3 * img_area:
+                    logger.info(f"Applying perspective correction for contour area: {contour_area:.0f} px ({contour_area/img_area:.1%})")
+                    return self.four_point_transform(image, screenCnt.reshape(4, 2))
+                else:
+                    logger.info(f"Skipping perspective correction. Detected contour area too small: {contour_area:.0f} px ({contour_area/img_area:.1%})")
+        except Exception as e:
+            logger.warning(f"Perspective correction failed ({e}). Returning original image.")
         
-        # Fallback: return original if no valid contour found
+        # Fallback: return original if no valid contour found or if warp fails
         return image

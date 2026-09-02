@@ -6,11 +6,22 @@ from dotenv import load_dotenv
 load_dotenv()
 POSTGRES_URL = os.environ.get("POSTGRES_URL", "sqlite:///./pantrix.db")
 
-if POSTGRES_URL.startswith("sqlite"):
-    engine = create_engine(POSTGRES_URL, connect_args={"check_same_thread": False})
-else:
-    engine = create_engine(POSTGRES_URL, pool_pre_ping=True, pool_recycle=1800)
+def _create_engine_with_fallback():
+    url = os.environ.get("POSTGRES_URL", "")
+    if url and not url.startswith("sqlite"):
+        try:
+            eng = create_engine(url, pool_pre_ping=True, pool_recycle=300, connect_args={"connect_timeout": 5})
+            with eng.connect() as conn:
+                pass
+            print("[DB Info] Connected successfully to Cloud PostgreSQL (Neon).")
+            return eng
+        except Exception as e:
+            print(f"[DB Warning] Cloud PostgreSQL connection refused/unavailable. Falling back to local SQLite (pantrix.db).")
+    
+    print("[DB Info] Connected to Local SQLite Database (pantrix.db).")
+    return create_engine("sqlite:///./pantrix.db", connect_args={"check_same_thread": False})
 
+engine = _create_engine_with_fallback()
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
@@ -145,11 +156,22 @@ class AnalysisResult(Base):
     price_deviations = Column(Text)
 
 def get_db():
-    db = SessionLocal()
+    db = None
     try:
+        db = SessionLocal()
+        yield db
+    except Exception as e:
+        print(f"[DB Session Warning] Connection error ({e}). Switching session to local SQLite...")
+        fallback_engine = create_engine("sqlite:///./pantrix.db", connect_args={"check_same_thread": False})
+        FallbackSession = sessionmaker(autocommit=False, autoflush=False, bind=fallback_engine)
+        db = FallbackSession()
         yield db
     finally:
-        db.close()
+        if db:
+            try:
+                db.close()
+            except Exception:
+                pass
 
 def init_db():
     Base.metadata.create_all(bind=engine)

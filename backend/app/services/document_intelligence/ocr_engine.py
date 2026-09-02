@@ -59,17 +59,24 @@ class OCREngine:
             scale = 1.0
             if isinstance(image, np.ndarray):
                 h, w = image.shape[:2]
+                if max(h, w) < 600:
+                    scale = 2.0
+                    image = cv2.resize(
+                        image,
+                        None,
+                        fx=scale,
+                        fy=scale,
+                        interpolation=cv2.INTER_CUBIC
+                    )
+            elif isinstance(image, str) and os.path.exists(image):
+                img_loaded = cv2.imread(image)
+                if img_loaded is not None:
+                    h, w = img_loaded.shape[:2]
+                    if max(h, w) < 600:
+                        scale = 2.0
+                        image = cv2.resize(img_loaded, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
 
-            if max(h, w) < 600:
-                scale = 2.0
-                image = cv2.resize(
-                    image,
-                    None,
-                    fx=scale,
-                    fy=scale,
-                    interpolation=cv2.INTER_CUBIC
-                )
-            result = self.engine.ocr(image,cls=self.use_angle_cls)
+            result = self.engine.ocr(image, cls=self.use_angle_cls)
             
             # PaddleOCR returns a list of pages, each page is a list of [bbox, (text, confidence)]
             if not result or result[0] is None:
