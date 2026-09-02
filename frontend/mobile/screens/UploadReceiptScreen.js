@@ -105,18 +105,17 @@ export default function UploadReceiptScreen({ navigation }) {
       }
 
       // Navigate to ReceiptDetails with the actual extracted backend data
-      // React Navigation crashes if we pass massive base64 strings in params.
-      const safeImageUri = pickedImage && pickedImage.startsWith('data:') ? null : pickedImage;
-      
-      // Since ReceiptDetails is inside the Receipts tab's stack navigator,
-      // we must route through the tab name ('Receipts') and specify the nested screen.
-      navigation.navigate('Receipts', {
-        screen: 'ReceiptDetails',
-        params: {
-          imageUri: safeImageUri,
+      try {
+        navigation.navigate('ReceiptDetails', {
+          imageUri: pickedImage,
           receiptData: responseData,
-        }
-      });
+        });
+      } catch (e) {
+        navigation.navigate('Receipts', {
+          screen: 'ReceiptDetails',
+          params: { imageUri: pickedImage, receiptData: responseData },
+        });
+      }
 
     } catch (error) {
       console.error('Upload Error:', error);

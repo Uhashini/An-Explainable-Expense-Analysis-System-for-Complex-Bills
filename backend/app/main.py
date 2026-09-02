@@ -3,7 +3,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from app.api.v1.endpoints import receipts, demo, auth, products, analytics, gain_muscle
+from app.database.postgres_client import init_db
 import os
+
+try:
+    init_db()
+except Exception as e:
+    print(f"[DB Warning] Could not initialize DB tables: {e}")
 
 app = FastAPI(
     title="Receipt API",

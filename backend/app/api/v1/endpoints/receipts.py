@@ -1,8 +1,11 @@
+import logging
 from fastapi import APIRouter, UploadFile, File, HTTPException, Body
 from pydantic import BaseModel
 from typing import List, Dict, Any
 from app.services.ocr_service import ocr_service
 from app.services.product_matcher import product_matcher
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -47,28 +50,35 @@ async def upload_receipt(file: UploadFile = File(...)):
         # Stamp the original filename
         result["filename"] = file.filename
 
-        # Insert into RawReceipt database table
-        try:
-            import json
-            from app.database.postgres_client import RawReceipt, get_db
-            # We don't have db as a dependency since it was missed in the route definition, let's create a local session
-            db_gen = get_db()
-            db = next(db_gen)
-            raw_receipt = RawReceipt(
-                ocr_payload=json.dumps(result)
-            )
-            db.add(raw_receipt)
-            db.commit()
-            db_gen.close()
-        except Exception as db_err:
-            print(f"Warning: Failed to save raw receipt to database: {db_err}")
+        # Auto-match extracted items against database food & nutrition items
+        items = result.get("data", {}).get("receipt_info", {}).get("items", [])
+        for item in items:
+            try:
+                item_name = item.get("name", "")
+                if item_name:
+                    match = product_matcher.match_item(item_name)
+                    if match:
+                        item["food_id"] = match.get("food_id")
+                        item["matched_name"] = match.get("matched_name")
+                        item["display_name"] = match.get("display_name")
+                        item["category"] = match.get("category")
+                        item["subcategory"] = match.get("subcategory")
+                        item["serving_size"] = match.get("serving_size")
+                        item["serving_unit"] = match.get("serving_unit")
+                        item["nutrition"] = match.get("nutrition")
+                        item["health"] = match.get("health")
+            except Exception as match_err:
+                logger.warning(f"Failed to match item '{item.get('name')}': {match_err}")
 
         return result
 
     except Exception as e:
+        import traceback
+        traceback.print_exc()
+        logger.error(f"Error processing receipt: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=500,
-            detail=f"Error processing receipt: {str(e)}",
+            detail=f"Error processing receipt: {str(e)}\n{traceback.format_exc()}",
         )
 
 class MatchProductsRequest(BaseModel):
@@ -163,6 +173,45 @@ def save_receipt(data: ReceiptCreate, db: Session = Depends(get_db)):
     db.commit()
     return {"status": "success", "message": "Receipt saved successfully", "receipt_id": receipt.receipt_id}
 
+@router.get("/check-matches", tags=["Receipts"])
+def check_matches(db: Session = Depends(get_db)):
+    """Check how many items are matched and unmatched."""
+    total_items = db.query(ReceiptItem).count()
+    matched_items = db.query(ReceiptItem).filter(ReceiptItem.matched_food_id != None).count()
+    unmatched_items = db.query(ReceiptItem).filter(ReceiptItem.matched_food_id == None).limit(20).all()
+    
+    return {
+        "status": "success",
+        "total_items": total_items,
+        "matched_items": matched_items,
+        "unmatched_items_count": total_items - matched_items,
+        "sample_unmatched": [item.name for item in unmatched_items]
+    }
+
+@router.post("/run-rematch", tags=["Receipts"])
+def run_rematch(db: Session = Depends(get_db)):
+    """Rematch all unmatched items using the current product matcher."""
+    unmatched_items = db.query(ReceiptItem).filter(ReceiptItem.matched_food_id == None).all()
+    
+    updated_count = 0
+    for item in unmatched_items:
+        if not item.name:
+            continue
+        match = product_matcher.match_item(item.name)
+        if match and match.get("food_id"):
+            item.matched_food_id = match["food_id"]
+            updated_count += 1
+            # Commit immediately so the connection isn't dropped!
+            try:
+                db.commit()
+            except:
+                db.rollback()
+        
+    return {
+        "status": "success",
+        "message": f"Successfully rematched {updated_count} out of {len(unmatched_items)} unmatched items."
+    }
+
 @router.get("/user/{user_id}", tags=["Receipts"])
 def get_user_receipts(user_id: int, db: Session = Depends(get_db)):
     user = db.query(UserProfile).filter(UserProfile.user_id == user_id).first()
@@ -238,6 +287,69 @@ def get_receipt(receipt_id: int, db: Session = Depends(get_db)):
             }
         }
     }
-    db.commit()
-    db.refresh(receipt)
-    return {"status": "success", "message": "Receipt updated", "merchant_name": receipt.merchant_name}
+
+
+class SaveMoneyAnalysisRequest(BaseModel):
+    items: List[Dict[str, Any]]
+    monthly_budget: Optional[float] = 3000.0
+    previous_spend: Optional[float] = 0.0
+    top_n: Optional[int] = None
+    user_id: Optional[int] = 1
+
+
+@router.post("/analyze-save-money", tags=["Receipts"])
+async def analyze_save_money(request: SaveMoneyAnalysisRequest, db: Session = Depends(get_db)):
+    """
+    Run Save Money mode (SM-01, SM-02, SM-03, SM-07) on a list of receipt items.
+    """
+    try:
+        from app.services.modes.save_money import run_save_money_analysis
+        from app.services.modes.save_money.schemas import ReceiptItem
+
+        receipt_items = []
+        for it in request.items:
+            name = it.get("name") or it.get("matched_name") or it.get("display_name") or "Unknown Item"
+            category = it.get("category") or "Uncategorized"
+            qty = float(it.get("quantity") or 1)
+            
+            if "unit_price" in it and it["unit_price"] is not None:
+                price = float(it["unit_price"])
+            elif "price" in it and it["price"] is not None:
+                price = float(it["price"])
+            elif "total_price" in it and it["total_price"] is not None:
+                price = float(it["total_price"]) / (qty if qty > 0 else 1)
+            else:
+                price = 0.0
+
+            matched_food_id = it.get("matched_food_id") or it.get("food_id")
+            
+            receipt_items.append(
+                ReceiptItem(
+                    name=name,
+                    category=category,
+                    price=price,
+                    quantity=qty,
+                    matched_food_id=matched_food_id,
+                    food_id=matched_food_id
+                )
+            )
+
+        analysis = run_save_money_analysis(
+            items=receipt_items,
+            db=db,
+            user_id=request.user_id,
+            monthly_budget=request.monthly_budget,
+            previous_spend=request.previous_spend or 0.0,
+            top_n=request.top_n,
+        )
+
+        return {
+            "status": "success",
+            "data": analysis.dict(),
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error analyzing save money mode: {str(e)}",
+        )
+

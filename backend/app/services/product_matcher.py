@@ -104,24 +104,24 @@ class ProductMatcher:
         if self.is_initialized:
             return
 
-        logger.info("Initializing ProductMatcher...")
-
-        if self.use_pg_trgm:
-            # Enable pg_trgm extension
+        postgres_url = os.environ.get("POSTGRES_URL", "")
+        if postgres_url and not postgres_url.startswith("sqlite"):
             db = SessionLocal()
             try:
                 db.execute(text("CREATE EXTENSION IF NOT EXISTS pg_trgm"))
                 db.commit()
+                self.use_pg_trgm = True
                 logger.info("pg_trgm extension enabled. Using PostgreSQL fuzzy matching.")
             except Exception as e:
-                logger.warning(f"Could not enable pg_trgm: {e}. Falling back to in-memory matching.")
+                logger.warning(f"Could not enable pg_trgm: {e}. Falling back to SQLite matching.")
                 db.rollback()
                 self.use_pg_trgm = False
             finally:
                 db.close()
+        else:
+            self.use_pg_trgm = False
 
         if not self.use_pg_trgm:
-            # Load all food items into memory for RapidFuzz matching
             self._load_fallback_items()
 
         self.is_initialized = True
@@ -135,8 +135,8 @@ class ProductMatcher:
             logger.info("Loading SentenceTransformer (all-MiniLM-L6-v2)...")
             # Load the lightweight semantic model
             self.model = SentenceTransformer('all-MiniLM-L6-v2')
-        except ImportError:
-            logger.error("sentence_transformers not installed! Cannot use Semantic Matching.")
+        except Exception as e:
+            logger.warning(f"SentenceTransformer not loaded ({e}). Using SQLite substring & pattern matching.")
             return
 
         db = SessionLocal()
@@ -166,9 +166,50 @@ class ProductMatcher:
             return None
 
         if self.use_pg_trgm:
-            return self._match_pg_trgm(item_name, normalized_query, similarity_threshold)
-        else:
-            return self._match_semantic(item_name, normalized_query)
+            res = self._match_pg_trgm(item_name, normalized_query, similarity_threshold)
+            if res:
+                return res
+
+        return self._match_sqlite(item_name, normalized_query)
+
+    def _match_sqlite(self, original_name: str, normalized_query: str):
+        """SQLite compatible matching using python substring & query matching."""
+        db = SessionLocal()
+        try:
+            items = db.query(FoodItem).all()
+            for item in items:
+                cname = (item.canonical_name or '').lower()
+                dname = (item.display_name or '').lower()
+                if normalized_query in cname or cname in normalized_query or (dname and normalized_query in dname):
+                    nut = item.nutrition
+                    h = item.health_indicators
+                    return {
+                        "food_id": item.food_id,
+                        "matched_name": item.canonical_name,
+                        "display_name": item.display_name,
+                        "category": item.category,
+                        "subcategory": item.subcategory,
+                        "serving_size": float(item.serving_size) if item.serving_size else None,
+                        "serving_unit": item.serving_unit,
+                        "nutrition": {
+                            "calories_kcal": float(nut.calories_kcal) if nut and nut.calories_kcal is not None else None,
+                            "protein_g": float(nut.protein_g) if nut and nut.protein_g is not None else None,
+                            "carbohydrates_g": float(nut.carbohydrates_g) if nut and nut.carbohydrates_g is not None else None,
+                            "fat_g": float(nut.fat_g) if nut and nut.fat_g is not None else None,
+                            "fiber_g": float(nut.fiber_g) if nut and nut.fiber_g is not None else None,
+                            "sugar_g": float(nut.sugar_g) if nut and nut.sugar_g is not None else None,
+                        },
+                        "health": {
+                            "health_score": h.health_score if h else None,
+                            "is_processed": h.is_processed if h else False,
+                        }
+                    }
+            return None
+        except Exception as e:
+            logger.error(f"Error in _match_sqlite for '{original_name}': {e}")
+            return None
+        finally:
+            db.close()
 
     def _match_pg_trgm(self, original_name: str, normalized_query: str, threshold: float):
         """
