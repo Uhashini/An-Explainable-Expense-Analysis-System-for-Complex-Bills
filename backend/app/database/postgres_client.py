@@ -9,7 +9,13 @@ POSTGRES_URL = os.environ.get("POSTGRES_URL", "sqlite:///./pantrix.db")
 if POSTGRES_URL.startswith("sqlite"):
     engine = create_engine(POSTGRES_URL, connect_args={"check_same_thread": False})
 else:
-    engine = create_engine(POSTGRES_URL)
+    engine = create_engine(
+        POSTGRES_URL,
+        pool_pre_ping=True,     # Test connections before use (fixes Neon idle drops)
+        pool_recycle=300,       # Recycle connections every 5 minutes
+        pool_size=5,
+        max_overflow=10,
+    )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
