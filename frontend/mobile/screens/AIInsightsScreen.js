@@ -5,6 +5,7 @@ import ScreenLayout from '../components/ScreenLayout';
 import { COLORS, FONTS } from '../theme';
 import { API_BASE_URL } from '../utils/apiConfig';
 import { getUser } from '../utils/authStorage';
+import { Feather } from '@expo/vector-icons';
 
 const MODES = ['Save Money', 'Eat Healthy', 'Gain Muscles'];
 const HEALTHY_SUB_OPTIONS = ['Basic Nutrition Analysis', 'Health Intelligence'];
@@ -1194,24 +1195,42 @@ export default function AIInsightsScreen({ route, navigation }) {
             </View>
 
             {/* SM-04: Spending Trend */}
-            <View style={styles.insightItemExtravagant}>
-              <View style={styles.insightHeaderExtravagant}>
-                <View style={styles.iconBox}>
-                  {isOver ? <Feather name="trending-up" size={20} color="#e74c3c" /> : <Feather name="trending-down" size={20} color="#27ae60" />}
-                </View>
-                <Text style={styles.insightTitleExtravagant}>Monthly Spending Trend</Text>
-              </View>
+            {(() => {
+              const trend = saveMoneyData?.spending_trend;
+              const categoryAnomalies = saveMoneyData?.category_anomalies || saveMoneyData?.spending_trend?.category_anomalies || [];
+              const isOver = (trend?.change_percentage || 0) > 0;
               
-              {trend ? (
-                <>
-                  <Text style={styles.insightDescExtravagant}>
-                    Comparing this receipt's total <Text style={{ fontFamily: FONTS.bold, color: COLORS.primary }}>(₹{trend.current_spending})</Text> against your rolling historical average <Text style={{ fontFamily: FONTS.bold, color: COLORS.primary }}>(₹{trend.previous_average})</Text>.
-                  </Text>
+              const radius = 60;
+              const strokeWidth = 12;
+              const circumference = 2 * Math.PI * radius;
+              const trendVal = trend?.change_percentage || 0;
+              const clampedVal = Math.min(Math.max(trendVal, -100), 100);
+              const fraction = Math.abs(clampedVal) / 100;
+              const avgDashoffset = circumference * 0.5;
+              const currDashoffset = isOver ? circumference * (1 - (0.5 + fraction * 0.5)) : circumference * (1 - (0.5 - fraction * 0.5));
+              const monthlyHistory = trend?.monthly_history || [];
+              const maxMonthVal = Math.max(...monthlyHistory.map(m => Math.max(m.amount, m.trend_val || m.amount)), 1);
 
-                  {/* SVG Donut Gauge */}
-                  <View style={{ alignItems: 'center', marginVertical: 24, position: 'relative' }}>
-                    <Svg width={180} height={180} viewBox="0 0 180 180">
-                      <Defs>
+              return (
+                <React.Fragment>
+                  <View style={styles.insightItemExtravagant}>
+                    <View style={styles.insightHeaderExtravagant}>
+                      <View style={styles.iconBox}>
+                        {isOver ? <Feather name="trending-up" size={20} color="#e74c3c" /> : <Feather name="trending-down" size={20} color="#27ae60" />}
+                      </View>
+                      <Text style={styles.insightTitleExtravagant}>Monthly Spending Trend</Text>
+                    </View>
+                    
+                    {trend ? (
+                      <>
+                        <Text style={styles.insightDescExtravagant}>
+                          Comparing this receipt's total <Text style={{ fontFamily: FONTS.bold, color: COLORS.primary }}>(₹{trend.current_spending})</Text> against your rolling historical average <Text style={{ fontFamily: FONTS.bold, color: COLORS.primary }}>(₹{trend.previous_average})</Text>.
+                        </Text>
+      
+                        {/* SVG Donut Gauge */}
+                        <View style={{ alignItems: 'center', marginVertical: 24, position: 'relative' }}>
+                          <Svg width={180} height={180} viewBox="0 0 180 180">
+                            <Defs>
                         <LinearGradient id="gradOver" x1="0%" y1="0%" x2="100%" y2="100%">
                           <Stop offset="0%" stopColor="#ff4d4d" />
                           <Stop offset="100%" stopColor="#c0392b" />
@@ -1476,6 +1495,7 @@ export default function AIInsightsScreen({ route, navigation }) {
                   <Text style={styles.insightDesc}>No recognizable items found to compare.</Text>
                 </View>
               )}
+              </View>
               {/* SM-06: Category Overspending */}
               <View style={[styles.insightItemExtravagant, { borderColor: categoryAnomalies.length > 0 ? '#ffb8b8' : 'transparent', borderWidth: categoryAnomalies.length > 0 ? 1 : 0 }]}>
                 <View style={styles.insightHeaderExtravagant}>
@@ -1512,7 +1532,9 @@ export default function AIInsightsScreen({ route, navigation }) {
                   </View>
                 )}
               </View>
-            </View>
+                </React.Fragment>
+              );
+            })()}
           </View>
         );
       case 'Eat Healthy':

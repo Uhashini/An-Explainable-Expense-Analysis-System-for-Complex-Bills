@@ -159,12 +159,18 @@ def get_db():
     db = None
     try:
         db = SessionLocal()
-        yield db
+        # Test connection briefly
+        from sqlalchemy import text
+        db.execute(text("SELECT 1"))
     except Exception as e:
         print(f"[DB Session Warning] Connection error ({e}). Switching session to local SQLite...")
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
         fallback_engine = create_engine("sqlite:///./pantrix.db", connect_args={"check_same_thread": False})
         FallbackSession = sessionmaker(autocommit=False, autoflush=False, bind=fallback_engine)
         db = FallbackSession()
+
+    try:
         yield db
     finally:
         if db:

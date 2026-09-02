@@ -4,7 +4,7 @@ Pydantic schemas for Save Money mode inputs and outputs.
 Uses Pydantic v1 syntax to match the project's pinned dependency (pydantic<2.0.0).
 """
 
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field
 
 
@@ -83,4 +83,6 @@ class SaveMoneyResult(BaseModel):
     item_breakdown: ItemBreakdownResult
     budget_utilization: Optional[BudgetUtilizationResult] = None
     price_deviation: Optional[PriceDeviationResult] = None
+    spending_trend: Optional[Dict[str, Any]] = None
+    category_anomalies: Optional[List[Dict[str, Any]]] = None
 
