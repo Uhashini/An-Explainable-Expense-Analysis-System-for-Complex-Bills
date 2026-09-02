@@ -29,19 +29,23 @@ class LayoutLMService:
             model_name
         ]
         
-        selected_path = None
+        self.model_name = model_name
+        self.selected_path = None
         for path in model_paths:
             if path == model_name or os.path.exists(path):
-                selected_path = path
+                self.selected_path = path
                 break
-                
+
+    def _ensure_model_loaded(self):
+        if self.enabled:
+            return True
         try:
             from transformers import LayoutLMv3Processor, LayoutLMv3ForTokenClassification
             import torch
             
-            logger.info(f"Loading LayoutLMv3 model from path: {selected_path}")
-            self.processor = LayoutLMv3Processor.from_pretrained(selected_path, apply_ocr=False)
-            self.model = LayoutLMv3ForTokenClassification.from_pretrained(selected_path)
+            logger.info(f"Loading LayoutLMv3 model from path: {self.selected_path}")
+            self.processor = LayoutLMv3Processor.from_pretrained(self.selected_path, apply_ocr=False)
+            self.model = LayoutLMv3ForTokenClassification.from_pretrained(self.selected_path)
             
             self.device = "cuda" if torch.cuda.is_available() else "cpu"
             self.model.to(self.device)
@@ -49,15 +53,17 @@ class LayoutLMService:
             
             logger.info(f"LayoutLMv3 initialized on {self.device}")
             self.enabled = True
+            return True
         except Exception as e:
             logger.warning(f"LayoutLMv3 disabled due to initialization error: {e}")
+            return False
 
     def predict_entities(self, image: np.ndarray, words: List[str], boxes: List[List[int]]) -> List[Dict[str, Any]]:
         """
         Performs multimodal inference on OCR results.
         - boxes: Normalized [x1, y1, x2, y2] in 0-1000 range.
         """
-        if not self.enabled:
+        if not self._ensure_model_loaded():
             return []
 
         # 1. Split space-merged and alphanumeric-merged tokens to match CORD format

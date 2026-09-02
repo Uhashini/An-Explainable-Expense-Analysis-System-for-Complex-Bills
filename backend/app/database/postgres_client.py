@@ -10,14 +10,21 @@ def _create_engine_with_fallback():
     url = os.environ.get("POSTGRES_URL", "")
     if url and not url.startswith("sqlite"):
         try:
-            eng = create_engine(url, pool_pre_ping=True, pool_recycle=300, connect_args={"connect_timeout": 5})
+            eng = create_engine(
+                url,
+                pool_pre_ping=True,     # Test connections before use (fixes Neon idle drops)
+                pool_recycle=300,       # Recycle connections every 5 minutes
+                pool_size=5,
+                max_overflow=10,
+                connect_args={"connect_timeout": 5},
+            )
             with eng.connect() as conn:
                 pass
             print("[DB Info] Connected successfully to Cloud PostgreSQL (Neon).")
             return eng
         except Exception as e:
             print(f"[DB Warning] Cloud PostgreSQL connection refused/unavailable. Falling back to local SQLite (pantrix.db).")
-    
+
     print("[DB Info] Connected to Local SQLite Database (pantrix.db).")
     return create_engine("sqlite:///./pantrix.db", connect_args={"check_same_thread": False})
 

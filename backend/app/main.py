@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from app.api.v1.endpoints import receipts, demo, auth, products, analytics
+from app.api.v1.endpoints import receipts, demo, auth, products, analytics, gain_muscle
 from app.database.postgres_client import init_db
 import os
 
@@ -32,6 +32,7 @@ app.include_router(demo.router, prefix="/api/v1/demo", tags=["Demo"])
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["Auth"])
 app.include_router(products.router, prefix="/api/v1/products", tags=["Products"])
 app.include_router(analytics.router, prefix="/api/v1/analytics", tags=["Analytics"])
+app.include_router(gain_muscle.router, prefix="/api/v1/gain-muscle", tags=["Gain Muscle"])
 
 # Serve Static Files
 static_path = os.path.join(os.getcwd(), "static")

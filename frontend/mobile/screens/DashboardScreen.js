@@ -82,10 +82,11 @@ function StatCard({ tag, label, value, sub, subAlert, accent }) {
   );
 }
 
-function GoalCard({ tag, label, progress, detail, color }) {
+function GoalCard({ tag, label, progress, detail, color, onPress }) {
   const pct = Math.round(progress * 100);
+  const Container = onPress ? TouchableOpacity : View;
   return (
-    <View style={styles.goalCard}>
+    <Container style={styles.goalCard} onPress={onPress} activeOpacity={0.85}>
       <View style={styles.goalHeader}>
         <View style={[styles.goalTagBox, { backgroundColor: color }]}>
           <Text style={[styles.goalTag, { color: color === COLORS.accent ? COLORS.primary : '#fff' }]}>
@@ -94,12 +95,13 @@ function GoalCard({ tag, label, progress, detail, color }) {
         </View>
         <Text style={styles.goalLabel}>{label}</Text>
         <Text style={styles.goalPct}>{pct}%</Text>
+        {onPress && <Text style={{ fontFamily: FONTS.bold, fontSize: 13, color: color, marginLeft: 4 }}>→</Text>}
       </View>
       <View style={styles.goalTrack}>
         <View style={[styles.goalFill, { width: `${pct}%`, backgroundColor: color }]} />
       </View>
       <Text style={styles.goalDetail}>{detail}</Text>
-    </View>
+    </Container>
   );
 }
 
@@ -148,7 +150,11 @@ export default function DashboardScreen({ navigation }) {
         <Text style={styles.sectionTitle}>GOAL PROGRESS</Text>
         <View style={styles.goalsContainer}>
           {GOALS.map((g) => (
-            <GoalCard key={g.label} {...g} />
+            <GoalCard
+              key={g.label}
+              {...g}
+              onPress={g.tag === 'FIT' ? () => navigation.navigate('GainMuscle') : undefined}
+            />
           ))}
         </View>
 
