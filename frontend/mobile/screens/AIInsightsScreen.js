@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Dimensions, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Dimensions, Platform, TextInput } from 'react-native';
 import Svg, { Path, Circle, Defs, LinearGradient, Stop, G, Text as SvgText, Rect, Line } from 'react-native-svg';
 import ScreenLayout from '../components/ScreenLayout';
 import { COLORS, FONTS } from '../theme';
@@ -21,7 +21,60 @@ export default function AIInsightsScreen({ route, navigation }) {
   const [analyticsData, setAnalyticsData] = useState(null);
   const [selectedPoint, setSelectedPoint] = useState(null);
 
+  // Save Money (SM-01, SM-02, SM-03) state
+  const [saveMoneyData, setSaveMoneyData] = useState(null);
+  const [isLoadingSaveMoney, setIsLoadingSaveMoney] = useState(false);
+  const [monthlyBudget, setMonthlyBudget] = useState('3000');
+  const [previousSpend, setPreviousSpend] = useState('1800');
+  const [showBudgetEditor, setShowBudgetEditor] = useState(false);
+
   const { receiptId, receiptData } = route.params || {};
+
+  const fetchSaveMoneyAnalysis = async (customItems = null, budgetVal = monthlyBudget, prevVal = previousSpend) => {
+    const items = customItems || receiptData?.receipt_info?.items || receiptData?.items || route.params?.items || [];
+    if (!items || items.length === 0) return;
+    setIsLoadingSaveMoney(true);
+    try {
+      const formattedItems = items.map((item) => {
+        let cleanPrice = 0;
+        if (item.total_price !== undefined && item.total_price !== null) {
+          cleanPrice = parseFloat(String(item.total_price).replace(/[^0-9.]/g, '')) || 0;
+        } else if (item.price !== undefined && item.price !== null) {
+          cleanPrice = parseFloat(String(item.price).replace(/[^0-9.]/g, '')) || 0;
+        } else if (item.unit_price !== undefined && item.unit_price !== null) {
+          cleanPrice = parseFloat(String(item.unit_price).replace(/[^0-9.]/g, '')) || 0;
+        }
+
+        const qty = parseFloat(String(item.quantity || item.qty || '1').replace(/[^0-9.]/g, '')) || 1;
+
+        return {
+          name: item.name || item.matched_name || item.display_name || 'Item',
+          category: item.category || 'Uncategorized',
+          price: cleanPrice,
+          quantity: qty,
+        };
+      });
+
+      const response = await fetch(`${API_BASE_URL}/receipts/analyze-save-money`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          items: formattedItems,
+          monthly_budget: parseFloat(budgetVal) || 0,
+          previous_spend: parseFloat(prevVal) || 0,
+        }),
+      });
+
+      const data = await response.json();
+      if (response.ok && data.status === 'success') {
+        setSaveMoneyData(data.data);
+      }
+    } catch (err) {
+      console.error('Error fetching save money analysis:', err);
+    } finally {
+      setIsLoadingSaveMoney(false);
+    }
+  };
 
   // Fetch saved receipts and calculate nutrition metrics
   useEffect(() => {
@@ -30,6 +83,10 @@ export default function AIInsightsScreen({ route, navigation }) {
       fetchReceiptNutrition(receiptId);
     } else if (receiptData) {
       calculateMetricsFromReceipt(receiptData);
+    }
+    const items = receiptData?.receipt_info?.items || receiptData?.items || route.params?.items || [];
+    if (items.length > 0) {
+      fetchSaveMoneyAnalysis(items);
     }
   }, [receiptId, receiptData]);
 
@@ -113,6 +170,10 @@ export default function AIInsightsScreen({ route, navigation }) {
       const json = await response.json();
       if (response.ok && json.status === 'success') {
         calculateMetricsFromReceipt(json.data);
+        const fetchedItems = json.data?.receipt_info?.items || json.data?.items || [];
+        if (fetchedItems.length > 0) {
+          fetchSaveMoneyAnalysis(fetchedItems);
+        }
       } else {
         setDefaultNutritionData();
       }
@@ -948,7 +1009,257 @@ export default function AIInsightsScreen({ route, navigation }) {
                 <Text style={styles.subtitle}>Analyzing Receipt #{receiptId || 'N/A'}</Text>
               </View>
             </View>
-            
+
+            {/* ─── SM-01: Category-wise Spending Distribution ─── */}
+            <View style={styles.insightItemExtravagant}>
+              <View style={styles.insightHeaderExtravagant}>
+                <View style={[styles.iconBox, { backgroundColor: '#e3f2fd' }]}>
+                  <Feather name="pie-chart" size={20} color="#1976D2" />
+                </View>
+                <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text style={styles.insightTitleExtravagant}>Category Spending</Text>
+                  {saveMoneyData?.category_spending?.total_spending != null && (
+                    <Text style={styles.smCardBadge}>
+                      Total: ₹{saveMoneyData.category_spending.total_spending.toLocaleString()}
+                    </Text>
+                  )}
+                </View>
+              </View>
+
+              {isLoadingSaveMoney ? (
+                <View style={styles.smLoadingBox}>
+                  <ActivityIndicator size="small" color={COLORS.primary} />
+                  <Text style={styles.smLoadingText}>Analyzing category spending...</Text>
+                </View>
+              ) : saveMoneyData?.category_spending ? (
+                <>
+                  {saveMoneyData.category_spending.highest_category && (
+                    <View style={styles.smHighlightBanner}>
+                      <Text style={styles.smHighlightLabel}>Highest Spend Category:</Text>
+                      <Text style={styles.smHighlightValue}>
+                        {saveMoneyData.category_spending.highest_category.category} (₹
+                        {saveMoneyData.category_spending.highest_category.amount.toLocaleString()} ·{" "}
+                        {saveMoneyData.category_spending.highest_category.percentage}%)
+                      </Text>
+                    </View>
+                  )}
+
+                  <View style={styles.smCategoryList}>
+                    {saveMoneyData.category_spending.categories?.map((cat, idx) => (
+                      <View key={cat.category || idx} style={styles.smCategoryRow}>
+                        <View style={styles.smCategoryHeaderRow}>
+                          <Text style={styles.smCategoryName}>{cat.category}</Text>
+                          <Text style={styles.smCategoryAmount}>
+                            ₹{cat.amount.toLocaleString()}{" "}
+                            <Text style={styles.smCategoryPct}>({cat.percentage}%)</Text>
+                          </Text>
+                        </View>
+                        <View style={styles.smCatBarBg}>
+                          <View
+                            style={[
+                              styles.smCatBarFill,
+                              {
+                                width: `${Math.min(cat.percentage, 100)}%`,
+                                backgroundColor: idx === 0 ? COLORS.primary : "#94B6EF",
+                              },
+                            ]}
+                          />
+                        </View>
+                      </View>
+                    ))}
+                  </View>
+                </>
+              ) : (
+                <Text style={styles.insightDesc}>No category breakdown available for this receipt.</Text>
+              )}
+            </View>
+
+            {/* ─── SM-02: Item-wise Spending Breakdown ─── */}
+            <View style={styles.insightItemExtravagant}>
+              <View style={styles.insightHeaderExtravagant}>
+                <View style={[styles.iconBox, { backgroundColor: '#e8f5e9' }]}>
+                  <Feather name="list" size={20} color="#2E7D32" />
+                </View>
+                <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text style={styles.insightTitleExtravagant}>Item Breakdown</Text>
+                  {saveMoneyData?.item_breakdown?.sorted_items && (
+                    <Text style={styles.smCardBadge}>
+                      {saveMoneyData.item_breakdown.sorted_items.length} items
+                    </Text>
+                  )}
+                </View>
+              </View>
+
+              {isLoadingSaveMoney ? (
+                <View style={styles.smLoadingBox}>
+                  <ActivityIndicator size="small" color={COLORS.primary} />
+                  <Text style={styles.smLoadingText}>Analyzing item ranking...</Text>
+                </View>
+              ) : saveMoneyData?.item_breakdown ? (
+                <>
+                  {saveMoneyData.item_breakdown.highest_expense && (
+                    <View style={[styles.smHighlightBanner, { backgroundColor: "rgba(56, 142, 60, 0.08)" }]}>
+                      <Text style={styles.smHighlightLabel}>Highest Expense Purchase:</Text>
+                      <Text style={[styles.smHighlightValue, { color: "#2E7D32" }]}>
+                        {saveMoneyData.item_breakdown.highest_expense.name} — ₹
+                        {saveMoneyData.item_breakdown.highest_expense.price.toLocaleString()}
+                      </Text>
+                    </View>
+                  )}
+
+                  <View style={styles.smRankedList}>
+                    {saveMoneyData.item_breakdown.sorted_items?.map((item, idx) => (
+                      <View key={idx} style={styles.smRankedRow}>
+                        <View style={styles.smRankBadge}>
+                          <Text style={styles.smRankBadgeText}>#{idx + 1}</Text>
+                        </View>
+                        <Text style={styles.smRankedName} numberOfLines={1}>
+                          {item.name}
+                        </Text>
+                        <Text style={styles.smRankedPrice}>₹{item.price.toLocaleString()}</Text>
+                      </View>
+                    ))}
+                  </View>
+                </>
+              ) : (
+                <Text style={styles.insightDesc}>No items available to rank for this receipt.</Text>
+              )}
+            </View>
+
+            {/* ─── SM-03: Budget Utilization & Goal Setting ─── */}
+            <View style={styles.insightItemExtravagant}>
+              <View style={styles.insightHeaderExtravagant}>
+                <View style={[styles.iconBox, { backgroundColor: '#fff3e0' }]}>
+                  <Feather name="target" size={20} color="#E65100" />
+                </View>
+                <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text style={styles.insightTitleExtravagant}>Budget Utilization</Text>
+                  {saveMoneyData?.budget_utilization && (
+                    <View
+                      style={[
+                        styles.smStatusBadge,
+                        saveMoneyData.budget_utilization?.status?.includes("✅")
+                          ? styles.statusBadgeSuccess
+                          : saveMoneyData.budget_utilization?.status?.includes("🚫")
+                          ? styles.statusBadgeDanger
+                          : styles.statusBadgeWarning,
+                      ]}
+                    >
+                      <Text style={styles.smStatusBadgeText}>
+                        {saveMoneyData.budget_utilization?.status || "Analyzing..."}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              </View>
+
+              {isLoadingSaveMoney ? (
+                <View style={styles.smLoadingBox}>
+                  <ActivityIndicator size="small" color={COLORS.primary} />
+                  <Text style={styles.smLoadingText}>Calculating budget metrics...</Text>
+                </View>
+              ) : saveMoneyData?.budget_utilization ? (
+                <>
+                  <View style={styles.smMetricsRow}>
+                    <View style={styles.smMetricBox}>
+                      <Text style={styles.smMetricLabel}>Budget</Text>
+                      <Text style={styles.smMetricValue}>
+                        ₹{parseFloat(monthlyBudget).toLocaleString()}
+                      </Text>
+                    </View>
+                    <View style={styles.smMetricBox}>
+                      <Text style={styles.smMetricLabel}>Total Spent</Text>
+                      <Text style={[styles.smMetricValue, { color: COLORS.primary }]}>
+                        ₹{saveMoneyData.budget_utilization?.total_spent?.toLocaleString()}
+                      </Text>
+                    </View>
+                    <View style={styles.smMetricBox}>
+                      <Text style={styles.smMetricLabel}>Remaining</Text>
+                      <Text
+                        style={[
+                          styles.smMetricValue,
+                          (saveMoneyData.budget_utilization?.remaining ?? 0) < 0
+                            ? { color: "#C62828" }
+                            : { color: "#2E7D32" },
+                        ]}
+                      >
+                        ₹{saveMoneyData.budget_utilization?.remaining?.toLocaleString()}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.smProgressWrapper}>
+                    <View style={styles.smProgressBarBg}>
+                      <View
+                        style={[
+                          styles.smProgressBarFill,
+                          {
+                            width: `${Math.min(
+                              saveMoneyData.budget_utilization?.utilization ?? 0,
+                              100,
+                            )}%`,
+                            backgroundColor:
+                              (saveMoneyData.budget_utilization?.utilization ?? 0) > 100
+                                ? "#C62828"
+                                : (saveMoneyData.budget_utilization?.utilization ?? 0) > 90
+                                ? "#E65100"
+                                : (saveMoneyData.budget_utilization?.utilization ?? 0) > 70
+                                ? "#F57C00"
+                                : "#2E7D32",
+                          },
+                        ]}
+                      />
+                    </View>
+                    <Text style={styles.smProgressLabel}>
+                      {saveMoneyData.budget_utilization?.utilization}% utilized
+                    </Text>
+                  </View>
+
+                  <TouchableOpacity
+                    style={styles.smConfigToggle}
+                    onPress={() => setShowBudgetEditor(!showBudgetEditor)}
+                  >
+                    <Text style={styles.smConfigToggleText}>
+                      {showBudgetEditor ? "▲ Hide Budget Settings" : "⚙ Adjust Monthly Budget & Previous Spend"}
+                    </Text>
+                  </TouchableOpacity>
+
+                  {showBudgetEditor && (
+                    <View style={styles.smEditorBox}>
+                      <View style={styles.smEditorRow}>
+                        <Text style={styles.smEditorLabel}>Monthly Budget (₹):</Text>
+                        <TextInput
+                          style={styles.smEditorInput}
+                          keyboardType="numeric"
+                          value={monthlyBudget}
+                          onChangeText={setMonthlyBudget}
+                          placeholder="3000"
+                        />
+                      </View>
+                      <View style={styles.smEditorRow}>
+                        <Text style={styles.smEditorLabel}>Previous Spend (₹):</Text>
+                        <TextInput
+                          style={styles.smEditorInput}
+                          keyboardType="numeric"
+                          value={previousSpend}
+                          onChangeText={setPreviousSpend}
+                          placeholder="1800"
+                        />
+                      </View>
+                      <TouchableOpacity
+                        style={styles.smRecalcButton}
+                        onPress={() => fetchSaveMoneyAnalysis(null, monthlyBudget, previousSpend)}
+                      >
+                        <Text style={styles.smRecalcButtonText}>Recalculate</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </>
+              ) : (
+                <Text style={styles.insightDesc}>No budget data available.</Text>
+              )}
+            </View>
+
             {/* SM-04: Spending Trend */}
             <View style={styles.insightItemExtravagant}>
               <View style={styles.insightHeaderExtravagant}>
@@ -1921,4 +2232,253 @@ const styles = StyleSheet.create({
   insightTextContainer: { flex: 1 },
   insightTitle: { fontFamily: FONTS.bold, fontSize: 14, color: '#3a2020', marginBottom: 4 },
   insightDesc: { fontFamily: FONTS.regular, fontSize: 13, color: COLORS.mutedText, lineHeight: 18 },
+
+  iconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: '#f5f6fa',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  insightTitleExtravagant: {
+    fontFamily: FONTS.bold,
+    fontSize: 15,
+    color: COLORS.primary,
+  },
+  insightDescExtravagant: {
+    fontFamily: FONTS.regular,
+    fontSize: 12,
+    color: COLORS.mutedText,
+    lineHeight: 18,
+  },
+
+  // Save Money Styles
+  smLoadingBox: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    marginBottom: 8,
+  },
+  smLoadingText: {
+    fontFamily: FONTS.semiBold,
+    fontSize: 12,
+    color: COLORS.primary,
+  },
+  smCardBadge: {
+    fontFamily: FONTS.bold,
+    fontSize: 11,
+    color: COLORS.primary,
+    backgroundColor: 'rgba(148, 182, 239, 0.2)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  smStatusBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  statusBadgeSuccess: {
+    backgroundColor: '#E8F5E9',
+  },
+  statusBadgeWarning: {
+    backgroundColor: '#FFF3E0',
+  },
+  statusBadgeDanger: {
+    backgroundColor: '#FFEBEE',
+  },
+  smStatusBadgeText: {
+    fontFamily: FONTS.bold,
+    fontSize: 11,
+    color: COLORS.primary,
+  },
+  smMetricsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(148, 182, 239, 0.08)',
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 12,
+  },
+  smMetricBox: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  smMetricLabel: {
+    fontFamily: FONTS.regular,
+    fontSize: 10,
+    color: 'rgba(153,8,8,0.6)',
+    marginBottom: 2,
+  },
+  smMetricValue: {
+    fontFamily: FONTS.bold,
+    fontSize: 13,
+    color: COLORS.primary,
+  },
+  smProgressWrapper: {
+    marginBottom: 10,
+  },
+  smProgressBarBg: {
+    height: 8,
+    backgroundColor: 'rgba(148, 182, 239, 0.25)',
+    borderRadius: 4,
+    overflow: 'hidden',
+    marginBottom: 4,
+  },
+  smProgressBarFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  smProgressLabel: {
+    fontFamily: FONTS.semiBold,
+    fontSize: 11,
+    color: 'rgba(153,8,8,0.7)',
+    textAlign: 'right',
+  },
+  smConfigToggle: {
+    paddingVertical: 6,
+    alignItems: 'center',
+  },
+  smConfigToggleText: {
+    fontFamily: FONTS.semiBold,
+    fontSize: 11,
+    color: COLORS.primary,
+  },
+  smEditorBox: {
+    marginTop: 8,
+    padding: 10,
+    backgroundColor: 'rgba(148, 182, 239, 0.08)',
+    borderRadius: 8,
+    gap: 8,
+  },
+  smEditorRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  smEditorLabel: {
+    fontFamily: FONTS.regular,
+    fontSize: 11,
+    color: COLORS.primary,
+  },
+  smEditorInput: {
+    backgroundColor: '#fff',
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(153,8,8,0.2)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    minWidth: 80,
+    fontFamily: FONTS.bold,
+    fontSize: 12,
+    color: COLORS.primary,
+    textAlign: 'right',
+  },
+  smRecalcButton: {
+    backgroundColor: COLORS.primary,
+    borderRadius: 6,
+    paddingVertical: 6,
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  smRecalcButtonText: {
+    fontFamily: FONTS.bold,
+    fontSize: 11,
+    color: '#fff',
+  },
+  smHighlightBanner: {
+    backgroundColor: 'rgba(25, 118, 210, 0.08)',
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 12,
+  },
+  smHighlightLabel: {
+    fontFamily: FONTS.regular,
+    fontSize: 10,
+    color: 'rgba(153,8,8,0.6)',
+    marginBottom: 2,
+  },
+  smHighlightValue: {
+    fontFamily: FONTS.bold,
+    fontSize: 13,
+    color: COLORS.primary,
+  },
+  smCategoryList: {
+    gap: 10,
+  },
+  smCategoryRow: {
+    gap: 4,
+  },
+  smCategoryHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  smCategoryName: {
+    fontFamily: FONTS.semiBold,
+    fontSize: 12,
+    color: COLORS.primary,
+  },
+  smCategoryAmount: {
+    fontFamily: FONTS.bold,
+    fontSize: 12,
+    color: COLORS.primary,
+  },
+  smCategoryPct: {
+    fontFamily: FONTS.regular,
+    fontSize: 11,
+    color: 'rgba(153,8,8,0.5)',
+  },
+  smCatBarBg: {
+    height: 6,
+    backgroundColor: 'rgba(148, 182, 239, 0.2)',
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  smCatBarFill: {
+    height: '100%',
+    borderRadius: 3,
+  },
+  smRankedList: {
+    gap: 8,
+  },
+  smRankedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    backgroundColor: 'rgba(148, 182, 239, 0.06)',
+    borderRadius: 8,
+  },
+  smRankBadge: {
+    width: 26,
+    height: 20,
+    backgroundColor: COLORS.primary,
+    borderRadius: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  smRankBadgeText: {
+    fontFamily: FONTS.bold,
+    fontSize: 10,
+    color: '#fff',
+  },
+  smRankedName: {
+    flex: 1,
+    fontFamily: FONTS.semiBold,
+    fontSize: 12,
+    color: COLORS.primary,
+  },
+  smRankedPrice: {
+    fontFamily: FONTS.bold,
+    fontSize: 12,
+    color: COLORS.primary,
+  },
 });

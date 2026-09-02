@@ -238,6 +238,62 @@ def get_receipt(receipt_id: int, db: Session = Depends(get_db)):
             }
         }
     }
-    db.commit()
-    db.refresh(receipt)
-    return {"status": "success", "message": "Receipt updated", "merchant_name": receipt.merchant_name}
+
+
+class SaveMoneyAnalysisRequest(BaseModel):
+    items: List[Dict[str, Any]]
+    monthly_budget: Optional[float] = 3000.0
+    previous_spend: Optional[float] = 0.0
+    top_n: Optional[int] = None
+
+
+@router.post("/analyze-save-money", tags=["Receipts"])
+async def analyze_save_money(request: SaveMoneyAnalysisRequest):
+    """
+    Run Save Money mode (SM-01, SM-02, SM-03) on a list of receipt items.
+    """
+    try:
+        from app.services.modes.save_money import run_save_money_analysis
+        from app.services.modes.save_money.schemas import ReceiptItem
+
+        receipt_items = []
+        for it in request.items:
+            name = it.get("name") or it.get("matched_name") or it.get("display_name") or "Unknown Item"
+            category = it.get("category") or "Uncategorized"
+            qty = float(it.get("quantity") or 1)
+            
+            if "unit_price" in it and it["unit_price"] is not None:
+                price = float(it["unit_price"])
+            elif "price" in it and it["price"] is not None:
+                price = float(it["price"])
+            elif "total_price" in it and it["total_price"] is not None:
+                price = float(it["total_price"]) / (qty if qty > 0 else 1)
+            else:
+                price = 0.0
+
+            receipt_items.append(
+                ReceiptItem(
+                    name=name,
+                    category=category,
+                    price=price,
+                    quantity=qty,
+                )
+            )
+
+        analysis = run_save_money_analysis(
+            items=receipt_items,
+            monthly_budget=request.monthly_budget,
+            previous_spend=request.previous_spend or 0.0,
+            top_n=request.top_n,
+        )
+
+        return {
+            "status": "success",
+            "data": analysis.dict(),
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error analyzing save money mode: {str(e)}",
+        )
+
