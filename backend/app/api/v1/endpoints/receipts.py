@@ -173,6 +173,45 @@ def save_receipt(data: ReceiptCreate, db: Session = Depends(get_db)):
     db.commit()
     return {"status": "success", "message": "Receipt saved successfully", "receipt_id": receipt.receipt_id}
 
+@router.get("/check-matches", tags=["Receipts"])
+def check_matches(db: Session = Depends(get_db)):
+    """Check how many items are matched and unmatched."""
+    total_items = db.query(ReceiptItem).count()
+    matched_items = db.query(ReceiptItem).filter(ReceiptItem.matched_food_id != None).count()
+    unmatched_items = db.query(ReceiptItem).filter(ReceiptItem.matched_food_id == None).limit(20).all()
+    
+    return {
+        "status": "success",
+        "total_items": total_items,
+        "matched_items": matched_items,
+        "unmatched_items_count": total_items - matched_items,
+        "sample_unmatched": [item.name for item in unmatched_items]
+    }
+
+@router.post("/run-rematch", tags=["Receipts"])
+def run_rematch(db: Session = Depends(get_db)):
+    """Rematch all unmatched items using the current product matcher."""
+    unmatched_items = db.query(ReceiptItem).filter(ReceiptItem.matched_food_id == None).all()
+    
+    updated_count = 0
+    for item in unmatched_items:
+        if not item.name:
+            continue
+        match = product_matcher.match_item(item.name)
+        if match and match.get("food_id"):
+            item.matched_food_id = match["food_id"]
+            updated_count += 1
+            # Commit immediately so the connection isn't dropped!
+            try:
+                db.commit()
+            except:
+                db.rollback()
+        
+    return {
+        "status": "success",
+        "message": f"Successfully rematched {updated_count} out of {len(unmatched_items)} unmatched items."
+    }
+
 @router.get("/user/{user_id}", tags=["Receipts"])
 def get_user_receipts(user_id: int, db: Session = Depends(get_db)):
     user = db.query(UserProfile).filter(UserProfile.user_id == user_id).first()
@@ -255,12 +294,13 @@ class SaveMoneyAnalysisRequest(BaseModel):
     monthly_budget: Optional[float] = 3000.0
     previous_spend: Optional[float] = 0.0
     top_n: Optional[int] = None
+    user_id: Optional[int] = 1
 
 
 @router.post("/analyze-save-money", tags=["Receipts"])
-async def analyze_save_money(request: SaveMoneyAnalysisRequest):
+async def analyze_save_money(request: SaveMoneyAnalysisRequest, db: Session = Depends(get_db)):
     """
-    Run Save Money mode (SM-01, SM-02, SM-03) on a list of receipt items.
+    Run Save Money mode (SM-01, SM-02, SM-03, SM-07) on a list of receipt items.
     """
     try:
         from app.services.modes.save_money import run_save_money_analysis
@@ -281,17 +321,23 @@ async def analyze_save_money(request: SaveMoneyAnalysisRequest):
             else:
                 price = 0.0
 
+            matched_food_id = it.get("matched_food_id") or it.get("food_id")
+            
             receipt_items.append(
                 ReceiptItem(
                     name=name,
                     category=category,
                     price=price,
                     quantity=qty,
+                    matched_food_id=matched_food_id,
+                    food_id=matched_food_id
                 )
             )
 
         analysis = run_save_money_analysis(
             items=receipt_items,
+            db=db,
+            user_id=request.user_id,
             monthly_budget=request.monthly_budget,
             previous_spend=request.previous_spend or 0.0,
             top_n=request.top_n,

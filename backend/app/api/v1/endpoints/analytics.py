@@ -3,7 +3,10 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.database.postgres_client import get_db, Receipt, ReceiptItem, AnalysisResult
-from app.services.analytics_service import get_spending_trend, get_price_deviations
+
+from app.services.modes.save_money.spending_trend import get_spending_trend
+from app.services.modes.save_money.price_deviation import get_price_deviations
+from app.services.modes.save_money.schemas import ReceiptItem as SchemaReceiptItem
 
 from pydantic import BaseModel
 from typing import List, Optional
@@ -51,12 +54,27 @@ def analyze_receipt(req: AnalyticsRequest, db: Session = Depends(get_db)):
     # 2. Parallel Processing with ThreadPoolExecutor
     items_data = [item.dict() for item in req.items]
     
+    # Map for price deviations
+    schema_items = []
+    for it in items_data:
+        qty = float(it.get("quantity") or 1.0)
+        p = float(it.get("total_price") or it.get("price") or 0.0)
+        unit_p = p / qty if p > 0 and qty > 0 else float(it.get("unit_price") or p)
+        
+        schema_items.append(SchemaReceiptItem(
+            name=it.get("name") or "Unknown",
+            price=unit_p,
+            quantity=qty,
+            matched_food_id=it.get("matched_food_id") or it.get("food_id")
+        ))
+    
     with ThreadPoolExecutor(max_workers=2) as executor:
         future_trend = executor.submit(run_isolated, get_spending_trend, db, req.user_id, req.total_amount, req.receipt_id, items_data)
-        future_price = executor.submit(run_isolated, get_price_deviations, db, req.user_id, items_data, req.receipt_id)
+        future_price = executor.submit(run_isolated, get_price_deviations, db, req.user_id, schema_items, req.receipt_id)
         
         trend_data = future_trend.result()
-        price_deviations = future_price.result()
+        price_result = future_price.result()
+        price_deviations = price_result.dict().get("price_deviation", []) if price_result else None
 
     # 3. Store Results in Cache
     if req.receipt_id:
@@ -111,13 +129,28 @@ def get_receipt_analytics(receipt_id: int, user_id: int, db: Session = Depends(g
     current_items = db.query(ReceiptItem).filter(ReceiptItem.receipt_id == receipt_id).all()
     items_data = [{"name": item.name, "price": item.price, "matched_food_id": item.matched_food_id} for item in current_items]
 
+    # Map for price deviations
+    schema_items = []
+    for it in items_data:
+        qty = float(it.get("quantity") or 1.0)
+        p = float(it.get("total_price") or it.get("price") or 0.0)
+        unit_p = p / qty if p > 0 and qty > 0 else float(it.get("unit_price") or p)
+        
+        schema_items.append(SchemaReceiptItem(
+            name=it.get("name") or "Unknown",
+            price=unit_p,
+            quantity=qty,
+            matched_food_id=it.get("matched_food_id") or it.get("food_id")
+        ))
+
     # 2. Parallel Processing
     with ThreadPoolExecutor(max_workers=2) as executor:
-        future_trend = executor.submit(run_isolated, get_spending_trend, db, user_id, receipt.total_amount or 0.0, receipt_id, items_data)
-        future_price = executor.submit(run_isolated, get_price_deviations, db, user_id, items_data, receipt_id)
+        future_trend = executor.submit(run_isolated, get_spending_trend, db, user_id, float(receipt.total_amount or 0.0), receipt_id, items_data)
+        future_price = executor.submit(run_isolated, get_price_deviations, db, user_id, schema_items, receipt_id)
         
         trend_data = future_trend.result()
-        price_deviations = future_price.result()
+        price_result = future_price.result()
+        price_deviations = price_result.dict().get("price_deviation", []) if price_result else None
 
     # 3. Store Results in Cache
     try:
