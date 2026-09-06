@@ -2557,7 +2557,9 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: COLORS.primary,
   },
-});
+  trendHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 6,
   },
