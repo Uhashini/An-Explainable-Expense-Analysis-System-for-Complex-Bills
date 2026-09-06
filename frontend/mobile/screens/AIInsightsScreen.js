@@ -11,6 +11,7 @@ const MODES = ['Save Money', 'Eat Healthy', 'Gain Muscles'];
 const HEALTHY_SUB_OPTIONS = ['Basic Nutrition Analysis', 'Health Intelligence'];
 
 export default function AIInsightsScreen({ route, navigation }) {
+  const { width: screenWidth } = Dimensions.get('window');
   const [activeMode, setActiveMode] = useState('Eat Healthy');
   const [healthySubOption, setHealthySubOption] = useState('Basic Nutrition Analysis');
   const [comparisonViewMode, setComparisonViewMode] = useState('Cards'); // 'Cards' | 'Chart'
