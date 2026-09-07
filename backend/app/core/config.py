@@ -1,7 +1,9 @@
 """Configuration settings for the Smart Receipt Analysis system."""
 
-# pyrefly: ignore [missing-import]
-from pydantic_settings import BaseSettings
+try:
+    from pydantic_settings import BaseSettings
+except ImportError:
+    from pydantic import BaseSettings
 from typing import Optional
 
 

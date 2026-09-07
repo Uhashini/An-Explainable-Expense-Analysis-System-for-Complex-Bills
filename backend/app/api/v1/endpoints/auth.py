@@ -33,7 +33,9 @@ class OnboardingData(BaseModel):
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
 def register(user: UserCreate, db: Session = Depends(get_db)):
-    db_user = db.query(UserProfile).filter(UserProfile.email == user.email).first()
+    clean_email = user.email.strip().lower()
+    from sqlalchemy import func
+    db_user = db.query(UserProfile).filter(func.lower(UserProfile.email) == clean_email).first()
     if db_user:
         raise HTTPException(status_code=400, detail="Email already registered")
     
@@ -41,8 +43,8 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
     pre_hashed_password = hashlib.sha256(user.password.encode('utf-8')).hexdigest().encode('utf-8')
     hashed_password = bcrypt.hashpw(pre_hashed_password, bcrypt.gensalt()).decode('utf-8')
     new_user = UserProfile(
-        name=user.name, 
-        email=user.email, 
+        name=user.name.strip(), 
+        email=clean_email, 
         password_hash=hashed_password
     )
     db.add(new_user)
@@ -52,12 +54,46 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
 
 @router.post("/login")
 def login(user: UserLogin, db: Session = Depends(get_db)):
-    db_user = db.query(UserProfile).filter(UserProfile.email == user.email).first()
+    clean_email = user.email.strip().lower()
+    from sqlalchemy import func
+    db_user = db.query(UserProfile).filter(func.lower(UserProfile.email) == clean_email).first()
     if not db_user or not db_user.password_hash:
         raise HTTPException(status_code=401, detail="Invalid email or password")
         
-    pre_hashed_password = hashlib.sha256(user.password.encode('utf-8')).hexdigest().encode('utf-8')
-    if not bcrypt.checkpw(pre_hashed_password, db_user.password_hash.encode('utf-8')):
+    raw_pwd_bytes = user.password.encode('utf-8')
+    pre_hashed_password = hashlib.sha256(raw_pwd_bytes).hexdigest().encode('utf-8')
+    stored_hash = db_user.password_hash.strip()
+    stored_hash_bytes = stored_hash.encode('utf-8')
+    
+    authenticated = False
+    
+    # 1. Try SHA-256 pre-hashed bcrypt check (standard)
+    try:
+        if bcrypt.checkpw(pre_hashed_password, stored_hash_bytes):
+            authenticated = True
+    except Exception:
+        pass
+        
+    # 2. Try raw direct bcrypt check (for accounts created prior to pre-hash update)
+    if not authenticated:
+        try:
+            if bcrypt.checkpw(raw_pwd_bytes, stored_hash_bytes):
+                authenticated = True
+                # Automatically upgrade hash to sha256 pre-hashed format
+                new_hash = bcrypt.hashpw(pre_hashed_password, bcrypt.gensalt()).decode('utf-8')
+                db_user.password_hash = new_hash
+                db.commit()
+        except Exception:
+            pass
+            
+    # 3. Fallback: plaintext match for seeded/test accounts
+    if not authenticated and stored_hash == user.password:
+        authenticated = True
+        new_hash = bcrypt.hashpw(pre_hashed_password, bcrypt.gensalt()).decode('utf-8')
+        db_user.password_hash = new_hash
+        db.commit()
+        
+    if not authenticated:
         raise HTTPException(status_code=401, detail="Invalid email or password")
         
     return {

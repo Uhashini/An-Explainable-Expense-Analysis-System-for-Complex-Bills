@@ -543,7 +543,17 @@ export default function ReceiptDetailsScreen({ route, navigation }) {
             activeOpacity={0.85}
             onPress={() => navigation.push('AIInsights', {
               receiptId,
-              receiptData: { receipt_info: { items: extractedItems, total_amount: totalAmount } }
+              receiptData: {
+                receipt_info: {
+                  receipt_id: receiptId,
+                  merchant_name: merchantName,
+                  date: dateStr,
+                  total_amount: totalAmount,
+                  items: extractedItems,
+                },
+                items: extractedItems,
+              },
+              initialMode: 'Save Money',
             })}
           >
             <Text style={[styles.primaryButtonText, { color: '#7a4800' }]}>

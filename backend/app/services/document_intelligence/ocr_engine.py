@@ -1,19 +1,4 @@
 import os
-# CRITICAL: These must be set BEFORE any paddle imports
-os.environ["FLAGS_enable_pir_api"] = "0"
-os.environ["FLAGS_use_onednn"] = "0"
-os.environ["FLAGS_use_mkldnn"] = "0"
-os.environ["PADDLE_DISABLE_ONEDNN"] = "1"
-
-try:
-    from paddleocr import PaddleOCR
-    import paddle
-    PADDLE_AVAILABLE = True
-except ImportError:
-    PaddleOCR = None
-    paddle = None
-    PADDLE_AVAILABLE = False
-
 import numpy as np
 import logging
 from typing import List, Dict, Any, Union
@@ -29,42 +14,57 @@ class OCREngine:
 
     def __init__(self, lang: str = 'en', use_angle_cls: bool = True):
         """
-        Initializes the PaddleOCR engine.
+        Initializes the PaddleOCR engine lazily.
         - lang: Language code (e.g., 'en', 'ch', 'fr').
         - use_angle_cls: Enables text orientation detection (useful for rotated receipts).
         """
+        self.lang = lang
         self.use_angle_cls = use_angle_cls
         self.engine = None
-        if not PADDLE_AVAILABLE:
-            logger.warning("PaddleOCR is not installed. OCR extraction via PaddleOCR will be disabled.")
-            return
+        self._initialized = False
+
+    def _ensure_engine(self):
+        if self._initialized:
+            return self.engine is not None
+
+        # CRITICAL: These must be set BEFORE any paddle imports
+        os.environ["FLAGS_enable_pir_api"] = "0"
+        os.environ["FLAGS_use_onednn"] = "0"
+        os.environ["FLAGS_use_mkldnn"] = "0"
+        os.environ["PADDLE_DISABLE_ONEDNN"] = "1"
 
         try:
-            # Note: The first time this runs, it will download the model weights (~100MB)
+            from paddleocr import PaddleOCR
             self.engine = PaddleOCR(
-                use_angle_cls=True,
-                lang="en",
+                use_angle_cls=self.use_angle_cls,
+                lang=self.lang,
                 enable_mkldnn=False,
-
                 det_limit_side_len=960,
-
                 det_db_thresh=0.3,
                 det_db_box_thresh=0.6,
                 det_db_unclip_ratio=1.5,
-
                 use_dilation=False,
-
                 drop_score=0.5
             )
-            logger.info(f"PaddleOCR initialized with language: {lang}")
+            logger.info(f"PaddleOCR initialized with language: {self.lang}")
+        except ImportError:
+            logger.warning("PaddleOCR is not installed. OCR extraction via PaddleOCR will be disabled.")
+            self.engine = None
         except Exception as e:
             logger.error(f"Failed to initialize PaddleOCR: {e}")
+            self.engine = None
+
+        self._initialized = True
+        return self.engine is not None
 
     def extract_text(self, image: Union[str, np.ndarray]) -> List[Dict[str, Any]]:
         """
         Extracts structured text data from an image.
         Returns a list of dictionaries containing text, confidence, and bounding box.
         """
+        if not self._ensure_engine():
+            logger.warning("OCREngine has no active OCR backend.")
+            return []
         try:
             # Perform OCR inference
             scale = 1.0

@@ -70,6 +70,8 @@ def get_budget_utilization(
     status = _resolve_status(utilization, budget_is_zero)
 
     return BudgetUtilizationResult(
+        analysis_id="SM-03",
+        monthly_budget=monthly_budget,
         total_spent=total_spent,
         remaining=remaining,
         utilization=utilization,
