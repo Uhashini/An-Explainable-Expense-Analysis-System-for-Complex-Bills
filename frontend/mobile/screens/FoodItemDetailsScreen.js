@@ -14,14 +14,18 @@ export default function FoodItemDetailsScreen({ route, navigation }) {
       fetchProductDetails(product_id);
     } else if (item_data) {
       setProductDetails({
-        name: item_name || item_data.matched_name || item_data.name,
-        category: item_data.category || 'Unknown Category',
-        health_score: item_data.health?.health_score || null,
+        food_id: item_data.food_id || item_data.matched_product_id,
+        name: item_name || item_data.matched_name || item_data.display_name || item_data.name,
+        category: item_data.category || 'General',
+        subcategory: item_data.subcategory,
+        serving_size: item_data.serving_size,
+        serving_unit: item_data.serving_unit,
+        health_score: item_data.health?.health_score || item_data.health_score || null,
         nutrition: item_data.nutrition || null,
         health: item_data.health || null,
       });
     }
-  }, [product_id]);
+  }, [product_id, item_data, item_name]);
 
   const fetchProductDetails = async (id) => {
     setLoading(true);

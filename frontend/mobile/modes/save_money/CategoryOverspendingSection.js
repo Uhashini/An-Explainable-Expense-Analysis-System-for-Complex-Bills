@@ -49,7 +49,7 @@ export default function CategoryOverspendingSection({ categoryAnomaliesData, isL
           />
         </View>
         <View style={{ flex: 1 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6 }}>
             <Text style={styles.insightTitleExtravagant}>Category Overspending & SHAP</Text>
             {isAlert ? (
               <View style={[styles.subBadge, { backgroundColor: '#FFEBEE' }]}>

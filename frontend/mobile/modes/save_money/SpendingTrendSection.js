@@ -94,7 +94,7 @@ export default function SpendingTrendSection({ spendingTrendData, isLoading }) {
           />
         </View>
         <View style={{ flex: 1 }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
             <Text style={styles.insightTitleExtravagant}>Monthly Spending Trend & STL</Text>
             <View style={[styles.subBadge, { backgroundColor: isOver ? '#FFEBEE' : '#E8F5E9' }]}>
               <Text style={[styles.subBadgeText, { color: isOver ? '#D32F2F' : '#2E7D32' }]}>

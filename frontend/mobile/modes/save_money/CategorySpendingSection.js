@@ -21,7 +21,7 @@ export default function CategorySpendingSection({ categorySpendingData, isLoadin
           <Feather name="pie-chart" size={20} color="#1976D2" />
         </View>
         <View style={{ flex: 1 }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
             <Text style={styles.insightTitleExtravagant}>Category Spending</Text>
             {total > 0 && (
               <View style={[styles.subBadge, { backgroundColor: '#E3F2FD' }]}>

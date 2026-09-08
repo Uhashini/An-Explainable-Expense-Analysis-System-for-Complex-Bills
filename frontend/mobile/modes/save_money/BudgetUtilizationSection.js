@@ -30,16 +30,21 @@ export default function BudgetUtilizationSection({
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference - (pct / 100) * circumference;
 
-  const status = budget?.status || (rawPct > 100 ? 'EXCEEDED' : rawPct >= 90 ? 'CRITICAL' : rawPct >= 75 ? 'WARNING' : 'SAFE');
+  const statusStr = String(budget?.status || '');
+  const isOver = rawPct > 100 || statusStr.includes('Over') || statusStr === 'EXCEEDED';
+  const isCritical = (rawPct > 90 && rawPct <= 100) || statusStr.includes('Almost') || statusStr === 'CRITICAL';
+  const isWarning = (rawPct >= 70 && rawPct <= 90) || statusStr.includes('Near') || statusStr === 'WARNING';
+  const isNoBudget = monthlyLimit <= 0 || statusStr.includes('No Budget');
 
-  const statusColor =
-    status === 'EXCEEDED'
-      ? '#D32F2F'
-      : status === 'CRITICAL'
-      ? '#E65100'
-      : status === 'WARNING'
-      ? '#F57C00'
-      : '#2E7D32';
+  const statusColor = isNoBudget
+    ? '#78909C'
+    : isOver
+    ? '#D32F2F'
+    : isCritical
+    ? '#E65100'
+    : isWarning
+    ? '#F57C00'
+    : '#2E7D32';
 
   const handleApply = () => {
     setMonthlyBudget(tempBudget);
@@ -58,13 +63,13 @@ export default function BudgetUtilizationSection({
           <Feather name="target" size={20} color="#2E7D32" />
         </View>
         <View style={{ flex: 1 }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
             <Text style={styles.insightTitleExtravagant}>Budget Utilization & Goals</Text>
             <TouchableOpacity
               onPress={() => setShowBudgetEditor(!showBudgetEditor)}
               style={styles.smEditBudgetBtn}
             >
-              <Feather name="edit-2" size={12} color={COLORS.primary} />
+              <Feather name="edit-2" size={12} color="#2E7D32" />
               <Text style={styles.smEditBudgetBtnText}>Edit Goal</Text>
             </TouchableOpacity>
           </View>
@@ -170,11 +175,13 @@ export default function BudgetUtilizationSection({
               styles.smStatusBanner,
               {
                 backgroundColor:
-                  status === 'EXCEEDED'
+                  isNoBudget
+                    ? '#ECEFF1'
+                    : isOver
                     ? '#FFEBEE'
-                    : status === 'CRITICAL'
+                    : isCritical
                     ? '#FFF3E0'
-                    : status === 'WARNING'
+                    : isWarning
                     ? '#FFF8E1'
                     : '#E8F5E9',
                 borderColor: statusColor,
@@ -182,10 +189,11 @@ export default function BudgetUtilizationSection({
             ]}
           >
             <Text style={[styles.smStatusBannerText, { color: statusColor }]}>
-              {status === 'EXCEEDED' && '🚨 Budget Exceeded! Spending has exceeded your monthly target limit.'}
-              {status === 'CRITICAL' && '⚠️ Critical Alert! Over 90% of your monthly budget is used.'}
-              {status === 'WARNING' && '⚡ Warning: Over 75% of your monthly budget has been consumed.'}
-              {status === 'SAFE' && '✅ Great job! Your spending is well within your monthly budget goal.'}
+              {isNoBudget && 'ℹ️ No Monthly Budget Set. Tap "Edit Goal" to set a spending target.'}
+              {isOver && '🚨 Budget Exceeded! Spending has exceeded your monthly target limit.'}
+              {isCritical && '⚠️ Critical Alert! Over 90% of your monthly budget is used.'}
+              {isWarning && '⚡ Warning: Over 70% of your monthly budget has been consumed.'}
+              {!isNoBudget && !isOver && !isCritical && !isWarning && '✅ Great job! Your spending is well within your monthly budget goal.'}
             </Text>
           </View>
         </>

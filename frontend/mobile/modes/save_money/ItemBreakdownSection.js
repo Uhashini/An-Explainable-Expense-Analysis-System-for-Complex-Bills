@@ -20,7 +20,7 @@ export default function ItemBreakdownSection({ itemBreakdownData, isLoading }) {
           <Feather name="list" size={20} color="#F57C00" />
         </View>
         <View style={{ flex: 1 }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
             <Text style={styles.insightTitleExtravagant}>Item-wise Spending Breakdown</Text>
             {items.length > 0 && (
               <View style={[styles.subBadge, { backgroundColor: '#FFF3E0' }]}>

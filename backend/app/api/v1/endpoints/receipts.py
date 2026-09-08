@@ -312,14 +312,16 @@ async def analyze_save_money(request: SaveMoneyAnalysisRequest, db: Session = De
             category = it.get("category") or "Uncategorized"
             qty = float(it.get("quantity") or 1)
             
-            if "unit_price" in it and it["unit_price"] is not None:
-                price = float(it["unit_price"])
-            elif "price" in it and it["price"] is not None:
-                price = float(it["price"])
+            if "unit_price" in it and it["unit_price"] is not None and float(it["unit_price"]) > 0:
+                unit_price = float(it["unit_price"])
+            elif "rate" in it and it["rate"] is not None and float(it["rate"]) > 0:
+                unit_price = float(it["rate"])
             elif "total_price" in it and it["total_price"] is not None:
-                price = float(it["total_price"]) / (qty if qty > 0 else 1)
+                unit_price = float(it["total_price"]) / (qty if qty > 0 else 1)
+            elif "price" in it and it["price"] is not None:
+                unit_price = float(it["price"])
             else:
-                price = 0.0
+                unit_price = 0.0
 
             matched_food_id = it.get("matched_food_id") or it.get("food_id")
             
@@ -327,7 +329,8 @@ async def analyze_save_money(request: SaveMoneyAnalysisRequest, db: Session = De
                 ReceiptItem(
                     name=name,
                     category=category,
-                    price=price,
+                    price=unit_price,
+                    unit_price=unit_price,
                     quantity=qty,
                     matched_food_id=matched_food_id,
                     food_id=matched_food_id

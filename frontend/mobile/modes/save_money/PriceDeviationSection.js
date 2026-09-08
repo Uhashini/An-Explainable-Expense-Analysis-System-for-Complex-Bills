@@ -18,7 +18,7 @@ export default function PriceDeviationSection({ priceDeviationData, isLoading })
           <Feather name="tag" size={20} color="#FFA000" />
         </View>
         <View style={{ flex: 1 }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
             <Text style={styles.insightTitleExtravagant}>Price Deviation Analysis</Text>
             {deviations.length > 0 && (
               <View style={[styles.subBadge, { backgroundColor: '#FFF8E1' }]}>

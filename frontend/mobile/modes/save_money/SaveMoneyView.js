@@ -63,29 +63,29 @@ export default function SaveMoneyView({
         </Text>
 
         {/* Quick KPI Stat Ribbon */}
-        <View style={[styles.metricsGrid, { marginTop: 16 }]}>
+        <View style={styles.metricsGrid}>
           <View style={styles.metricCard}>
             <View style={styles.metricCardTop}>
               <View style={[styles.metricIconBg, { backgroundColor: '#E3F2FD' }]}>
-                <Feather name="shopping-bag" size={18} color="#1976D2" />
+                <Feather name="shopping-bag" size={16} color="#1976D2" />
               </View>
               <Text style={styles.rdiBadge}>SM-01</Text>
             </View>
-            <Text style={styles.metricValue}>₹{totalSpend.toLocaleString()}</Text>
-            <Text style={styles.metricLabel}>Total Spend</Text>
+            <Text style={styles.metricValue} numberOfLines={1}>₹{totalSpend.toLocaleString()}</Text>
+            <Text style={styles.metricLabel} numberOfLines={1}>Total Spend</Text>
           </View>
 
           <View style={styles.metricCard}>
             <View style={styles.metricCardTop}>
               <View style={[styles.metricIconBg, { backgroundColor: '#FFF3E0' }]}>
-                <Feather name="pie-chart" size={18} color="#F57C00" />
+                <Feather name="pie-chart" size={16} color="#F57C00" />
               </View>
               <Text style={[styles.rdiBadge, { backgroundColor: '#FFF3E0', color: '#F57C00' }]}>Top Cat</Text>
             </View>
-            <Text style={[styles.metricValue, { fontSize: 16 }]} numberOfLines={1}>
+            <Text style={[styles.metricValue, { fontSize: 14 }]} numberOfLines={1}>
               {highestCat}
             </Text>
-            <Text style={styles.metricLabel}>Highest Spend Area</Text>
+            <Text style={styles.metricLabel} numberOfLines={1}>Highest Spend</Text>
           </View>
 
           <View style={styles.metricCard}>
@@ -105,7 +105,7 @@ export default function SaveMoneyView({
               >
                 <Feather
                   name="shield"
-                  size={18}
+                  size={16}
                   color={
                     budgetStatus === 'SAFE'
                       ? '#2E7D32'
@@ -137,10 +137,10 @@ export default function SaveMoneyView({
                 {budgetStatus}
               </Text>
             </View>
-            <Text style={styles.metricValue}>
+            <Text style={styles.metricValue} numberOfLines={1}>
               {budgetUtilization?.utilization_percentage ?? budgetUtilization?.utilization ?? 0}%
             </Text>
-            <Text style={styles.metricLabel}>Budget Used</Text>
+            <Text style={styles.metricLabel} numberOfLines={1}>Budget Used</Text>
           </View>
         </View>
       </View>

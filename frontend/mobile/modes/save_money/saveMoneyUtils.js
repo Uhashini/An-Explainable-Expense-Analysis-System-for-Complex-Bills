@@ -18,17 +18,20 @@ export const calculateSaveMoneyMetrics = (rawItems, monthlyBudget = 3000, previo
 
   items.forEach((it) => {
     let price = 0;
+    const qty = parseFloat(String(it.quantity || it.qty || '1').replace(/[^0-9.]/g, '')) || 1;
     if (it.total_price !== undefined && it.total_price !== null) {
       price = parseFloat(String(it.total_price).replace(/[^0-9.]/g, '')) || 0;
-    } else if (it.price !== undefined && it.price !== null) {
-      price = parseFloat(String(it.price).replace(/[^0-9.]/g, '')) || 0;
     } else if (it.unit_price !== undefined && it.unit_price !== null) {
-      const qty = parseFloat(String(it.quantity || it.qty || '1').replace(/[^0-9.]/g, '')) || 1;
       price = (parseFloat(String(it.unit_price).replace(/[^0-9.]/g, '')) || 0) * qty;
+    } else if (it.rate !== undefined && it.rate !== null) {
+      price = (parseFloat(String(it.rate).replace(/[^0-9.]/g, '')) || 0) * qty;
+    } else if (it.price !== undefined && it.price !== null) {
+      const p = parseFloat(String(it.price).replace(/[^0-9.]/g, '')) || 0;
+      price = p;
     }
 
     const name = it.name || it.item_name || it.matched_name || it.display_name || 'Grocery Item';
-    const category = it.category || 'Produce & Essentials';
+    const category = (it.category || 'Uncategorized').trim() || 'Uncategorized';
 
     totalSpending += price;
     categoryMap[category] = (categoryMap[category] || 0) + price;
@@ -39,6 +42,8 @@ export const calculateSaveMoneyMetrics = (rawItems, monthlyBudget = 3000, previo
       category,
       price: Math.round(price * 100) / 100,
       total_cost: Math.round(price * 100) / 100,
+      unit_price: qty > 0 ? Math.round((price / qty) * 100) / 100 : price,
+      quantity: qty,
     });
   });
 

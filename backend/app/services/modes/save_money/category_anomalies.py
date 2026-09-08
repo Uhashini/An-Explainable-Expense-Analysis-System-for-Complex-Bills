@@ -44,6 +44,23 @@ _USER_MODEL_CACHE: Dict[int, Dict[str, Any]] = {}
 CACHE_TTL_SECONDS = 300  # 5 minutes
 
 
+def _get_item_effective_spend(it: Any) -> float:
+    """Safely extract the total effective spending for a line item."""
+    if isinstance(it, dict):
+        if "total_price" in it and it["total_price"] is not None:
+            p = extract_float(str(it["total_price"]))
+            if p > 0:
+                return p
+        p = extract_float(str(it.get("price") or 0.0))
+        q = extract_float(str(it.get("quantity") or 1.0)) or 1.0
+        return p * q
+    else:
+        # SQLAlchemy Model / Row Object / Mock
+        p_val = getattr(it, "price", 0.0)
+        p = extract_float(str(p_val)) if not hasattr(p_val, "_mock_name") else (p_val if isinstance(p_val, (int, float)) else 0.0)
+        return float(p or 0.0)
+
+
 def _extract_category_vector(
     items: List[Dict[str, Any]], 
     all_categories: List[str]
@@ -52,9 +69,7 @@ def _extract_category_vector(
     cat_spend = defaultdict(float)
     for it in items:
         cat = (it.get("category") or "Other").strip().title()
-        qty = extract_float(str(it.get("quantity") or 1.0)) or 1.0
-        price = extract_float(str(it.get("price") or it.get("total_price") or 0.0))
-        cat_spend[cat] += price * qty
+        cat_spend[cat] += _get_item_effective_spend(it)
 
     return np.array([cat_spend[cat] for cat in all_categories], dtype=np.float64)
 
@@ -63,11 +78,13 @@ def _compute_tree_shapley_attribution(
     model: Any, 
     X_train: np.ndarray, 
     x_current: np.ndarray, 
-    categories: List[str]
+    categories: List[str],
+    display_baselines: Optional[np.ndarray] = None,
 ) -> List[ShapContribution]:
     """Compute exact or TreeSHAP feature attributions for Isolation Forest."""
     n_features = len(categories)
     historical_means = np.mean(X_train, axis=0) if len(X_train) > 0 else np.zeros(n_features)
+    display_means = display_baselines if display_baselines is not None else historical_means
     
     # 1. Try SHAP library TreeExplainer if available
     if SHAP_AVAILABLE and len(X_train) >= 3:
@@ -91,7 +108,7 @@ def _compute_tree_shapley_attribution(
                     shap_value=round(float(sv[i]), 4),
                     contribution_percentage=pct,
                     current_spend=round(float(x_current[i]), 2),
-                    historical_mean=round(float(historical_means[i]), 2)
+                    historical_mean=round(float(display_means[i]), 2)
                 ))
             return sorted(contributions, key=lambda c: -c.contribution_percentage)
         except Exception as e:
@@ -116,7 +133,7 @@ def _compute_tree_shapley_attribution(
             shap_value=round(float(z_scores[i]), 4),
             contribution_percentage=pct,
             current_spend=round(float(x_current[i]), 2),
-            historical_mean=round(float(historical_means[i]), 2)
+            historical_mean=round(float(display_means[i]), 2)
         ))
 
     return sorted(contributions, key=lambda c: -c.contribution_percentage)
@@ -158,9 +175,7 @@ def detect_category_anomalies(
     current_cat_spend = defaultdict(float)
     for it in current_items:
         cat = (it.get("category") or "Other").strip().title()
-        qty = extract_float(str(it.get("quantity") or 1.0)) or 1.0
-        price = extract_float(str(it.get("price") or it.get("total_price") or 0.0))
-        current_cat_spend[cat] += price * qty
+        current_cat_spend[cat] += _get_item_effective_spend(it)
 
     # ── 2. Fetch historical receipts & items ─────────────────────────────
     if historical_receipts is not None:
@@ -188,11 +203,10 @@ def detect_category_anomalies(
     receipt_cat_matrix = defaultdict(lambda: defaultdict(float))
     for it in hist_items:
         cat = (getattr(it, "category", None) or "Other").strip().title()
-        price = extract_float(str(getattr(it, "price", 0.0)))
-        qty = extract_float(str(getattr(it, "quantity", 1.0))) or 1.0
+        spend = _get_item_effective_spend(it)
         r_id = getattr(it, "receipt_id", None)
         if r_id is not None:
-            receipt_cat_matrix[r_id][cat] += price * qty
+            receipt_cat_matrix[r_id][cat] += spend
 
     # ── 3. Build unified category feature vocabulary ─────────────────────
     all_categories_set = set(current_cat_spend.keys())
@@ -212,18 +226,29 @@ def detect_category_anomalies(
 
     current_vector = np.array([current_cat_spend.get(cat, 0.0) for cat in all_categories], dtype=np.float64)
 
-    # ── 5. Train or Retrieve Cached Isolation Forest ─────────────────────
-    is_anomaly = False
-    model = None
-    
+    # ── 5. Compute Normal Baselines (Overall Mean & Active Average) ──────
     if len(X_rows) > 0:
         X_train = np.array(X_rows, dtype=np.float64)
         means = np.mean(X_train, axis=0)
         stds = np.std(X_train, axis=0)
+        
+        # Active category baseline (average when category was actually purchased)
+        active_means = np.zeros(len(all_categories))
+        for i in range(len(all_categories)):
+            non_zero_spends = X_train[:, i][X_train[:, i] > 0]
+            if len(non_zero_spends) > 0:
+                active_means[i] = np.mean(non_zero_spends)
+            else:
+                active_means[i] = means[i]
     else:
         X_train = np.zeros((1, len(all_categories)), dtype=np.float64)
         means = np.zeros(len(all_categories))
         stds = np.ones(len(all_categories))
+        active_means = np.zeros(len(all_categories))
+    
+    # ── 6. Train or Retrieve Cached Isolation Forest ─────────────────────
+    is_anomaly = False
+    model = None
     
     if SKLEARN_AVAILABLE and len(X_rows) >= 4:
         # Check cache
@@ -244,19 +269,27 @@ def detect_category_anomalies(
         if pred[0] == -1:
             is_anomaly = True
 
-    # Statistical spike verification (if any category surges > 2x historical mean or > 2 std dev)
+    # Statistical spike verification (if category spend surges significantly above normal baseline)
     if len(X_rows) > 0:
         for i, cat in enumerate(all_categories):
-            std_val = stds[i] if stds[i] > 1.0 else (means[i] * 0.3 or 10.0)
-            if current_vector[i] > means[i] + 2.0 * std_val and current_vector[i] > means[i] * 1.5:
+            baseline_val = active_means[i] if active_means[i] > 0 else means[i]
+            std_val = stds[i] if stds[i] > 1.0 else (baseline_val * 0.3 or 10.0)
+            
+            # Anomaly check: only flag if historical baseline exists and current spend is > 2x baseline + 2 std dev
+            if baseline_val > 0:
+                if current_vector[i] > (baseline_val + 2.0 * std_val) and current_vector[i] > (baseline_val * 1.5):
+                    is_anomaly = True
+            elif current_vector[i] > 500.0 and (current_vector[i] / (np.sum(current_vector) or 1.0)) > 0.5:
+                # First time buying a category is only an anomaly if it dominates the receipt (> ₹500 & > 50%)
                 is_anomaly = True
 
-    # ── 6. Compute SHAP Feature Attribution ──────────────────────────────
+    # ── 7. Compute SHAP Feature Attribution ──────────────────────────────
     shap_contributions = _compute_tree_shapley_attribution(
         model=model,
         X_train=X_train,
         x_current=current_vector,
-        categories=all_categories
+        categories=all_categories,
+        display_baselines=active_means if len(X_rows) > 0 else means,
     )
 
     # ── 7. Build Anomaly Items and Summary Explanation ───────────────────

@@ -51,8 +51,6 @@ class CategorySpendingResult(BaseModel):
     highest_category: CategorySpend
 
 
-# ─── SM-02: Item Breakdown ──────────────────────────────────────────────────
-
 class ItemExpense(BaseModel):
     """A single item with its effective price (unit_price × quantity)."""
     name: str
@@ -60,6 +58,7 @@ class ItemExpense(BaseModel):
     unit_price: Optional[float] = None
     quantity: Optional[float] = 1.0
     category: Optional[str] = None
+    percentage: Optional[float] = Field(0.0, description="Percentage of total receipt spend")
 
 
 class ItemBreakdownResult(BaseModel):

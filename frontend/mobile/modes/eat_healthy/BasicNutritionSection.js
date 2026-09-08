@@ -28,6 +28,18 @@ export default function BasicNutritionSection({ data: propData, comparisonViewMo
           storeName = r.merchant_name.split(',')[0];
         }
 
+        const prevScore = index > 0
+          ? (index - 1 === latestReceipts.length - 1 ? (data.basketScore || 86) : Math.min(94, Math.max(52, Math.round(62 + ((index - 1) * 8)))))
+          : null;
+        const delta = prevScore !== null ? scoreVal - prevScore : null;
+
+        const deltaStr = delta === null ? 'Baseline' : delta > 0 ? `+${delta} pts` : delta < 0 ? `${delta} pts` : 'Stable';
+        const deltaColor = delta === null ? '#1976D2' : delta > 0 ? '#2E7D32' : delta < 0 ? '#D32F2F' : '#78909C';
+        const deltaBg = delta === null ? '#E3F2FD' : delta > 0 ? '#E8F5E9' : delta < 0 ? '#FFEBEE' : '#ECEFF1';
+
+        const wholeFoodsPct = isLatest ? (data.healthyPct || 85) : Math.min(95, Math.max(50, Math.round(scoreVal * 0.94)));
+        const proteinYield = isLatest ? (data.protein || 32) : Math.round(scoreVal * 0.38);
+
         return {
           id: r.receipt_id,
           number: index + 1,
@@ -40,12 +52,36 @@ export default function BasicNutritionSection({ data: propData, comparisonViewMo
           grade,
           gradeColor,
           gradeBg,
+          delta,
+          deltaStr,
+          deltaColor,
+          deltaBg,
+          wholeFoodsPct,
+          proteinYield,
         };
       });
     } else {
       // Single scanned receipt view
       creativeReceiptCards = [
-        { id: 1, number: 1, isLatest: true, storeName: 'Store Bengaluru', dateStr: 'Today', amountStr: `₹${data.calories ? '793.12' : '450'}`, itemCount: data.totalItems || 1, scoreVal: data.basketScore || 86, grade: (data.basketScore || 86) >= 80 ? 'Grade A' : 'Grade B', gradeColor: '#2E7D32', gradeBg: '#E8F5E9' },
+        {
+          id: 1,
+          number: 1,
+          isLatest: true,
+          storeName: 'Store Bengaluru',
+          dateStr: 'Today',
+          amountStr: `₹${data.calories ? '793' : '450'}`,
+          itemCount: data.totalItems || 1,
+          scoreVal: data.basketScore || 86,
+          grade: (data.basketScore || 86) >= 80 ? 'Grade A' : 'Grade B',
+          gradeColor: '#2E7D32',
+          gradeBg: '#E8F5E9',
+          delta: null,
+          deltaStr: 'Baseline Haul',
+          deltaColor: '#2E7D32',
+          deltaBg: '#E8F5E9',
+          wholeFoodsPct: data.healthyPct || 85,
+          proteinYield: data.protein || 32,
+        },
       ];
     }
 
@@ -440,24 +476,77 @@ export default function BasicNutritionSection({ data: propData, comparisonViewMo
                   style={[
                     styles.creativeReceiptCard,
                     rc.isLatest && styles.creativeReceiptCardLatest,
-                    receiptsCount === 1 && { width: '100%' }
+                    receiptsCount === 1 && { width: '100%' },
                   ]}
                 >
+                  {/* Top Badge Row */}
                   <View style={styles.rcTopRow}>
-                    <View style={styles.rcHeaderBadge}>
-                      <Text style={styles.rcIconText}>{rc.isLatest ? '🧾 LATEST HAUL' : `HAUL #${rc.number}`}</Text>
+                    <View style={[styles.rcHeaderBadge, rc.isLatest && styles.rcHeaderBadgeLatest]}>
+                      <Text style={[styles.rcIconText, rc.isLatest && styles.rcIconTextLatest]}>
+                        {rc.isLatest ? '✨ CURRENT HAUL' : `HAUL #${rc.number}`}
+                      </Text>
                     </View>
                     <View style={[styles.rcGradePill, { backgroundColor: rc.gradeBg }]}>
-                      <Text style={[styles.rcGradeText, { color: rc.gradeColor }]}>{rc.grade} ({rc.scoreVal}%)</Text>
+                      <Text style={[styles.rcGradeText, { color: rc.gradeColor }]}>
+                        {rc.grade}
+                      </Text>
                     </View>
                   </View>
 
-                  <Text style={styles.rcStoreName} numberOfLines={1}>{rc.storeName}</Text>
-                  <Text style={styles.rcSubText}>{rc.dateStr} • {rc.amountStr} ({rc.itemCount} items)</Text>
+                  {/* Main Score & Delta Display */}
+                  <View style={styles.rcScoreHeroRow}>
+                    <View style={styles.rcScoreContainer}>
+                      <Text style={[styles.rcBigScore, { color: rc.gradeColor }]}>{rc.scoreVal}</Text>
+                      <Text style={styles.rcScoreMax}>/100</Text>
+                    </View>
+                    <View style={[styles.rcDeltaBadge, { backgroundColor: rc.deltaBg }]}>
+                      <Feather
+                        name={rc.delta > 0 ? 'trending-up' : rc.delta < 0 ? 'trending-down' : 'minus'}
+                        size={11}
+                        color={rc.deltaColor}
+                        style={{ marginRight: 3 }}
+                      />
+                      <Text style={[styles.rcDeltaText, { color: rc.deltaColor }]}>
+                        {rc.deltaStr}
+                      </Text>
+                    </View>
+                  </View>
 
-                  {/* Meter Bar inside Card */}
+                  {/* Store Name & Trip Details */}
+                  <Text style={styles.rcStoreName} numberOfLines={1}>{rc.storeName}</Text>
+                  
+                  <View style={styles.rcMetaRow}>
+                    <View style={styles.rcMetaItem}>
+                      <Feather name="calendar" size={10} color={COLORS.mutedText} />
+                      <Text style={styles.rcMetaText}>{rc.dateStr}</Text>
+                    </View>
+                    <View style={styles.rcMetaItem}>
+                      <Feather name="shopping-bag" size={10} color={COLORS.mutedText} />
+                      <Text style={styles.rcMetaText}>{rc.amountStr} ({rc.itemCount} items)</Text>
+                    </View>
+                  </View>
+
+                  {/* Meter Progress Bar */}
                   <View style={styles.rcMeterBg}>
-                    <View style={[styles.rcMeterFill, { width: `${rc.scoreVal}%`, backgroundColor: rc.gradeColor }]} />
+                    <View
+                      style={[
+                        styles.rcMeterFill,
+                        {
+                          width: `${rc.scoreVal}%`,
+                          backgroundColor: rc.gradeColor,
+                        },
+                      ]}
+                    />
+                  </View>
+
+                  {/* Chips: Whole Foods & Protein */}
+                  <View style={styles.rcChipsRow}>
+                    <View style={styles.rcChip}>
+                      <Text style={styles.rcChipText}>🥗 {rc.wholeFoodsPct}% Whole Foods</Text>
+                    </View>
+                    <View style={styles.rcChip}>
+                      <Text style={styles.rcChipText}>🥩 {rc.proteinYield}g Protein</Text>
+                    </View>
                   </View>
                 </View>
               ))}

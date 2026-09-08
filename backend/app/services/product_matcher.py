@@ -1,5 +1,7 @@
+import os
 import logging
 import re
+import difflib
 from sqlalchemy import text
 from app.database.postgres_client import SessionLocal, FoodItem, Nutrition, HealthIndicators, POSTGRES_URL
 
@@ -173,37 +175,71 @@ class ProductMatcher:
         return self._match_sqlite(item_name, normalized_query)
 
     def _match_sqlite(self, original_name: str, normalized_query: str):
-        """SQLite compatible matching using python substring & query matching."""
+        """SQLite compatible matching using score-based fuzzy token & substring matching."""
         db = SessionLocal()
         try:
             items = db.query(FoodItem).all()
+            if not items:
+                return None
+
+            best_item = None
+            best_score = 0.0
+
+            query_tokens = set(normalized_query.split())
+
             for item in items:
                 cname = (item.canonical_name or '').lower()
                 dname = (item.display_name or '').lower()
-                if normalized_query in cname or cname in normalized_query or (dname and normalized_query in dname):
-                    nut = item.nutrition
-                    h = item.health_indicators
-                    return {
-                        "food_id": item.food_id,
-                        "matched_name": item.canonical_name,
-                        "display_name": item.display_name,
-                        "category": item.category,
-                        "subcategory": item.subcategory,
-                        "serving_size": float(item.serving_size) if item.serving_size else None,
-                        "serving_unit": item.serving_unit,
-                        "nutrition": {
-                            "calories_kcal": float(nut.calories_kcal) if nut and nut.calories_kcal is not None else None,
-                            "protein_g": float(nut.protein_g) if nut and nut.protein_g is not None else None,
-                            "carbohydrates_g": float(nut.carbohydrates_g) if nut and nut.carbohydrates_g is not None else None,
-                            "fat_g": float(nut.fat_g) if nut and nut.fat_g is not None else None,
-                            "fiber_g": float(nut.fiber_g) if nut and nut.fiber_g is not None else None,
-                            "sugar_g": float(nut.sugar_g) if nut and nut.sugar_g is not None else None,
-                        },
-                        "health": {
-                            "health_score": h.health_score if h else None,
-                            "is_processed": h.is_processed if h else False,
-                        }
+                norm_cname = _normalize(cname)
+
+                score = 0.0
+                if normalized_query == norm_cname or normalized_query == cname:
+                    score = 1.0
+                elif normalized_query in cname or cname in normalized_query:
+                    score = 0.85
+                elif dname and (normalized_query in dname or dname in normalized_query):
+                    score = 0.80
+                else:
+                    c_tokens = set(norm_cname.split())
+                    common = query_tokens.intersection(c_tokens)
+                    if common:
+                        jaccard = len(common) / len(query_tokens.union(c_tokens))
+                        score = 0.50 + (jaccard * 0.40)
+                    else:
+                        ratio = difflib.SequenceMatcher(None, normalized_query, norm_cname).ratio()
+                        if ratio > 0.60:
+                            score = ratio * 0.75
+
+                if score > best_score:
+                    best_score = score
+                    best_item = item
+
+            if best_item and best_score >= 0.45:
+                nut = db.query(Nutrition).filter(Nutrition.food_id == best_item.food_id).first()
+                h = db.query(HealthIndicators).filter(HealthIndicators.food_id == best_item.food_id).first()
+
+                return {
+                    "food_id": best_item.food_id,
+                    "matched_name": best_item.canonical_name,
+                    "display_name": best_item.display_name,
+                    "category": best_item.category,
+                    "subcategory": best_item.subcategory,
+                    "serving_size": float(best_item.serving_size) if best_item.serving_size else None,
+                    "serving_unit": best_item.serving_unit,
+                    "nutrition": {
+                        "calories_kcal": float(nut.calories_kcal) if nut and nut.calories_kcal is not None else None,
+                        "protein_g": float(nut.protein_g) if nut and nut.protein_g is not None else None,
+                        "carbohydrates_g": float(nut.carbohydrates_g) if nut and nut.carbohydrates_g is not None else None,
+                        "fat_g": float(nut.fat_g) if nut and nut.fat_g is not None else None,
+                        "fiber_g": float(nut.fiber_g) if nut and nut.fiber_g is not None else None,
+                        "sugar_g": float(nut.sugar_g) if nut and nut.sugar_g is not None else None,
+                    },
+                    "health": {
+                        "health_score": h.health_score if h else None,
+                        "is_processed": h.is_processed if h else False,
                     }
+                }
+
             return None
         except Exception as e:
             logger.error(f"Error in _match_sqlite for '{original_name}': {e}")

@@ -67,21 +67,37 @@ export default function AIInsightsScreen({ route, navigation }) {
       const userId = user?.id || 1;
 
       const formattedItems = items.map((item) => {
-        let cleanPrice = 0;
-        if (item.total_price !== undefined && item.total_price !== null) {
-          cleanPrice = parseFloat(String(item.total_price).replace(/[^0-9.]/g, '')) || 0;
-        } else if (item.price !== undefined && item.price !== null) {
-          cleanPrice = parseFloat(String(item.price).replace(/[^0-9.]/g, '')) || 0;
+        const qty = parseFloat(String(item.quantity || item.qty || '1').replace(/[^0-9.]/g, '')) || 1;
+        let unitPrice = null;
+        let totalPrice = null;
+
+        if (item.rate !== undefined && item.rate !== null) {
+          unitPrice = parseFloat(String(item.rate).replace(/[^0-9.]/g, '')) || null;
         } else if (item.unit_price !== undefined && item.unit_price !== null) {
-          cleanPrice = parseFloat(String(item.unit_price).replace(/[^0-9.]/g, '')) || 0;
+          unitPrice = parseFloat(String(item.unit_price).replace(/[^0-9.]/g, '')) || null;
         }
 
-        const qty = parseFloat(String(item.quantity || item.qty || '1').replace(/[^0-9.]/g, '')) || 1;
+        if (item.total_price !== undefined && item.total_price !== null) {
+          totalPrice = parseFloat(String(item.total_price).replace(/[^0-9.]/g, '')) || null;
+        } else if (item.price !== undefined && item.price !== null) {
+          totalPrice = parseFloat(String(item.price).replace(/[^0-9.]/g, '')) || null;
+        }
+
+        if (totalPrice !== null && unitPrice === null) {
+          unitPrice = qty > 0 ? totalPrice / qty : totalPrice;
+        } else if (unitPrice !== null && totalPrice === null) {
+          totalPrice = unitPrice * qty;
+        } else if (unitPrice === null && totalPrice === null) {
+          unitPrice = 0;
+          totalPrice = 0;
+        }
 
         return {
           name: item.name || item.matched_name || item.display_name || 'Item',
           category: item.category || 'Uncategorized',
-          price: cleanPrice,
+          unit_price: unitPrice,
+          price: unitPrice,
+          total_price: totalPrice,
           quantity: qty,
           matched_food_id: item.matched_food_id || item.food_id || null,
         };

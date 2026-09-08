@@ -44,17 +44,24 @@ def get_item_breakdown(
     Returns:
         ItemBreakdownResult with the sorted item list and the single
         highest-expense item.
-
-    Tie-breaking behaviour:
-        If multiple items share the highest effective price, the one
-        appearing **first** in the original ``items`` list is returned
-        as ``highest_expense``.
     """
+    total_spending = sum(_effective_price(item) for item in items)
+
     # ── Build effective-price list ──────────────────────────────────────
-    expenses: List[ItemExpense] = [
-        ItemExpense(name=item.name, price=_effective_price(item))
-        for item in items
-    ]
+    expenses: List[ItemExpense] = []
+    for item in items:
+        eff_price = _effective_price(item)
+        pct = round((eff_price / total_spending) * 100, 1) if total_spending > 0 else 0.0
+        expenses.append(
+            ItemExpense(
+                name=item.name,
+                price=round(eff_price, 2),
+                unit_price=round(item.price, 2) if item.price is not None else round(eff_price, 2),
+                quantity=item.quantity if item.quantity is not None else 1.0,
+                category=item.category or "Uncategorized",
+                percentage=pct,
+            )
+        )
 
     # Stable sort descending by price (preserves original order on ties)
     sorted_items = sorted(expenses, key=lambda e: -e.price)
@@ -63,7 +70,7 @@ def get_item_breakdown(
     if sorted_items:
         highest_expense = sorted_items[0]
     else:
-        highest_expense = ItemExpense(name="N/A", price=0)
+        highest_expense = ItemExpense(name="N/A", price=0.0, percentage=0.0)
 
     # ── Apply optional topN slice ───────────────────────────────────────
     if top_n is not None and top_n > 0:

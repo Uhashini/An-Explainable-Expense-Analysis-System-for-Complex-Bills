@@ -36,10 +36,10 @@ def get_category_spending(items: List[ReceiptItem]) -> CategorySpendingResult:
     category_totals: dict[str, float] = defaultdict(float)
     for item in items:
         cat = (item.category or "").strip() or "Uncategorized"
-        effective_price = item.price * (item.quantity if item.quantity else 1)
+        effective_price = (item.price or 0.0) * (item.quantity if item.quantity else 1.0)
         category_totals[cat] += effective_price
 
-    total_spending = sum(category_totals.values())
+    total_spending = round(sum(category_totals.values()), 2)
 
     # ── Build sorted list (descending by amount, alpha on tie) ───────────
     sorted_cats = sorted(
@@ -49,14 +49,15 @@ def get_category_spending(items: List[ReceiptItem]) -> CategorySpendingResult:
 
     categories: List[CategorySpend] = []
     for cat, amount in sorted_cats:
+        amount_rounded = round(amount, 2)
         pct = round((amount / total_spending) * 100, 1) if total_spending else 0.0
-        categories.append(CategorySpend(category=cat, amount=amount, percentage=pct))
+        categories.append(CategorySpend(category=cat, amount=amount_rounded, percentage=pct))
 
     # ── Highest category (first in sorted list, or a zero sentinel) ──────
     if categories:
         highest_category = categories[0]
     else:
-        highest_category = CategorySpend(category="N/A", amount=0, percentage=0)
+        highest_category = CategorySpend(category="N/A", amount=0.0, percentage=0.0)
 
     return CategorySpendingResult(
         total_spending=total_spending,

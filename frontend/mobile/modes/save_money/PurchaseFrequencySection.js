@@ -17,7 +17,7 @@ export default function PurchaseFrequencySection({ purchaseFrequencyData, isLoad
           <Feather name="repeat" size={20} color="#1976D2" />
         </View>
         <View style={{ flex: 1 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6 }}>
             <Text style={styles.insightTitleExtravagant}>Purchase Frequency & Staples</Text>
             {totalUnique > 0 && (
               <View style={[styles.subBadge, { backgroundColor: '#E3F2FD' }]}>

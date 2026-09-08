@@ -58,10 +58,14 @@ def get_budget_utilization(
         BudgetUtilizationResult with total_spent, remaining, utilization %,
         and a status label.
     """
-    total_spent = previous_spend + current_receipt_total
-    remaining = monthly_budget - total_spent
+    monthly_budget = round(float(monthly_budget or 0.0), 2)
+    current_receipt_total = round(float(current_receipt_total or 0.0), 2)
+    previous_spend = round(float(previous_spend or 0.0), 2)
 
-    budget_is_zero = monthly_budget == 0
+    total_spent = round(previous_spend + current_receipt_total, 2)
+    remaining = round(monthly_budget - total_spent, 2)
+
+    budget_is_zero = monthly_budget <= 0
     if budget_is_zero:
         utilization = 0.0
     else:
