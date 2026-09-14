@@ -1,4 +1,4 @@
-# PANTRIX API Documentation
+# PANTRIX Complete API Documentation
 
 **Base URL:** `http://localhost:8000/api/v1`  
 **Interactive Swagger UI:** `http://localhost:8000/docs`  
@@ -6,16 +6,52 @@
 
 ---
 
-## 1. Overview & Authentication
+## 📋 Endpoint Summary Table
 
-PANTRIX provides a RESTful FastAPI backend that converts receipt images into structured financial and nutritional analytics.
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `GET` | `/health` | System health and version check |
+| `GET` | `/` | Web UI root dashboard |
+| **Receipts** | | |
+| `POST` | `/api/v1/receipts/upload` | Upload receipt image, run PaddleOCR + LayoutLMv3, match items |
+| `POST` | `/api/v1/receipts/match-products` | Bulk match receipt item strings with food DB |
+| `POST` | `/api/v1/receipts/save` | Persist receipt & item breakdown to database |
+| `GET` | `/api/v1/receipts/check-matches` | Check total count of unmatched items |
+| `POST` | `/api/v1/receipts/run-rematch` | Execute background re-matching job for unmatched items |
+| `GET` | `/api/v1/receipts/user/{user_id}` | Fetch all receipts for a given user |
+| `GET` | `/api/v1/receipts/{receipt_id}` | Fetch receipt details, items, & 2D bounding boxes |
+| `POST` | `/api/v1/receipts/analyze-save-money` | Run Save-Money cost optimization on a receipt |
+| **Analytics** | | |
+| `POST` | `/api/v1/analytics/calculate` | Calculate price deviations & spending trends |
+| `GET` | `/api/v1/analytics/receipt/{receipt_id}` | Retrieve cached analytics result for a receipt |
+| **Gain Muscle** | | |
+| `GET` | `/api/v1/gain-muscle/{user_id}` | Compute protein availability, quality, cost efficiency, & trends |
+| `GET` | `/api/v1/gain-muscle/{user_id}/recommendations` | Get dynamic high-protein recommendations |
+| **Products** | | |
+| `GET` | `/api/v1/products/{product_id}` | Get product details & nutrition info by ID |
+| **Auth & Profile** | | |
+| `POST` | `/api/v1/auth/register` | Register a new user |
+| `POST` | `/api/v1/auth/login` | Authenticate user |
+| `POST` | `/api/v1/auth/onboarding` | Save onboarding fitness goals & dietary preferences |
+| `GET` | `/api/v1/auth/me/{user_id}` | Get user profile info |
+| `PUT` | `/api/v1/auth/me/{user_id}` | Update user profile & goals |
+| **Demo** | | |
+| `POST` | `/api/v1/demo/process-receipt` | Process sample receipt for live web demo |
 
-- **Request Format:** JSON (for data endpoints) or `multipart/form-data` (for image uploads).
-- **Response Format:** Standard JSON.
-- **Authentication:** Bearer JWT token in headers (for protected user endpoints):
-  ```http
-  Authorization: Bearer <your_jwt_token>
+---
+
+## 1. System & Web UI Routes
+
+### `GET /health`
+Returns backend service health status and version.
+
+* **Response (200 OK):**
+  ```json
+  { "status": "healthy", "version": "0.1.0" }
   ```
+
+### `GET /`
+Serves the static web dashboard interface (`index.html`).
 
 ---
 
@@ -59,7 +95,7 @@ Uploads a receipt image (JPEG, PNG, WEBP), performs PaddleOCR + LayoutLMv3 extra
 ---
 
 ### `POST /api/v1/receipts/match-products`
-Manually triggers fuzzy matching of item names against the food database.
+Enhances a list of raw receipt items by matching them against the food database.
 
 * **Request Body:**
   ```json
@@ -67,26 +103,53 @@ Manually triggers fuzzy matching of item names against the food database.
     "items": [{ "name": "Oat Milk 1L", "quantity": 1, "total_price": 4.20 }]
   }
   ```
-* **Response (200 OK):** Enriched array of items with matched nutrition metadata.
+* **Response (200 OK):** Array of items enriched with `food_id`, `category`, `nutrition`, and `health` scores.
 
 ---
 
 ### `POST /api/v1/receipts/save`
-Persists verified receipt data and item breakdown into PostgreSQL.
+Persists extracted receipt data and items into PostgreSQL.
 
-* **Request Body:** Standard receipt object (from `/upload` output).
+* **Request Body:**
+  ```json
+  {
+    "user_id": 1,
+    "merchant_name": "Smart Bazaar",
+    "total_amount": 45.50,
+    "date": "2026-09-14",
+    "items": [
+      { "name": "MILK 1L", "quantity": 2, "price": 7.00, "food_id": "FOOD_102" }
+    ]
+  }
+  ```
+* **Response (200 OK):** `{ "status": "success", "receipt_id": 42 }`
+
+---
+
+### `GET /api/v1/receipts/check-matches`
+Checks the number of items in the database missing product matches.
+
 * **Response (200 OK):**
   ```json
-  { "status": "success", "receipt_id": 42, "message": "Receipt saved successfully" }
+  { "status": "success", "unmatched_count": 14 }
   ```
 
 ---
 
-### `GET /api/v1/receipts/history`
-Retrieves past uploaded receipts for the authenticated user.
+### `POST /api/v1/receipts/run-rematch`
+Triggers a background job to re-match all unmatched items against updated database food rules.
 
-* **Query Parameters:** `limit` (default: 20), `offset` (default: 0)
-* **Response (200 OK):** List of saved receipt summaries.
+* **Response (200 OK):**
+  ```json
+  { "status": "success", "rematched_items": 12 }
+  ```
+
+---
+
+### `GET /api/v1/receipts/user/{user_id}`
+Retrieves all receipts saved by a specific user.
+
+* **Response (200 OK):** List of user receipts with line items.
 
 ---
 
@@ -95,89 +158,129 @@ Retrieves complete receipt details, raw OCR bounding boxes, and item breakdown b
 
 ---
 
+### `POST /api/v1/receipts/analyze-save-money`
+Runs the "Save Money" cost-optimization analysis engine on a specific receipt.
+
+* **Request Body:** `{ "receipt_id": 42 }`
+* **Response (200 OK):** Price deviation analysis, store price comparisons, and cheaper alternative recommendations.
+
+---
+
 ## 3. Financial & Nutritional Analytics (`/analytics`)
 
-### `GET /api/v1/analytics/dashboard`
-Returns high-level summary KPIs (total spend, total calories, macro split).
+### `POST /api/v1/analytics/calculate`
+Calculates financial spend trends, price deviations, and nutritional statistics across receipt items in parallel.
 
+* **Request Body:**
+  ```json
+  {
+    "user_id": 1,
+    "receipt_id": 42,
+    "items": [
+      { "name": "Chicken Breast", "quantity": 1, "price": 12.50, "category": "Poultry" }
+    ]
+  }
+  ```
 * **Response (200 OK):**
   ```json
   {
-    "total_spend": 342.50,
-    "receipt_count": 12,
-    "total_calories": 24500,
-    "macronutrients": { "protein_g": 620, "carbs_g": 2100, "fat_g": 540 }
+    "status": "success",
+    "data": {
+      "trend": { "monthly_spend": 320.00, "top_category": "Poultry" },
+      "price_deviations": [
+        { "item": "Chicken Breast", "paid_price": 12.50, "avg_market_price": 10.00, "deviation_pct": 25.0 }
+      ]
+    }
   }
   ```
 
 ---
 
-### `GET /api/v1/analytics/spending-trends`
-Categorizes spending over time (Monthly / Weekly).
-
-* **Query Parameters:** `timeframe` (`weekly` | `monthly`), `category` (optional)
-* **Response (200 OK):** Aggregated spend by category (e.g., Dairy, Produce, Snacks).
+### `GET /api/v1/analytics/receipt/{receipt_id}`
+Retrieves cached analysis results for a specific receipt ID.
 
 ---
 
-### `GET /api/v1/analytics/nutrition-breakdown`
-Analyzes nutritional quality of grocery purchases.
+## 4. Muscle Gain & High-Protein Mode (`/gain-muscle`)
 
-* **Response (200 OK):** Food group distribution, processed food ratio, and macro density per dollar spent.
-
----
-
-## 4. Special Modes: Gain Muscle (`/gain-muscle`)
-
-### `GET /api/v1/gain-muscle/recommendations`
-Provides high-protein budget efficiency recommendations based on past receipt data.
+### `GET /api/v1/gain-muscle/{user_id}`
+Returns complete Gain Muscle metrics (**GM-01** Protein Availability, **GM-02** Protein Quality, **GM-03** Protein Cost Efficiency, and **GM-05** Protein Trend) for a user.
 
 * **Response (200 OK):**
   ```json
   {
-    "protein_per_dollar_rankings": [
-      { "item_name": "Eggs 12-pack", "protein_per_dollar": "32.5g/$" },
-      { "item_name": "Chicken Breast 1kg", "protein_per_dollar": "28.0g/$" }
-    ],
-    "suggestions": ["Replace sugar cereals with oats to increase protein density."]
+    "status": "success",
+    "data": {
+      "protein_availability": { "total_protein_g": 450.0, "daily_avg_g": 64.2 },
+      "protein_quality": { "complete_protein_ratio": 0.85 },
+      "protein_cost_efficiency": { "avg_cost_per_10g_protein": 0.42 },
+      "protein_trend": { "weekly_change_pct": 12.5 }
+    }
   }
   ```
 
 ---
 
-## 5. Food Product Search (`/products`)
+### `GET /api/v1/gain-muscle/{user_id}/recommendations`
+Generates high-protein product recommendations excluding foods already purchased by the user.
 
-### `GET /api/v1/products/search`
-Searches the internal food database for nutrition profiles.
-
-* **Query Parameters:** `q` (search term, e.g., `almond milk`)
-* **Response (200 OK):** Array of matching food items.
-
----
-
-## 6. Authentication (`/auth`)
-
-| Endpoint | Method | Description | Request Body |
-| :--- | :--- | :--- | :--- |
-| `/api/v1/auth/signup` | `POST` | Register a new user | `{ "email", "password", "name" }` |
-| `/api/v1/auth/login` | `POST` | Login user & get JWT | `{ "email", "password" }` |
-| `/api/v1/auth/me` | `GET` | Get current user profile | Header: `Authorization: Bearer <token>` |
+* **Query Parameters:** `top_n` (default: 6)
+* **Response (200 OK):**
+  ```json
+  {
+    "status": "success",
+    "data": [
+      { "food_id": "FOOD_301", "name": "Greek Yogurt 500g", "protein_per_dollar": "24.5g/$", "category": "Dairy" }
+    ]
+  }
+  ```
 
 ---
 
-## 7. Demo & System Health (`/demo`, `/health`)
+## 5. Food Products (`/products`)
 
-* `GET /health` — Health check endpoint (`{"status": "healthy"}`).
-* `GET /api/v1/demo/sample-receipts` — List available sample test receipt images.
-* `POST /api/v1/demo/process-sample` — Process a sample receipt without uploading a new file.
+### `GET /api/v1/products/{product_id}`
+Retrieves complete nutritional and category profile for a specific food item ID.
 
 ---
 
-## 8. HTTP Error Codes
+## 6. Auth & User Profile (`/auth`)
 
-| Status Code | Meaning | Common Cause |
+### `POST /api/v1/auth/register`
+Registers a new user account.
+
+* **Request Body:** `{ "email": "user@example.com", "password": "secretpassword", "name": "John Doe" }`
+
+### `POST /api/v1/auth/login`
+Authenticates user and returns access token.
+
+* **Request Body:** `{ "email": "user@example.com", "password": "secretpassword" }`
+
+### `POST /api/v1/auth/onboarding`
+Saves user onboarding profile (dietary preferences, fitness goals, budget target).
+
+### `GET /api/v1/auth/me/{user_id}`
+Retrieves profile and fitness target settings for a user.
+
+### `PUT /api/v1/auth/me/{user_id}`
+Updates user profile settings and budget preferences.
+
+---
+
+## 7. Web Demo Playground (`/demo`)
+
+### `POST /api/v1/demo/process-receipt`
+Processes a sample receipt image for live web interface demonstrations.
+
+---
+
+## 8. HTTP Error Handling
+
+| Code | Status | Meaning |
 | :--- | :--- | :--- |
-| **400 Bad Request** | Invalid Input | Uploaded file is not an image or missing required JSON fields. |
-| **401 Unauthorized** | Authentication Failed | Missing or expired JWT token. |
-| **404 Not Found** | Resource Missing | Invalid `receipt_id` or `food_id`. |
-| **500 Internal Error** | Server Error | OCR or LayoutLMv3 inference error. |
+| **200** | OK | Request succeeded |
+| **201** | Created | Resource (user / receipt) created successfully |
+| **400** | Bad Request | Invalid payload format or non-image upload |
+| **401** | Unauthorized | Invalid or missing authentication credentials |
+| **404** | Not Found | Resource (user_id / receipt_id / product_id) not found |
+| **500** | Internal Server Error | Deep learning inference or database execution error |
