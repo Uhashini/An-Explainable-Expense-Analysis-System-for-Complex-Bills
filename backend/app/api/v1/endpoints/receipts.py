@@ -126,7 +126,7 @@ async def match_products(request: MatchProductsRequest):
 
 from sqlalchemy.orm import Session
 from fastapi import Depends
-from app.database.postgres_client import get_db, UserProfile, Receipt, ReceiptItem
+from app.database.postgres_client import get_db, UserProfile, Receipt, ReceiptItem, AnalysisResult
 from typing import Optional
 
 class ReceiptItemCreate(BaseModel):
@@ -287,6 +287,81 @@ def get_receipt(receipt_id: int, db: Session = Depends(get_db)):
             }
         }
     }
+
+
+class ReceiptItemUpdate(BaseModel):
+    item_id: Optional[int] = None
+    name: Optional[str] = None
+    quantity: Optional[str] = None
+    rate: Optional[str] = None
+    price: Optional[str] = None
+
+class ReceiptUpdate(BaseModel):
+    merchant_name: Optional[str] = None
+    date: Optional[str] = None
+    total_amount: Optional[float] = None
+    items: Optional[List[ReceiptItemUpdate]] = None
+
+@router.patch("/{receipt_id}", tags=["Receipts"])
+def update_receipt(receipt_id: int, data: ReceiptUpdate, db: Session = Depends(get_db)):
+    """Update receipt header fields and item names/values for an existing receipt."""
+    receipt = db.query(Receipt).filter(Receipt.receipt_id == receipt_id).first()
+    if not receipt:
+        raise HTTPException(status_code=404, detail="Receipt not found")
+
+    # Update header fields if provided
+    if data.merchant_name is not None:
+        receipt.merchant_name = data.merchant_name
+    if data.date is not None:
+        receipt.date = data.date
+    if data.total_amount is not None:
+        receipt.total_amount = data.total_amount
+
+    # Update individual items by item_id
+    if data.items:
+        for item_update in data.items:
+            if not item_update.item_id:
+                continue
+            db_item = db.query(ReceiptItem).filter(
+                ReceiptItem.item_id == item_update.item_id,
+                ReceiptItem.receipt_id == receipt_id,
+            ).first()
+            if db_item:
+                if item_update.name is not None:
+                    db_item.name = item_update.name
+                if item_update.quantity is not None:
+                    db_item.quantity = item_update.quantity
+                if item_update.rate is not None:
+                    db_item.rate = item_update.rate
+                if item_update.price is not None:
+                    db_item.price = item_update.price
+
+    db.commit()
+    return {"status": "success", "message": f"Receipt #{receipt_id} updated successfully"}
+
+
+@router.delete("/{receipt_id}", tags=["Receipts"])
+def delete_receipt(receipt_id: int, db: Session = Depends(get_db)):
+    """Delete a receipt and all its associated items and analysis results."""
+    receipt = db.query(Receipt).filter(Receipt.receipt_id == receipt_id).first()
+    if not receipt:
+        raise HTTPException(status_code=404, detail="Receipt not found")
+
+    try:
+        db.query(AnalysisResult).filter(AnalysisResult.receipt_id == receipt_id).delete()
+    except Exception as e:
+        logger.warning(f"Could not delete AnalysisResult for receipt {receipt_id}: {e}")
+
+    # Delete all items first (cascade)
+    try:
+        db.query(ReceiptItem).filter(ReceiptItem.receipt_id == receipt_id).delete()
+    except Exception as e:
+        logger.warning(f"Could not delete ReceiptItem for receipt {receipt_id}: {e}")
+
+    db.delete(receipt)
+    db.commit()
+
+    return {"status": "success", "message": f"Receipt #{receipt_id} deleted successfully"}
 
 
 class SaveMoneyAnalysisRequest(BaseModel):

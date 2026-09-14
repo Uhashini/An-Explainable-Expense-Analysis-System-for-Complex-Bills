@@ -6,8 +6,9 @@ import ScreenLayout from '../components/ScreenLayout';
 import { COLORS, FONTS } from '../theme';
 import { API_BASE_URL } from '../utils/apiConfig';
 import { getUser } from '../utils/authStorage';
+import { showConfirm, showNotification } from '../utils/alertHelper';
 
-function ReceiptCard({ receipt, onPress }) {
+function ReceiptCard({ receipt, onPress, onDelete }) {
   return (
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.8}>
       <View style={styles.cardIcon}>
@@ -20,7 +21,20 @@ function ReceiptCard({ receipt, onPress }) {
       </View>
       <View style={styles.cardRight}>
         <Text style={styles.cardAmount}>{receipt.amount}</Text>
-        <Text style={styles.cardArrow}>›</Text>
+        <View style={styles.cardActionRow}>
+          <TouchableOpacity
+            style={styles.deleteIconButton}
+            onPress={(e) => {
+              if (e && e.stopPropagation) e.stopPropagation();
+              onDelete(receipt);
+            }}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityLabel={`Delete receipt from ${receipt.store}`}
+          >
+            <Text style={styles.deleteIconText}>🗑</Text>
+          </TouchableOpacity>
+          <Text style={styles.cardArrow}>›</Text>
+        </View>
       </View>
     </TouchableOpacity>
   );
@@ -70,6 +84,35 @@ export default function ReceiptHistoryScreen({ navigation }) {
     return unsubscribe;
   }, [navigation]);
 
+  const handleDeleteReceipt = (receipt) => {
+    showConfirm({
+      title: "Delete Receipt",
+      message: `Are you sure you want to permanently delete the receipt from "${receipt.store}" (${receipt.amount})? This cannot be undone.`,
+      confirmText: "Delete",
+      onConfirm: async () => {
+        const previousReceipts = [...receipts];
+        // Optimistic UI update: remove receipt from view immediately
+        setReceipts((prev) => prev.filter((r) => r.id !== receipt.id));
+
+        try {
+          const response = await fetch(`${API_BASE_URL}/receipts/${receipt.id}`, {
+            method: 'DELETE',
+          });
+          const data = await response.json();
+          if (!response.ok) {
+            throw new Error(data.detail || 'Failed to delete receipt');
+          }
+          showNotification("Deleted", "Receipt has been deleted.");
+        } catch (error) {
+          console.error("Error deleting receipt:", error);
+          // Rollback if deletion failed
+          setReceipts(previousReceipts);
+          showNotification("Error", "Could not delete receipt. Please try again.");
+        }
+      },
+    });
+  };
+
   const filtered = receipts.filter((r) =>
     r.store && r.store.toLowerCase().includes(search.toLowerCase())
   );
@@ -109,6 +152,7 @@ export default function ReceiptHistoryScreen({ navigation }) {
                 key={r.id}
                 receipt={r}
                 onPress={() => navigation.navigate('ReceiptDetails', { receiptId: r.id })}
+                onDelete={handleDeleteReceipt}
               />
             ))
           ) : (
@@ -235,6 +279,24 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.bold,
     fontSize: 15,
     color: COLORS.primary,
+  },
+  cardActionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  deleteIconButton: {
+    paddingHorizontal: 7,
+    paddingVertical: 4,
+    borderRadius: 8,
+    backgroundColor: '#fff5f5',
+    borderWidth: 1,
+    borderColor: '#f5c6cb',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  deleteIconText: {
+    fontSize: 13,
   },
   cardArrow: {
     fontSize: 22,

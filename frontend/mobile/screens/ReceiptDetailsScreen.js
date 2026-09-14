@@ -8,12 +8,13 @@ import {
   Animated,
   Alert,
   ActivityIndicator,
+  TextInput,
 } from "react-native";
 import ScreenLayout from "../components/ScreenLayout";
 import { COLORS, FONTS } from "../theme";
 import { API_BASE_URL } from "../utils/apiConfig";
 import { getUser } from "../utils/authStorage";
-import { TextInput } from "react-native";
+import { showConfirm, showNotification } from "../utils/alertHelper";
 
 // ─── Mock receipt data ──────────────────────────────────────────────────────
 const ITEMS = [
@@ -146,7 +147,13 @@ function InsightCard({ title, detail, accent }) {
 
 // ─── Screen ──────────────────────────────────────────────────────────────────
 export default function ReceiptDetailsScreen({ route, navigation }) {
-  const { imageUri, receiptData, receiptId } = route.params || {};
+  const { imageUri, receiptData, receiptId: routeReceiptId } = route.params || {};
+  const [receiptId, setReceiptId] = useState(
+    routeReceiptId ||
+    receiptData?.data?.receipt_info?.receipt_id ||
+    receiptData?.receipt_info?.receipt_id ||
+    null
+  );
   const [showAnalysis, setShowAnalysis] = useState(false);
   const [activeMode, setActiveMode] = useState(0); // 0=muscle, 1=healthy, 2=money
 
@@ -170,8 +177,22 @@ export default function ReceiptDetailsScreen({ route, navigation }) {
   const [foodDetailsLoaded, setFoodDetailsLoaded] = useState(isMock || !!receiptId);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  // Snapshot of items before editing starts, used for Cancel
+  const [itemsSnapshot, setItemsSnapshot] = useState(null);
+  const [merchantSnapshot, setMerchantSnapshot] = useState(null);
+  const [dateSnapshot, setDateSnapshot] = useState(null);
+  const [totalSnapshot, setTotalSnapshot] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [isFetchingReceipt, setIsFetchingReceipt] = useState(!!receiptId);
+
+  // Sync if new route param comes in
+  useEffect(() => {
+    if (routeReceiptId && routeReceiptId !== receiptId) {
+      setReceiptId(routeReceiptId);
+    }
+  }, [routeReceiptId]);
 
   // Update state if new props come in or if receiptId is provided
   useEffect(() => {
@@ -189,11 +210,11 @@ export default function ReceiptDetailsScreen({ route, navigation }) {
             setExtractedItems(info.items ? [...info.items] : []);
             setFoodDetailsLoaded(true);
           } else {
-            Alert.alert("Error", "Failed to load receipt details.");
+            showNotification("Error", "Failed to load receipt details.");
           }
         } catch (error) {
           console.error("Error fetching receipt:", error);
-          Alert.alert("Error", "Failed to load receipt details.");
+          showNotification("Error", "Failed to load receipt details.");
         } finally {
           setIsFetchingReceipt(false);
         }
@@ -211,7 +232,7 @@ export default function ReceiptDetailsScreen({ route, navigation }) {
 
   const fetchFoodDetails = async () => {
     if (extractedItems.length === 0) {
-      Alert.alert("No items", "There are no items to fetch details for.");
+      showNotification("No items", "There are no items to fetch details for.");
       return;
     }
 
@@ -230,13 +251,13 @@ export default function ReceiptDetailsScreen({ route, navigation }) {
 
       setExtractedItems(data.items);
       setFoodDetailsLoaded(true);
-      Alert.alert(
+      showNotification(
         "Success",
         "Food details retrieved! Tap any item in the table to view its full details page.",
       );
     } catch (error) {
       console.error("Error fetching food details:", error);
-      Alert.alert("Error", "Failed to fetch food details. Please try again.");
+      showNotification("Error", "Failed to fetch food details. Please try again.");
     } finally {
       setIsLoadingDetails(false);
     }
@@ -247,7 +268,7 @@ export default function ReceiptDetailsScreen({ route, navigation }) {
     try {
       const user = await getUser();
       if (!user || !user.id) {
-        Alert.alert("Error", "You must be logged in to save receipts.");
+        showNotification("Error", "You must be logged in to save receipts.");
         return;
       }
       const payload = {
@@ -272,17 +293,170 @@ export default function ReceiptDetailsScreen({ route, navigation }) {
       const data = await response.json();
       if (!response.ok) throw new Error(data.detail || "Failed to save");
 
-      Alert.alert("Success", "Receipt saved to database!");
+      if (data.receipt_id) {
+        setReceiptId(data.receipt_id);
+        navigation.setParams?.({ receiptId: data.receipt_id });
+      }
+
+      showNotification("Success", "Receipt saved to database!");
     } catch (err) {
       console.error(err);
-      Alert.alert("Error", "Could not save receipt.");
+      showNotification("Error", "Could not save receipt.");
     } finally {
       setIsSaving(false);
     }
   };
 
+  // Kick off edit mode — snapshot current values so Cancel can restore them
+  const startEditing = () => {
+    setItemsSnapshot(JSON.parse(JSON.stringify(extractedItems)));
+    setMerchantSnapshot(merchantName);
+    setDateSnapshot(dateStr);
+    setTotalSnapshot(totalAmount);
+    setIsEditing(true);
+  };
+
+  const cancelEditing = () => {
+    if (itemsSnapshot) setExtractedItems(itemsSnapshot);
+    if (merchantSnapshot !== null) setMerchantName(merchantSnapshot);
+    if (dateSnapshot !== null) setDateStr(dateSnapshot);
+    if (totalSnapshot !== null) setTotalAmount(totalSnapshot);
+    setIsEditing(false);
+  };
+
+  const handleUpdateReceipt = async () => {
+    if (!receiptId) {
+      // Not yet saved — just exit edit mode (user can hit Save Receipt)
+      setIsEditing(false);
+      return;
+    }
+    setIsUpdating(true);
+    try {
+      const payload = {
+        merchant_name: merchantName,
+        date: dateStr,
+        total_amount: parseFloat(totalAmount) || 0.0,
+        items: extractedItems.map((it) => ({
+          item_id: it.item_id ?? null,
+          name: it.name,
+          quantity: String(it.quantity || it.qty || "1"),
+          rate: String(it.unit_price || it.rate || ""),
+          price: String(it.total_price || it.price || ""),
+        })),
+      };
+      const response = await fetch(`${API_BASE_URL}/receipts/${receiptId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.detail || "Failed to update");
+      setIsEditing(false);
+      showNotification("Updated", "Receipt changes saved successfully!");
+    } catch (err) {
+      console.error(err);
+      showNotification("Error", "Could not save changes. Please try again.");
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleDeleteReceipt = () => {
+    if (!receiptId) {
+      showConfirm({
+        title: "Discard Receipt",
+        message: "This receipt has not been saved yet. Are you sure you want to discard it?",
+        confirmText: "Discard",
+        cancelText: "Keep Editing",
+        onConfirm: () => {
+          navigation.goBack();
+        },
+      });
+      return;
+    }
+
+    showConfirm({
+      title: "Delete Receipt",
+      message: "Are you sure you want to permanently delete this receipt? This cannot be undone.",
+      confirmText: "Delete",
+      cancelText: "Cancel",
+      onConfirm: async () => {
+        setIsDeleting(true);
+        try {
+          const response = await fetch(`${API_BASE_URL}/receipts/${receiptId}`, {
+            method: "DELETE",
+          });
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.detail || "Failed to delete");
+          showNotification("Deleted", "Receipt has been deleted.", () => {
+            navigation.goBack();
+          });
+        } catch (err) {
+          console.error("Delete receipt error:", err);
+          showNotification("Error", "Could not delete receipt. Please try again.");
+        } finally {
+          setIsDeleting(false);
+        }
+      },
+    });
+  };
+
   return (
-    <ScreenLayout title="Receipt Details" navigation={navigation} showBack>
+    <ScreenLayout
+      title="Receipt Details"
+      navigation={navigation}
+      showBack
+      rightAction={
+        <View style={styles.headerActions}>
+          {isEditing ? (
+            <>
+              <TouchableOpacity
+                onPress={cancelEditing}
+                disabled={isUpdating}
+                style={styles.headerCancelBtn}
+                accessibilityLabel="Cancel editing"
+              >
+                <Text style={styles.headerCancelText}>✕</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleUpdateReceipt}
+                disabled={isUpdating}
+                style={styles.headerSaveBtn}
+                accessibilityLabel="Save changes"
+              >
+                {isUpdating ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.headerSaveText}>✓</Text>
+                )}
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <TouchableOpacity
+                onPress={startEditing}
+                style={styles.headerEditBtn}
+                accessibilityLabel="Edit receipt"
+              >
+                <Text style={styles.headerEditText}>✏️</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleDeleteReceipt}
+                disabled={isDeleting}
+                style={styles.headerDeleteBtn}
+                accessibilityLabel={receiptId ? "Delete receipt" : "Discard receipt"}
+              >
+                {isDeleting ? (
+                  <ActivityIndicator size="small" color="#c0392b" />
+                ) : (
+                  <Text style={styles.headerDeleteText}>🗑</Text>
+                )}
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
+      }
+    >
       {isFetchingReceipt ? (
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
           <ActivityIndicator size="large" color={COLORS.primary} />
@@ -527,15 +701,31 @@ export default function ReceiptDetailsScreen({ route, navigation }) {
             )}
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.secondaryButton}
-            activeOpacity={0.85}
-            onPress={() => setIsEditing(!isEditing)}
-          >
-            <Text style={styles.secondaryButtonText}>
-              {isEditing ? "Done Editing" : "Edit Details"}
-            </Text>
-          </TouchableOpacity>
+          {/* Save-Changes / Cancel row (only visible when in editing mode) */}
+          {isEditing && (
+            <View style={styles.editActionRow}>
+              <TouchableOpacity
+                style={[styles.editSaveBtn, isUpdating && { opacity: 0.6 }]}
+                activeOpacity={0.85}
+                onPress={handleUpdateReceipt}
+                disabled={isUpdating}
+              >
+                {isUpdating ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Text style={styles.editSaveBtnText}>✓  Save Changes</Text>
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.editCancelBtn}
+                activeOpacity={0.85}
+                onPress={cancelEditing}
+                disabled={isUpdating}
+              >
+                <Text style={styles.editCancelBtnText}>✕  Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          )}
 
           {/* ── Advanced AI Analytics Button ── */}
           <TouchableOpacity
@@ -616,6 +806,8 @@ export default function ReceiptDetailsScreen({ route, navigation }) {
               </View>
             </View>
           )}
+
+
 
           <View style={{ height: 32 }} />
         </ScrollView>
@@ -975,6 +1167,124 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: "rgba(153,8,8,0.7)",
     lineHeight: 20,
+  },
+  deleteButton: {
+    width: "100%",
+    paddingVertical: 14,
+    borderRadius: 50,
+    borderWidth: 1.5,
+    borderColor: "#c0392b",
+    backgroundColor: "#fff5f5",
+    alignItems: "center",
+    marginTop: 4,
+    marginBottom: 12,
+  },
+  deleteButtonText: {
+    fontFamily: FONTS.semiBold,
+    fontSize: 14,
+    color: "#c0392b",
+    letterSpacing: 0.5,
+  },
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  headerEditBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(148, 182, 239, 0.2)",
+    borderWidth: 1,
+    borderColor: "rgba(148, 182, 239, 0.45)",
+  },
+  headerEditText: {
+    fontSize: 16,
+    color: COLORS.primary,
+  },
+  headerDeleteBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#fff5f5",
+    borderWidth: 1,
+    borderColor: "#f5c6cb",
+  },
+  headerDeleteText: {
+    fontSize: 16,
+    color: "#c0392b",
+  },
+  headerCancelBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#fff",
+    borderWidth: 1.5,
+    borderColor: "rgba(153,8,8,0.35)",
+  },
+  headerCancelText: {
+    fontSize: 15,
+    color: COLORS.primary,
+    fontFamily: FONTS.bold,
+  },
+  headerSaveBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: COLORS.primary,
+  },
+  headerSaveText: {
+    fontSize: 16,
+    color: "#fff",
+    fontFamily: FONTS.bold,
+  },
+
+  // Edit action row
+  editActionRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginBottom: 16,
+  },
+  editSaveBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 50,
+    backgroundColor: COLORS.primary,
+    alignItems: "center",
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  editSaveBtnText: {
+    fontFamily: FONTS.bold,
+    fontSize: 13,
+    color: "#fff",
+    letterSpacing: 0.8,
+  },
+  editCancelBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 50,
+    borderWidth: 1.5,
+    borderColor: "rgba(153,8,8,0.35)",
+    backgroundColor: "#fff",
+    alignItems: "center",
+  },
+  editCancelBtnText: {
+    fontFamily: FONTS.semiBold,
+    fontSize: 13,
+    color: COLORS.primary,
+    letterSpacing: 0.5,
   },
 });
 

@@ -78,7 +78,10 @@ const styles = StyleSheet.create({
     letterSpacing: 1.5,
   },
   headerSide: {
-    width: 36,
+    minWidth: 36,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
   },
   content: {
     flex: 1,
