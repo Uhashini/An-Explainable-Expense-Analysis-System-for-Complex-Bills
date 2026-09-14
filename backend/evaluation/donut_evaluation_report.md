@@ -6,26 +6,26 @@ This independent benchmark evaluates **Donut (`naver-clova-ix/donut-base-finetun
 ---
 
 ## 1. CORD Dataset Performance (50 Samples)
-- **Normalized Character Error Rate (CER)**: `96.99%`
-- **Normalized Word Error Rate (WER)**: `98.02%`
-- **Sequence Text Similarity (Levenshtein)**: `1.98%`
-- **Average Inference Latency**: `8.33 seconds / image`
+- **Normalized Character Error Rate (CER)**: `95.20%`
+- **Normalized Word Error Rate (WER)**: `97.99%`
+- **Sequence Text Similarity (Levenshtein)**: `5.02%`
+- **Average Inference Latency**: `13.84 seconds / image`
 
 ---
 
 ## 2. SROIE Dataset Performance (50 Samples)
-- **Normalized Character Error Rate (CER)**: `427.36%`
-- **Normalized Word Error Rate (WER)**: `456.65%`
-- **Sequence Text Similarity (Levenshtein)**: `12.69%`
-- **Average Inference Latency**: `22.85 seconds / image`
+- **Normalized Character Error Rate (CER)**: `89.14%`
+- **Normalized Word Error Rate (WER)**: `76.50%`
+- **Sequence Text Similarity (Levenshtein)**: `10.83%`
+- **Average Inference Latency**: `30.61 seconds / image`
 
 ### SROIE Field Extraction Accuracy
 | Field | Extraction Accuracy |
 |---|---|
-| **Company / Merchant** | `48.00%` |
-| **Date** | `52.00%` |
+| **Company / Merchant** | `46.00%` |
+| **Date** | `50.00%` |
 | **Address** | `18.00%` |
-| **Grand Total** | `82.00%` |
+| **Grand Total** | `80.00%` |
 
 ---
 
@@ -34,11 +34,11 @@ This independent benchmark evaluates **Donut (`naver-clova-ix/donut-base-finetun
 | Benchmark Metric | Current Pipeline (LayoutLMv3 + PaddleOCR) | Donut Base (OCR-Free VisionEncoderDecoder) |
 |---|---|---|
 | **Architecture Type** | Multimodal (Visual + OCR Text + Bounding Box) | End-to-End Vision Transformer (No OCR) |
-| **CORD F1 / Sequence Accuracy** | **94.20%** | ~`1.98%` (Text Match) |
-| **SROIE OCR Word Accuracy** | **97.8%** | `-356.65%` |
-| **SROIE Character Accuracy** | **98.2%** | `-327.36%` |
+| **CORD F1 / Sequence Accuracy** | **94.20%** | ~`5.02%` (Text Match) |
+| **SROIE OCR Word Accuracy** | **97.8%** | `23.50%` |
+| **SROIE Character Accuracy** | **98.2%** | `10.86%` |
 | **OCR Dependency** | Requires external OCR (PaddleOCR) | ❌ None (OCR-Free) |
-| **Inference Speed (CPU)** | ~0.8 - 1.2 sec/image | ~`8.33` sec/image |
+| **Inference Speed (CPU)** | ~0.8 - 1.2 sec/image | ~`13.84` sec/image |
 | **Handling Bounding Box Bounding** | Precise spatial coordinates per word | Generates raw text sequence only |
 
 ---

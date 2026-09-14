@@ -3,7 +3,8 @@ import re
 import json
 import time
 import torch
-import jiwer
+import difflib
+from typing import List, Tuple, Dict, Any
 from pathlib import Path
 from PIL import Image
 from transformers import DonutProcessor, VisionEncoderDecoderModel
@@ -24,16 +25,31 @@ def normalize_string(text: str) -> str:
     return text
 
 def calculate_levenshtein_similarity(s1: str, s2: str) -> float:
-    """Calculate normalized Levenshtein similarity between two strings."""
+    """Calculate similarity using difflib SequenceMatcher."""
     s1, s2 = normalize_string(s1), normalize_string(s2)
     if not s1 and not s2:
         return 1.0
     if not s1 or not s2:
         return 0.0
-    align = jiwer.process_words(s1, s2)
-    dist = align.substitutions + align.deletions + align.insertions
-    max_len = max(len(s1.split()), len(s2.split()), 1)
-    return max(0.0, 1.0 - (dist / max_len))
+    return difflib.SequenceMatcher(None, s1, s2).ratio()
+
+def compute_error_rates(refs: List[str], hyps: List[str]) -> Tuple[float, float]:
+    """Compute WER and CER estimates via difflib."""
+    if not refs:
+        return 0.0, 0.0
+    total_words, total_chars = 0, 0
+    word_errs, char_errs = 0.0, 0.0
+    for r, h in zip(refs, hyps):
+        r_words, h_words = r.split(), h.split()
+        w_len = max(len(r_words), 1)
+        c_len = max(len(r), 1)
+        total_words += w_len
+        total_chars += c_len
+        w_sim = difflib.SequenceMatcher(None, r_words, h_words).ratio()
+        c_sim = difflib.SequenceMatcher(None, r, h).ratio()
+        word_errs += (1.0 - w_sim) * w_len
+        char_errs += (1.0 - c_sim) * c_len
+    return (word_errs / total_words), (char_errs / total_chars)
 
 def flatten_json_to_text(obj) -> str:
     """Recursively convert nested JSON / dict to a single text string."""
@@ -76,16 +92,16 @@ def run_donut_inference(image: Image.Image, processor, model, device, task_promp
         )
     latency = time.time() - start_t
     
-    sequence = processor.batch_decode(outputs.sequences)[0]
-    sequence = sequence.replace(processor.tokenizer.eos_token, "").replace(processor.tokenizer.pad_token, "")
-    sequence = re.sub(r"<.*?>", "", sequence).strip() # clean special tokens
+    raw_sequence = processor.batch_decode(outputs.sequences)[0]
+    raw_sequence = raw_sequence.replace(processor.tokenizer.eos_token, "").replace(processor.tokenizer.pad_token, "").strip()
     
     try:
-        json_output = processor.token2json(sequence)
+        json_output = processor.token2json(raw_sequence)
     except Exception:
-        json_output = {"raw_text": sequence}
+        json_output = {"raw_text": re.sub(r"<.*?>", "", raw_sequence).strip()}
         
-    return sequence, json_output, latency
+    clean_text = re.sub(r"<.*?>", "", raw_sequence).strip()
+    return raw_sequence, clean_text, json_output, latency
 
 def evaluate_cord(processor, model, device, num_samples: int = 50):
     print(f"\n=======================================================")
@@ -120,31 +136,30 @@ def evaluate_cord(processor, model, device, num_samples: int = 50):
         gt_text = flatten_json_to_text(gt_json)
         
         img = Image.open(img_path)
-        pred_seq, pred_json, latency = run_donut_inference(img, processor, model, device, task_prompt="<s_cord-v2>")
+        raw_seq, clean_text, pred_json, latency = run_donut_inference(img, processor, model, device, task_prompt="<s_cord-v2>")
         
         latencies.append(latency)
         strict_refs.append(gt_text if gt_text else "")
-        strict_hyps.append(pred_seq)
+        strict_hyps.append(clean_text)
         norm_refs.append(normalize_string(gt_text))
-        norm_hyps.append(normalize_string(pred_seq))
+        norm_hyps.append(normalize_string(clean_text))
         
-        sim = calculate_levenshtein_similarity(gt_text, pred_seq)
+        sim = calculate_levenshtein_similarity(gt_text, clean_text)
         
         sample_results.append({
             "sample_id": img_path.stem,
             "latency_sec": round(latency, 3),
             "ground_truth_text": gt_text[:200],
-            "predicted_sequence": pred_seq[:200],
+            "raw_sequence": raw_seq,
+            "predicted_json": pred_json,
             "similarity_score": round(sim, 4)
         })
         
         if idx % 10 == 0 or idx == len(image_files):
             print(f"Processed {idx}/{len(image_files)} CORD samples... (Last latency: {latency:.2f}s, Sim: {sim:.2%})", flush=True)
 
-    strict_wer = jiwer.wer(strict_refs, strict_hyps) if strict_refs else 0.0
-    strict_cer = jiwer.cer(strict_refs, strict_hyps) if strict_refs else 0.0
-    norm_wer = jiwer.wer(norm_refs, norm_hyps) if norm_refs else 0.0
-    norm_cer = jiwer.cer(norm_refs, norm_hyps) if norm_refs else 0.0
+    strict_wer, strict_cer = compute_error_rates(strict_refs, strict_hyps)
+    norm_wer, norm_cer = compute_error_rates(norm_refs, norm_hyps)
     avg_latency = sum(latencies) / len(latencies) if latencies else 0.0
     avg_similarity = sum(s["similarity_score"] for s in sample_results) / len(sample_results) if sample_results else 0.0
     
@@ -194,16 +209,16 @@ def evaluate_sroie(processor, model, device, num_samples: int = 50):
         gt_text = " ".join([f"{k}: {v}" for k, v in gt_entities.items()])
         
         img = Image.open(img_path)
-        pred_seq, pred_json, latency = run_donut_inference(img, processor, model, device, task_prompt="<s_cord-v2>")
+        raw_seq, clean_text, pred_json, latency = run_donut_inference(img, processor, model, device, task_prompt="<s_cord-v2>")
         
         latencies.append(latency)
         strict_refs.append(gt_text)
-        strict_hyps.append(pred_seq)
+        strict_hyps.append(clean_text)
         norm_refs.append(normalize_string(gt_text))
-        norm_hyps.append(normalize_string(pred_seq))
+        norm_hyps.append(normalize_string(clean_text))
         
         # Field match analysis
-        pred_norm = normalize_string(pred_seq)
+        pred_norm = normalize_string(clean_text)
         for field in ["company", "date", "address", "total"]:
             if field in gt_entities and gt_entities[field]:
                 total_fields[field] += 1
@@ -211,23 +226,22 @@ def evaluate_sroie(processor, model, device, num_samples: int = 50):
                 if val_norm and val_norm in pred_norm:
                     field_matches[field] += 1
                     
-        sim = calculate_levenshtein_similarity(gt_text, pred_seq)
+        sim = calculate_levenshtein_similarity(gt_text, clean_text)
         
         sample_results.append({
             "sample_id": img_path.stem,
             "latency_sec": round(latency, 3),
             "ground_truth_entities": gt_entities,
-            "predicted_sequence": pred_seq[:200],
+            "raw_sequence": raw_seq,
+            "predicted_json": pred_json,
             "similarity_score": round(sim, 4)
         })
         
         if idx % 10 == 0 or idx == len(image_files):
             print(f"Processed {idx}/{len(image_files)} SROIE samples... (Last latency: {latency:.2f}s, Sim: {sim:.2%})")
 
-    strict_wer = jiwer.wer(strict_refs, strict_hyps) if strict_refs else 0.0
-    strict_cer = jiwer.cer(strict_refs, strict_hyps) if strict_refs else 0.0
-    norm_wer = jiwer.wer(norm_refs, norm_hyps) if norm_refs else 0.0
-    norm_cer = jiwer.cer(norm_refs, norm_hyps) if norm_refs else 0.0
+    strict_wer, strict_cer = compute_error_rates(strict_refs, strict_hyps)
+    norm_wer, norm_cer = compute_error_rates(norm_refs, norm_hyps)
     avg_latency = sum(latencies) / len(latencies) if latencies else 0.0
     avg_similarity = sum(s["similarity_score"] for s in sample_results) / len(sample_results) if sample_results else 0.0
     

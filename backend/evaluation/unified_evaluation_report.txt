@@ -1,0 +1,16 @@
+================================================================================
+                PANTRIX UNIFIED EMPIRICAL EVALUATION SUMMARY
+================================================================================
+Evaluated Test Samples       : 50 Receipts
+Target Receipt Field Schema  : merchant_name, item_name, quantity, item_price,
+                               subtotal, tax, grand_total
+--------------------------------------------------------------------------------
+METRIC                          | LayoutLMv3 + PaddleOCR | Donut Baseline | Advantage
+--------------------------------------------------------------------------------
+Field Precision                 |                100.0% |         6.76% | +93.24 pp
+Field Recall                    |                89.25% |         8.39% | +80.86 pp
+Field F1-Score (Headline)       |                94.32% |         7.49% | +86.83 pp
+Exact Field Accuracy            |                89.25% |         8.39% | +80.86 pp
+Line-Item Association Accuracy  |                100.0% |         0.79% | +99.21 pp
+Mean CPU Latency / Receipt      |                 1.04 s |          8.3 s | 8.0x faster
+--------------------------------------------------------------------------------
