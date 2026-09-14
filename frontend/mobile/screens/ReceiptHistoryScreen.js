@@ -45,6 +45,16 @@ export default function ReceiptHistoryScreen({ navigation }) {
   const [receipts, setReceipts] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // Silently seed demo data for uhashini@gmail.com on every focus.
+  // The backend is idempotent — it skips seeding if the user already has ≥5 receipts.
+  const triggerSeed = async () => {
+    try {
+      await fetch(`${API_BASE_URL}/seed/populate`, { method: 'POST' });
+    } catch (_) {
+      // Non-critical — ignore errors silently
+    }
+  };
+
   useEffect(() => {
     const fetchReceipts = async () => {
       try {
@@ -55,6 +65,9 @@ export default function ReceiptHistoryScreen({ navigation }) {
           setLoading(false);
           return;
         }
+
+        // Trigger demo seed before loading (idempotent — no-op if already seeded)
+        await triggerSeed();
 
         const response = await fetch(`${API_BASE_URL}/receipts/user/${userId}`);
         const data = await response.json();
