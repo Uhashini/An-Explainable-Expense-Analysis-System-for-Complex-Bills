@@ -1,20 +1,20 @@
 OCR EVALUATION RESULTS
 ----------------------------------------
-Total Samples                 : 10
+Total Samples                 : 50
 Evaluation images             : E:\6th sem\final yr project\CORD\test\image
 Evaluation annotations        : E:\6th sem\final yr project\CORD\test\json
 Production pipeline evaluated : yes (CLAHE -> perspective correction -> PaddleOCR -> LayoutLMv3 -> TokenCleaner)
-Perspective correction applied: 0/10 images
-Strict Word Error Rate         : 44.00%
-Strict Character Error Rate    : 14.72%
-Normalized Word Error Rate     : 26.17%
-Normalized Character Error Rate: 11.96%
-OCR Accuracy (normalized)     : 75.39%
-Detection @ IoU 0.5           : precision=76.70%, recall=72.19%, F1=74.38%
-Detection @ IoU 0.4           : precision=81.82%, recall=77.01%, F1=79.34%
-Detection @ IoU 0.3           : precision=89.77%, recall=84.49%, F1=87.05%
+Perspective correction applied: 0/50 images
+Strict Word Error Rate         : 37.18%
+Strict Character Error Rate    : 12.31%
+Normalized Word Error Rate     : 21.07%
+Normalized Character Error Rate: 10.23%
+OCR Accuracy (normalized)     : 82.28%
+Detection @ IoU 0.5           : precision=74.57%, recall=71.83%, F1=73.17%
+Detection @ IoU 0.4           : precision=79.76%, recall=76.82%, F1=78.26%
+Detection @ IoU 0.3           : precision=83.42%, recall=80.34%, F1=81.85%
 Coordinate-scaling comparison (@ IoU 0.5):
-  Before (simulated 2x-coordinate bug): precision=7.95%, recall=7.49%, F1=7.71%
-  After  (scaled back before normalization): precision=76.70%, recall=72.19%, F1=74.38%
-Average Confidence            : 0.928
+  Before (simulated 2x-coordinate bug): precision=10.20%, recall=9.83%, F1=10.01%
+  After  (scaled back before normalization): precision=74.57%, recall=71.83%, F1=73.17%
+Average Confidence            : 0.930
 Debug overlays                : E:\6th sem\final yr project\receipt\backend\evaluation\debug

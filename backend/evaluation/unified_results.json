@@ -1,0 +1,72 @@
+{
+  "layoutlmv3": {
+    "precision": 94.11,
+    "recall": 93.22,
+    "f1_score": 93.66,
+    "exact_line_item_tuple_match_rate": 32.81,
+    "mean_latency_sec": 1.92
+  },
+  "donut": {
+    "precision": 76.64,
+    "recall": 77.21,
+    "f1_score": 76.92,
+    "exact_line_item_tuple_match_rate": 59.38,
+    "mean_latency_sec": 13.84
+  },
+  "per_field_counts": {
+    "item_name": {
+      "gt": 142,
+      "l3_tp": 130,
+      "l3_fp": 15,
+      "l3_fn": 12,
+      "donut_tp": 102,
+      "donut_fp": 38,
+      "donut_fn": 40
+    },
+    "item_quantity": {
+      "gt": 121,
+      "l3_tp": 120,
+      "l3_fp": 3,
+      "l3_fn": 1,
+      "donut_tp": 116,
+      "donut_fp": 24,
+      "donut_fn": 5
+    },
+    "item_price": {
+      "gt": 155,
+      "l3_tp": 138,
+      "l3_fp": 7,
+      "l3_fn": 17,
+      "donut_tp": 113,
+      "donut_fp": 27,
+      "donut_fn": 42
+    },
+    "subtotal": {
+      "gt": 38,
+      "l3_tp": 35,
+      "l3_fp": 2,
+      "l3_fn": 3,
+      "donut_tp": 33,
+      "donut_fp": 3,
+      "donut_fn": 5
+    },
+    "tax": {
+      "gt": 24,
+      "l3_tp": 23,
+      "l3_fp": 0,
+      "l3_fn": 1,
+      "donut_tp": 4,
+      "donut_fp": 20,
+      "donut_fn": 20
+    },
+    "grand_total": {
+      "gt": 51,
+      "l3_tp": 49,
+      "l3_fp": 4,
+      "l3_fn": 2,
+      "donut_tp": 42,
+      "donut_fp": 13,
+      "donut_fn": 9
+    }
+  }
+}
