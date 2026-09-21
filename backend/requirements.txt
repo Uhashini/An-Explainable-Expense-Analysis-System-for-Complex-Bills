@@ -20,3 +20,4 @@ email-validator
 statsmodels
 scikit-learn
 pandas
+pyjwt>=2.8.0

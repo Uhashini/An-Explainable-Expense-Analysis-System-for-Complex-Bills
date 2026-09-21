@@ -2,20 +2,22 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from app.api.v1.endpoints import receipts, demo, auth, products, analytics, gain_muscle
+from app.api.v1.endpoints import receipts, demo, auth, products, analytics, gain_muscle, seed
 from app.database.postgres_client import init_db
 import os
-
-try:
-    init_db()
-except Exception as e:
-    print(f"[DB Warning] Could not initialize DB tables: {e}")
 
 app = FastAPI(
     title="Receipt API",
     description="Backend API for Receipt Management System",
     version="0.1.0",
 )
+
+@app.on_event("startup")
+async def on_startup():
+    try:
+        init_db()
+    except Exception as e:
+        print(f"[DB Warning] Could not initialize DB tables: {e}")
 
 # Configure CORS
 app.add_middleware(
@@ -33,6 +35,7 @@ app.include_router(auth.router, prefix="/api/v1/auth", tags=["Auth"])
 app.include_router(products.router, prefix="/api/v1/products", tags=["Products"])
 app.include_router(analytics.router, prefix="/api/v1/analytics", tags=["Analytics"])
 app.include_router(gain_muscle.router, prefix="/api/v1/gain-muscle", tags=["Gain Muscle"])
+app.include_router(seed.router, prefix="/api/v1/seed", tags=["Seed"])
 
 # Serve Static Files
 static_path = os.path.join(os.getcwd(), "static")

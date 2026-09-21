@@ -3,11 +3,6 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.database.postgres_client import get_db, Receipt, ReceiptItem, AnalysisResult
-
-from app.services.modes.save_money.spending_trend import get_spending_trend
-from app.services.modes.save_money.price_deviation import get_price_deviations
-from app.services.modes.save_money.schemas import ReceiptItem as SchemaReceiptItem
-
 from pydantic import BaseModel
 from typing import List, Optional
 
@@ -52,6 +47,10 @@ def analyze_receipt(req: AnalyticsRequest, db: Session = Depends(get_db)):
             }
 
     # 2. Parallel Processing with ThreadPoolExecutor
+    from app.services.modes.save_money.spending_trend import get_spending_trend
+    from app.services.modes.save_money.price_deviation import get_price_deviations
+    from app.services.modes.save_money.schemas import ReceiptItem as SchemaReceiptItem
+
     items_data = [item.dict() for item in req.items]
     
     # Map for price deviations
@@ -124,6 +123,10 @@ def get_receipt_analytics(receipt_id: int, user_id: int, db: Session = Depends(g
     
     if not receipt:
         raise HTTPException(status_code=404, detail="Receipt not found or unauthorized")
+
+    from app.services.modes.save_money.spending_trend import get_spending_trend
+    from app.services.modes.save_money.price_deviation import get_price_deviations
+    from app.services.modes.save_money.schemas import ReceiptItem as SchemaReceiptItem
 
     # Get items explicitly
     current_items = db.query(ReceiptItem).filter(ReceiptItem.receipt_id == receipt_id).all()

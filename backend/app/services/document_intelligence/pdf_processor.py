@@ -1,4 +1,7 @@
-import fitz  # PyMuPDF
+try:
+    import fitz  # PyMuPDF
+except Exception:
+    fitz = None
 from PIL import Image
 import io
 import os
