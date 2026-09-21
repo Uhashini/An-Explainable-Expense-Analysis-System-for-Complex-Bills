@@ -2,8 +2,6 @@ import logging
 from fastapi import APIRouter, UploadFile, File, HTTPException, Body
 from pydantic import BaseModel
 from typing import List, Dict, Any
-from app.services.ocr_service import ocr_service
-from app.services.product_matcher import product_matcher
 
 logger = logging.getLogger(__name__)
 

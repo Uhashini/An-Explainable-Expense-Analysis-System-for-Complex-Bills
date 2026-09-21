@@ -2,16 +2,17 @@ import React from 'react';
 import { TouchableOpacity, Text, View, StyleSheet } from 'react-native';
 import { COLORS, FONTS } from '../theme';
 
-export default function SocialButton({ provider, onPress }) {
+export default function SocialButton({ provider, actionText, onPress }) {
   const isGoogle = provider === 'google';
+  const defaultLabel = `Continue with ${isGoogle ? 'Google' : 'Apple'}`;
 
   return (
     <TouchableOpacity style={styles.button} onPress={onPress} activeOpacity={0.8}>
       <View style={styles.iconBox}>
-        <Text style={styles.icon}>{isGoogle ? 'G' : ''}</Text>
+        <Text style={styles.icon}>{isGoogle ? 'G' : ''}</Text>
       </View>
       <Text style={styles.label}>
-        Continue with {isGoogle ? 'Google' : 'Apple'}
+        {actionText || defaultLabel}
       </Text>
       <View style={styles.spacer} />
     </TouchableOpacity>
@@ -45,7 +46,7 @@ const styles = StyleSheet.create({
   icon: {
     fontSize: 16,
     fontWeight: '800',
-    color: '#4285F4',   // Google blue for G; Apple uses  which is a proper apple symbol
+    color: '#4285F4',
   },
   label: {
     flex: 1,

@@ -34,6 +34,12 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api/v1"
     CORS_ORIGINS: list = ["*"]
 
+    # JWT Authentication Configuration
+    JWT_SECRET_KEY: str = "pantrix-secure-jwt-secret-key-super-safe-2026"
+    JWT_ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 30  # 30 days
+
     # Feature Flags
     ENABLE_RECIPE_ASSISTANT: bool = True
     ENABLE_CHATBOT: bool = True
