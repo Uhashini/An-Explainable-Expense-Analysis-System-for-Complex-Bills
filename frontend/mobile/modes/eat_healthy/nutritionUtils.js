@@ -2,34 +2,71 @@
 
 export const estimateNutrition = (name) => {
   const n = (name || '').toLowerCase();
+
+  // 1. Processed Snacks & Confectionery & Junk Food
+  if (
+    n.includes('chip') || n.includes('snack') || n.includes('biscuit') ||
+    n.includes('cookie') || n.includes('wafer') || n.includes('candy') ||
+    n.includes('chocolate') || n.includes('sweet') || n.includes('cake') ||
+    n.includes('donut') || n.includes('ice cream') || n.includes('soda') ||
+    n.includes('coke') || n.includes('pepsi') || n.includes('sprite') ||
+    n.includes('burger') || n.includes('pizza') || n.includes('fries') ||
+    n.includes('noodle') || n.includes('maggi') || n.includes('junk') ||
+    n.includes('crisp') || n.includes('confectionery')
+  ) {
+    const isDrink = n.includes('soda') || n.includes('coke') || n.includes('pepsi') || n.includes('sprite');
+    if (isDrink) {
+      return { calories: 150, protein: 0, carbs: 38, fat: 0, fiber: 0, sugar: 38, is_processed: true, category: 'Soft Drink' };
+    }
+    return { calories: 420, protein: 4, carbs: 58, fat: 22, fiber: 1, sugar: 26, is_processed: true, category: 'Processed Snacks' };
+  }
+
+  // 2. Healthy Beverages
+  if (n.includes('tea') || n.includes('chai')) {
+    return { calories: 50, protein: 1.5, carbs: 8, fat: 1.5, fiber: 0, sugar: 7, is_processed: false, category: 'Beverage' };
+  }
+  if (n.includes('coffee')) {
+    return { calories: 70, protein: 2.5, carbs: 9, fat: 2.5, fiber: 0, sugar: 8, is_processed: false, category: 'Beverage' };
+  }
+  if (n.includes('water')) {
+    return { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, sugar: 0, is_processed: false, category: 'Beverage' };
+  }
+
+  // 3. South Indian / Breakfast Dishes
+  if (n.includes('dosa') || n.includes('roast') || n.includes('idli') || n.includes('vada') || n.includes('uttapam')) {
+    return { calories: 240, protein: 6, carbs: 40, fat: 7, fiber: 3, sugar: 2, is_processed: false, category: 'Main Dish' };
+  }
+
+  // 4. Rice & Main Dishes
   if (n.includes('biryani') || n.includes('pulao') || n.includes('fried rice')) {
     return { calories: 520, protein: 18, carbs: 75, fat: 16, fiber: 4, sugar: 3, is_processed: false, category: 'Main Dish' };
   }
-  if (n.includes('water') || n.includes('soda') || n.includes('drink')) {
-    return { calories: 10, protein: 0, carbs: 2, fat: 0, fiber: 0, sugar: 2, is_processed: n.includes('soda'), category: 'Beverage' };
-  }
-  if (n.includes('sweet') || n.includes('cake') || n.includes('chocolate') || n.includes('ice cream') || n.includes('candy')) {
-    return { calories: 340, protein: 4, carbs: 48, fat: 15, fiber: 1, sugar: 32, is_processed: true, category: 'Confectionery' };
-  }
+
+  // 5. Meat, Poultry & Fish
   if (n.includes('chicken') || n.includes('mutton') || n.includes('fish') || n.includes('meat')) {
-    return { calories: 420, protein: 55, carbs: 0, fat: 22, fiber: 0, sugar: 0, is_processed: false, category: 'Lean Meat' };
+    return { calories: 380, protein: 45, carbs: 2, fat: 20, fiber: 0, sugar: 0, is_processed: false, category: 'Lean Meat' };
   }
   if (n.includes('egg')) {
-    return { calories: 210, protein: 18, carbs: 2, fat: 14, fiber: 0, sugar: 1, is_processed: false, category: 'Dairy & Eggs' };
+    return { calories: 150, protein: 13, carbs: 1, fat: 10, fiber: 0, sugar: 1, is_processed: false, category: 'Dairy & Eggs' };
   }
+
+  // 6. Dairy & Paneer
   if (n.includes('milk') || n.includes('curd') || n.includes('yogurt') || n.includes('paneer')) {
-    return { calories: 180, protein: 12, carbs: 14, fat: 9, fiber: 0, sugar: 11, is_processed: false, category: 'Dairy' };
+    return { calories: 180, protein: 12, carbs: 12, fat: 10, fiber: 0, sugar: 8, is_processed: false, category: 'Dairy' };
   }
+
+  // 7. Grains & Bread
   if (n.includes('rice') || n.includes('roti') || n.includes('bread') || n.includes('wheat') || n.includes('oat')) {
-    return { calories: 280, protein: 8, carbs: 58, fat: 3, fiber: 6, sugar: 2, is_processed: false, category: 'Whole Grains' };
+    return { calories: 260, protein: 8, carbs: 54, fat: 3, fiber: 5, sugar: 2, is_processed: false, category: 'Whole Grains' };
   }
-  if (n.includes('chip') || n.includes('snack') || n.includes('biscuit') || n.includes('cookie')) {
-    return { calories: 450, protein: 6, carbs: 56, fat: 24, fiber: 2, sugar: 22, is_processed: true, category: 'Processed Snacks' };
-  }
+
+  // 8. Vegetables & Fruits
   if (n.includes('veg') || n.includes('salad') || n.includes('fruit') || n.includes('apple') || n.includes('banana')) {
-    return { calories: 140, protein: 3, carbs: 32, fat: 1, fiber: 7, sugar: 18, is_processed: false, category: 'Fresh Produce' };
+    return { calories: 120, protein: 2, carbs: 28, fat: 1, fiber: 6, sugar: 16, is_processed: false, category: 'Fresh Produce' };
   }
-  return { calories: 220, protein: 8, carbs: 30, fat: 7, fiber: 3, sugar: 5, is_processed: false, category: 'Grocery Item' };
+
+  // Generic fallback
+  return { calories: 180, protein: 5, carbs: 28, fat: 5, fiber: 2, sugar: 4, is_processed: false, category: 'Grocery Item' };
 };
 
 export const calculateMetricsFromReceipt = (data) => {
@@ -63,7 +100,9 @@ export const calculateMetricsFromReceipt = (data) => {
     fiber += itemFiber * qty;
     sugar += itemSugar * qty;
 
-    const isProc = h.is_processed ?? est.is_processed;
+    const isProc = (h.is_processed !== undefined && h.is_processed !== null)
+      ? Boolean(h.is_processed)
+      : (h.processed_level ? (h.processed_level === 'MEDIUM' || h.processed_level === 'ULTRA') : Boolean(est.is_processed));
     if (isProc) {
       processedCount++;
     } else {

@@ -121,14 +121,41 @@ def _protein_quality_score(
 
 # ─── Data Fetching ─────────────────────────────────────────────────────────────
 
-def _get_user_receipt_items(db: Session, user_id: int) -> List[Dict[str, Any]]:
-    """Return all receipt items for a user, enriched with food and nutrition data."""
-    receipts = (
-        db.query(Receipt)
-        .filter(Receipt.user_id == user_id)
-        .order_by(Receipt.receipt_id.asc())
-        .all()
-    )
+def _get_user_receipt_items(
+    db: Session,
+    user_id: int,
+    receipt_id: Optional[str] = None,
+    scope: Optional[str] = None,
+) -> List[Dict[str, Any]]:
+    """
+    Return receipt items for a user, enriched with food and nutrition data.
+    - scope="all": return items across ALL user receipts.
+    - receipt_id provided: return items for that specific receipt.
+    - Default (scope is None and receipt_id is None): return items for the LATEST uploaded receipt.
+    """
+    if scope == "all":
+        receipts = (
+            db.query(Receipt)
+            .filter(Receipt.user_id == user_id)
+            .order_by(Receipt.receipt_id.asc())
+            .all()
+        )
+    elif receipt_id and str(receipt_id).isdigit():
+        receipts = (
+            db.query(Receipt)
+            .filter(Receipt.user_id == user_id, Receipt.receipt_id == int(receipt_id))
+            .all()
+        )
+    else:
+        # Default: latest uploaded receipt
+        latest = (
+            db.query(Receipt)
+            .filter(Receipt.user_id == user_id)
+            .order_by(Receipt.receipt_id.desc())
+            .first()
+        )
+        receipts = [latest] if latest else []
+
     if not receipts:
         return []
 
@@ -174,6 +201,7 @@ def _get_user_receipt_items(db: Session, user_id: int) -> List[Dict[str, Any]]:
             "item_id": item.item_id,
             "receipt_id": item.receipt_id,
             "receipt_date": receipt.date,
+            "merchant_name": receipt.merchant_name,
             "name": item.name or "Unknown",
             "quantity_str": item.quantity,
             "price_float": _parse_price(item.price),
@@ -203,8 +231,13 @@ def _compute_protein_for_item(item: Dict[str, Any]) -> Optional[float]:
 
 # ─── GM-01: Protein Availability ──────────────────────────────────────────────
 
-def gm01_protein_availability(db: Session, user_id: int) -> Dict[str, Any]:
-    items = _get_user_receipt_items(db, user_id)
+def gm01_protein_availability(
+    db: Session,
+    user_id: int,
+    receipt_id: Optional[str] = None,
+    scope: Optional[str] = None,
+) -> Dict[str, Any]:
+    items = _get_user_receipt_items(db, user_id, receipt_id=receipt_id, scope=scope)
 
     if not items:
         return {
@@ -288,8 +321,13 @@ def gm01_protein_availability(db: Session, user_id: int) -> Dict[str, Any]:
 
 # ─── GM-02: Protein Quality ────────────────────────────────────────────────────
 
-def gm02_protein_quality(db: Session, user_id: int) -> Dict[str, Any]:
-    items = _get_user_receipt_items(db, user_id)
+def gm02_protein_quality(
+    db: Session,
+    user_id: int,
+    receipt_id: Optional[str] = None,
+    scope: Optional[str] = None,
+) -> Dict[str, Any]:
+    items = _get_user_receipt_items(db, user_id, receipt_id=receipt_id, scope=scope)
 
     if not items:
         return {
@@ -371,8 +409,13 @@ def gm02_protein_quality(db: Session, user_id: int) -> Dict[str, Any]:
 
 # ─── GM-03: Protein Cost Efficiency ───────────────────────────────────────────
 
-def gm03_protein_cost_efficiency(db: Session, user_id: int) -> Dict[str, Any]:
-    items = _get_user_receipt_items(db, user_id)
+def gm03_protein_cost_efficiency(
+    db: Session,
+    user_id: int,
+    receipt_id: Optional[str] = None,
+    scope: Optional[str] = None,
+) -> Dict[str, Any]:
+    items = _get_user_receipt_items(db, user_id, receipt_id=receipt_id, scope=scope)
 
     if not items:
         return {
@@ -447,7 +490,7 @@ def gm03_protein_cost_efficiency(db: Session, user_id: int) -> Dict[str, Any]:
 # ─── GM-04: High-Protein Recommendations ──────────────────────────────────────
 
 def gm04_recommendations(db: Session, user_id: int, top_n: int = 6) -> Dict[str, Any]:
-    items = _get_user_receipt_items(db, user_id)
+    items = _get_user_receipt_items(db, user_id, scope="all")
     user_food_ids = {item["food_id"] for item in items if item["food_id"] is not None}
 
     candidates = (
@@ -457,7 +500,7 @@ def gm04_recommendations(db: Session, user_id: int, top_n: int = 6) -> Dict[str,
             joinedload(FoodItem.health_indicators),
         )
         .join(Nutrition, FoodItem.food_id == Nutrition.food_id)
-        .filter(Nutrition.protein_g > 0)
+        .filter(Nutrition.protein_g >= 5.0)
         .all()
     )
 
@@ -482,7 +525,7 @@ def gm04_recommendations(db: Session, user_id: int, top_n: int = 6) -> Dict[str,
         protein_g = _safe_float(nutr.protein_g) if nutr else None
         calories = _safe_float(nutr.calories_kcal) if nutr else None
 
-        if not protein_g or protein_g <= 0:
+        if not protein_g or protein_g < 5.0:
             continue
 
         q_score, q_label = _protein_quality_score(
@@ -491,6 +534,10 @@ def gm04_recommendations(db: Session, user_id: int, top_n: int = 6) -> Dict[str,
             category=food.category,
             processed_level=hlth.processed_level if hlth else None,
         )
+
+        # Exclude low-quality or ultra-processed protein sources from recommendations
+        if q_score < 40 or q_label == "Low":
+            continue
 
         candidate_score = (protein_g * q_score) / 100.0
 
@@ -557,8 +604,13 @@ def _extract_month_key(date_str: str) -> str:
     return "0000-00"
 
 
-def gm05_protein_trend(db: Session, user_id: int) -> Dict[str, Any]:
-    items = _get_user_receipt_items(db, user_id)
+def gm05_protein_trend(
+    db: Session,
+    user_id: int,
+    receipt_id: Optional[str] = None,
+    scope: Optional[str] = None,
+) -> Dict[str, Any]:
+    items = _get_user_receipt_items(db, user_id, scope=scope or "all")
 
     if not items:
         return {
@@ -651,12 +703,35 @@ def gm05_protein_trend(db: Session, user_id: int) -> Dict[str, Any]:
 
 # ─── Combined ──────────────────────────────────────────────────────────────────
 
-def get_full_gain_muscle_analysis(db: Session, user_id: int) -> Dict[str, Any]:
+def get_full_gain_muscle_analysis(
+    db: Session,
+    user_id: int,
+    receipt_id: Optional[str] = None,
+    scope: Optional[str] = None,
+) -> Dict[str, Any]:
     """Run GM-01..05 (excluding GM-04 recommendations) and return combined result."""
+    active_receipt_info = None
+    if receipt_id and str(receipt_id).isdigit():
+        r = db.query(Receipt).filter(Receipt.user_id == user_id, Receipt.receipt_id == int(receipt_id)).first()
+    elif scope == "all":
+        r = None
+    else:
+        r = db.query(Receipt).filter(Receipt.user_id == user_id).order_by(Receipt.receipt_id.desc()).first()
+
+    if r:
+        active_receipt_info = {
+            "receipt_id": r.receipt_id,
+            "merchant_name": r.merchant_name,
+            "date": r.date,
+            "total_amount": r.total_amount,
+        }
+
     return {
         "user_id": user_id,
-        "gm01_availability": gm01_protein_availability(db, user_id),
-        "gm02_quality": gm02_protein_quality(db, user_id),
-        "gm03_cost_efficiency": gm03_protein_cost_efficiency(db, user_id),
-        "gm05_trend": gm05_protein_trend(db, user_id),
+        "receipt_info": active_receipt_info,
+        "scope": scope or ("all" if scope == "all" else ("specific" if receipt_id else "latest")),
+        "gm01_availability": gm01_protein_availability(db, user_id, receipt_id=receipt_id, scope=scope),
+        "gm02_quality": gm02_protein_quality(db, user_id, receipt_id=receipt_id, scope=scope),
+        "gm03_cost_efficiency": gm03_protein_cost_efficiency(db, user_id, receipt_id=receipt_id, scope=scope),
+        "gm05_trend": gm05_protein_trend(db, user_id, receipt_id=receipt_id, scope=scope),
     }

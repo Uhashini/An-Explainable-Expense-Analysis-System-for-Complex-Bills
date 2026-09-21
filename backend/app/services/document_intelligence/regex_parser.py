@@ -150,9 +150,10 @@ class RegexParser:
             line["words"].sort(key=lambda x: x["box"][0])
             line_text = [w["text"] for w in line["words"]]
             
-            # Skip likely non-item lines
+            # Skip likely non-item & tax/metadata lines
             full_line_lower = " ".join(line_text).lower()
-            if any(kw in full_line_lower for kw in ["total", "subtotal", "tax", "cash", "change", "visa", "mastercard"]):
+            non_food_kw = ["total", "subtotal", "sub total", "tax", "cgst", "sgst", "gst", "vat", "round", "cash", "change", "visa", "mastercard", "fssai", "gstin", "dine in", "token no", "bill no"]
+            if any(kw in full_line_lower for kw in non_food_kw):
                 continue
                 
             # Try to find price (usually the last or second to last token with numbers/decimals)

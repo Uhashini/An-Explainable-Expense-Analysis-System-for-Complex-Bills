@@ -211,6 +211,11 @@ class LayoutLMService:
                                 
                 if names or price_val > 0:
                     item_name = " ".join(names).strip() or "Item"
+                    # Filter out non-food tax & metadata lines
+                    item_lower = item_name.lower()
+                    non_food_kw = ["cgst", "sgst", "gst", "vat", "tax", "round", "subtotal", "sub total", "total", "fssai", "gstin", "dine in", "bill no", "token no"]
+                    if any(kw in item_lower for kw in non_food_kw):
+                        continue
                     if not any(char.isalpha() for char in item_name) and price_val == 0.0:
                         continue
                     

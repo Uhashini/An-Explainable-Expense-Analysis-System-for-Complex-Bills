@@ -9,6 +9,8 @@ All endpoints are user-scoped. Receipt data is filtered by user_id.
 No mock data is used anywhere in this module.
 """
 
+from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
@@ -30,15 +32,22 @@ def _verify_user(user_id: int, db: Session) -> UserProfile:
 
 
 @router.get("/{user_id}", tags=["Gain Muscle"])
-def gain_muscle_analysis(user_id: int, db: Session = Depends(get_db)):
+def gain_muscle_analysis(
+    user_id: int,
+    receipt_id: Optional[str] = None,
+    scope: Optional[str] = None,
+    db: Session = Depends(get_db),
+):
     """
     Return GM-01 (Protein Availability), GM-02 (Protein Quality),
     GM-03 (Protein Cost Efficiency), and GM-05 (Protein Trend)
-    for the given user based on their actual receipt history.
+    for the given user based on their latest uploaded or specified receipt.
     """
     _verify_user(user_id, db)
     try:
-        result = get_full_gain_muscle_analysis(db, user_id)
+        result = get_full_gain_muscle_analysis(
+            db, user_id, receipt_id=receipt_id, scope=scope
+        )
         return {"status": "success", "data": result}
     except Exception as e:
         raise HTTPException(
