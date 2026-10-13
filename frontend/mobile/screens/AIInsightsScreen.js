@@ -1511,5 +1511,4 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: COLORS.primary,
   },
->>>>>>> 2e8ab8594af6e726aa168a46a9e34c231121c90d
 });

@@ -30,7 +30,7 @@ export default function UploadReceiptScreen({ navigation }) {
     }
 
     const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       allowsEditing: true,
       quality: 0.85,
     });
@@ -52,7 +52,7 @@ export default function UploadReceiptScreen({ navigation }) {
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       allowsEditing: true,
       quality: 0.85,
     });
@@ -71,37 +71,52 @@ export default function UploadReceiptScreen({ navigation }) {
     setIsUploading(true);
 
     try {
-      const formData = new FormData();
-
-      if (Platform.OS === 'web') {
-        const blobResponse = await fetch(pickedImage);
-        const blob = await blobResponse.blob();
-        const ext = blob.type.split('/')[1] || 'jpg';
-        formData.append('file', blob, `receipt.${ext}`);
-      } else {
-        const filename = pickedImage.split('/').pop();
-        const match = /\.(\w+)$/.exec(filename);
-        const type = match ? `image/${match[1].toLowerCase()}` : 'image/jpeg';
-        formData.append('file', {
-          uri: pickedImage,
-          name: filename || 'receipt.jpg',
-          type,
-        });
-      }
-
       // Import API_BASE_URL locally to avoid breaking if it's missing at top level
       const { API_BASE_URL } = require('../utils/apiConfig');
+      const uploadUrl = `${API_BASE_URL}/receipts/upload`;
+      let responseData;
 
-      const response = await fetch(`${API_BASE_URL}/receipts/upload`, {
-        method: 'POST',
-        body: formData,
-        // Do NOT set Content-Type manually for FormData in React Native
-      });
+      if (Platform.OS === 'web') {
+        const formData = new FormData();
+        const blobResponse = await fetch(pickedImage);
+        const blob = await blobResponse.blob();
+        formData.append('file', blob, 'receipt.jpg');
+        const res = await fetch(uploadUrl, { method: 'POST', body: formData });
+        responseData = await res.json();
+        if (!res.ok) throw new Error(responseData.detail || `Server error ${res.status}`);
+      } else {
+        // Use native XMLHttpRequest for mobile — correctly streams binary files via Android/iOS OkHttp
+        responseData = await new Promise((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open('POST', uploadUrl);
+          xhr.onload = () => {
+            try {
+              const data = JSON.parse(xhr.responseText);
+              if (xhr.status >= 200 && xhr.status < 300) {
+                resolve(data);
+              } else {
+                reject(new Error(data.detail || `Server error ${xhr.status}`));
+              }
+            } catch {
+              reject(new Error(xhr.responseText || `Server returned ${xhr.status}`));
+            }
+          };
+          xhr.onerror = () => reject(new Error('Network request failed. Is the backend running?'));
 
-      const responseData = await response.json();
+          const formData = new FormData();
+          const filename = pickedImage.split('/').pop() || 'receipt.jpg';
+          const match = /\.(\w+)$/.exec(filename);
+          const ext = match ? match[1].toLowerCase() : 'jpeg';
+          const type = ext === 'png' ? 'image/png' : 'image/jpeg';
 
-      if (!response.ok) {
-        throw new Error(responseData.detail || `Server error ${response.status}`);
+          formData.append('file', {
+            uri: pickedImage,
+            name: filename,
+            type,
+          });
+
+          xhr.send(formData);
+        });
       }
 
       // Navigate to ReceiptDetails with the actual extracted backend data
