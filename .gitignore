@@ -78,10 +78,7 @@ node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-
-# Markdown Documentation Files (EXCLUDED AS PER REQUEST)
-*.md
-!README.md
+# Generated Reports
 EVALUATION_REPORT.md
 TECHNICAL_REPORT_COMPREHENSIVE.md
 PROJECT_SUMMARY.md
