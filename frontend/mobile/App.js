@@ -36,6 +36,7 @@ import PersonalInformationScreen from './screens/PersonalInformationScreen';
 import FoodItemDetailsScreen from './screens/FoodItemDetailsScreen';
 import EditGoalsScreen from './screens/EditGoalsScreen';
 import GainMuscleScreen from './screens/GainMuscleScreen';
+import GemmaChatScreen from './screens/GemmaChatScreen';
 
 import { COLORS, FONTS } from './theme';
 
@@ -262,6 +263,11 @@ export default function App() {
           <Stack.Screen
             name="GainMuscle"
             component={GainMuscleScreen}
+            options={{ animation: 'slide_from_right' }}
+          />
+          <Stack.Screen
+            name="GemmaChat"
+            component={GemmaChatScreen}
             options={{ animation: 'slide_from_right' }}
           />
         </Stack.Navigator>

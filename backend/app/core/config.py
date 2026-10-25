@@ -3,7 +3,10 @@
 try:
     from pydantic_settings import BaseSettings
 except ImportError:
-    from pydantic import BaseSettings
+    try:
+        from pydantic import BaseSettings
+    except Exception:
+        from pydantic.v1 import BaseSettings
 from typing import Optional
 
 
@@ -38,6 +41,14 @@ class Settings(BaseSettings):
     ENABLE_RECIPE_ASSISTANT: bool = True
     ENABLE_CHATBOT: bool = True
     ENABLE_FORECASTING: bool = True
+
+    # LLM / Gemma 3 12B Configuration
+    GEMMA_MODEL_NAME: str = "gemma-3-12b-it"
+    GEMINI_API_KEY: Optional[str] = None
+    GEMMA_API_KEY: Optional[str] = None
+    OPENROUTER_API_KEY: Optional[str] = None
+    GROQ_API_KEY: Optional[str] = None
+    LLM_API_BASE_URL: Optional[str] = None
 
     # Anomaly Detection Thresholds
     ANOMALY_SCORE_THRESHOLD: float = 0.65  # Flag if anomaly score > this
