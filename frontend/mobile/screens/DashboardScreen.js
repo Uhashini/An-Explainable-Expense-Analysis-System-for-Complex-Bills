@@ -119,64 +119,117 @@ export default function DashboardScreen({ navigation }) {
 
   return (
     <ScreenLayout title="Dashboard">
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Greeting */}
-        <View style={styles.greeting}>
-          <View style={styles.greetingLeft}>
-            <Text style={styles.greetingHello}>
-              Hello{name ? `, ${name}` : ''}.
-            </Text>
-            <Text style={styles.greetingSub}>
-              Here's what's happening with your grocery habits today.
-            </Text>
-          </View>
-          <View style={styles.greetingBadge}>
-            <Text style={styles.greetingBadgeText}>Live</Text>
-          </View>
-        </View>
-
-        {/* Quick Stats 2×2 Grid */}
-        <Text style={styles.sectionTitle}>QUICK STATS</Text>
-        <View style={styles.statsGrid}>
-          {QUICK_STATS.map((s) => (
-            <StatCard key={s.label} {...s} />
-          ))}
-        </View>
-
-        {/* Goal Progress */}
-        <Text style={styles.sectionTitle}>GOAL PROGRESS</Text>
-        <View style={styles.goalsContainer}>
-          {GOALS.map((g) => (
-            <GoalCard
-              key={g.label}
-              {...g}
-              onPress={g.tag === 'FIT' ? () => navigation.navigate('GainMuscle') : undefined}
-            />
-          ))}
-        </View>
-
-        {/* AI Insight */}
-        <View style={styles.insightCard}>
-          <View style={styles.insightHeader}>
-            <View style={styles.insightTagBox}>
-              <Text style={styles.insightTag}>AI</Text>
+      <View style={{ flex: 1 }}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Greeting */}
+          <View style={styles.greeting}>
+            <View style={styles.greetingLeft}>
+              <Text style={styles.greetingHello}>
+                Hello{name ? `, ${name}` : ''}.
+              </Text>
+              <Text style={styles.greetingSub}>
+                Here's what's happening with your grocery habits today.
+              </Text>
             </View>
-            <Text style={styles.insightTitle}>Latest Insight</Text>
+            <View style={styles.greetingBadge}>
+              <Text style={styles.greetingBadgeText}>Live</Text>
+            </View>
           </View>
-          <Text style={styles.insightText}>
-            You're spending ₹350/month more on snacks than similar shoppers.
-            Consider buying family packs or healthier alternatives to cut costs.
-          </Text>
-          <TouchableOpacity style={styles.insightBtn}>
-            <Text style={styles.insightBtnText}>View Recommendations</Text>
-          </TouchableOpacity>
-        </View>
 
-        <View style={{ height: 24 }} />
-      </ScrollView>
+          {/* Gemma 3 12B AI Assistant Card */}
+          <TouchableOpacity
+            style={styles.gemmaCard}
+            onPress={() => navigation.navigate('GemmaChat')}
+            activeOpacity={0.9}
+          >
+            <View style={styles.gemmaHeader}>
+              <View style={styles.gemmaBadgeRow}>
+                <View style={styles.gemmaIconCircle}>
+                  <Text style={styles.gemmaIcon}>✦</Text>
+                </View>
+                <View>
+                  <Text style={styles.gemmaTitle}>Pantrix AI Assistant</Text>
+                  <View style={styles.gemmaTagRow}>
+                    <View style={styles.gemmaModelTag}>
+                      <Text style={styles.gemmaModelText}>Gemma 3 12B</Text>
+                    </View>
+                    <Text style={styles.gemmaLiveText}>• Context-Aware</Text>
+                  </View>
+                </View>
+              </View>
+              <View style={styles.gemmaArrowBtn}>
+                <Text style={styles.gemmaArrow}>→</Text>
+              </View>
+            </View>
+            <Text style={styles.gemmaDescription}>
+              Ask anything about your bills, protein intake, macros, or smart ways to cut grocery costs.
+            </Text>
+            <View style={styles.gemmaPromptRow}>
+              <View style={styles.gemmaPromptPill}>
+                <Text style={styles.gemmaPromptText}>"Track my protein"</Text>
+              </View>
+              <View style={styles.gemmaPromptPill}>
+                <Text style={styles.gemmaPromptText}>"Save ₹500"</Text>
+              </View>
+              <View style={styles.gemmaPromptPill}>
+                <Text style={styles.gemmaPromptText}>"Analyze bill"</Text>
+              </View>
+            </View>
+          </TouchableOpacity>
+
+          {/* Quick Stats 2×2 Grid */}
+          <Text style={styles.sectionTitle}>QUICK STATS</Text>
+          <View style={styles.statsGrid}>
+            {QUICK_STATS.map((s) => (
+              <StatCard key={s.label} {...s} />
+            ))}
+          </View>
+
+          {/* Goal Progress */}
+          <Text style={styles.sectionTitle}>GOAL PROGRESS</Text>
+          <View style={styles.goalsContainer}>
+            {GOALS.map((g) => (
+              <GoalCard
+                key={g.label}
+                {...g}
+                onPress={g.tag === 'FIT' ? () => navigation.navigate('GainMuscle') : undefined}
+              />
+            ))}
+          </View>
+
+          {/* AI Insight */}
+          <View style={styles.insightCard}>
+            <View style={styles.insightHeader}>
+              <View style={styles.insightTagBox}>
+                <Text style={styles.insightTag}>AI</Text>
+              </View>
+              <Text style={styles.insightTitle}>Latest Insight</Text>
+            </View>
+            <Text style={styles.insightText}>
+              You're spending ₹350/month more on snacks than similar shoppers.
+              Consider buying family packs or healthier alternatives to cut costs.
+            </Text>
+            <TouchableOpacity style={styles.insightBtn} onPress={() => navigation.navigate('GemmaChat')}>
+              <Text style={styles.insightBtnText}>Ask Gemma for Food Swaps →</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={{ height: 60 }} />
+        </ScrollView>
+
+        {/* Floating AI Button (FAB) */}
+        <TouchableOpacity
+          style={styles.fab}
+          onPress={() => navigation.navigate('GemmaChat')}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.fabIcon}>✦</Text>
+          <Text style={styles.fabText}>Ask Gemma</Text>
+        </TouchableOpacity>
+      </View>
     </ScreenLayout>
   );
 }
@@ -414,6 +467,142 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.bold,
     fontSize: 12,
     color: COLORS.primary,
+    letterSpacing: 0.3,
+  },
+
+  // Gemma 3 12B Assistant Card
+  gemmaCard: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 22,
+    borderWidth: 1.5,
+    borderColor: '#94B6EF',
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    elevation: 3,
+  },
+  gemmaHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  gemmaBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  gemmaIconCircle: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: COLORS.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  gemmaIcon: {
+    color: '#fff',
+    fontSize: 18,
+    fontFamily: FONTS.bold,
+  },
+  gemmaTitle: {
+    fontFamily: FONTS.bold,
+    fontSize: 15,
+    color: COLORS.primary,
+  },
+  gemmaTagRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
+  },
+  gemmaModelTag: {
+    backgroundColor: '#E6E279',
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 6,
+    marginRight: 6,
+  },
+  gemmaModelText: {
+    fontFamily: FONTS.bold,
+    fontSize: 9,
+    color: COLORS.primary,
+    letterSpacing: 0.3,
+  },
+  gemmaLiveText: {
+    fontFamily: FONTS.regular,
+    fontSize: 11,
+    color: '#34A853',
+  },
+  gemmaArrowBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(153, 8, 8, 0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  gemmaArrow: {
+    fontFamily: FONTS.bold,
+    fontSize: 14,
+    color: COLORS.primary,
+  },
+  gemmaDescription: {
+    fontFamily: FONTS.regular,
+    fontSize: 13,
+    color: '#444',
+    lineHeight: 18,
+    marginBottom: 12,
+  },
+  gemmaPromptRow: {
+    flexDirection: 'row',
+    gap: 6,
+    flexWrap: 'wrap',
+  },
+  gemmaPromptPill: {
+    backgroundColor: '#F4F2EF',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#ede8e0',
+  },
+  gemmaPromptText: {
+    fontFamily: FONTS.regular,
+    fontSize: 11,
+    color: COLORS.primary,
+  },
+
+  // Floating Action Button (FAB)
+  fab: {
+    position: 'absolute',
+    bottom: 24,
+    right: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 30,
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    elevation: 6,
+    zIndex: 999,
+  },
+  fabIcon: {
+    color: '#E6E279',
+    fontSize: 16,
+    fontFamily: FONTS.bold,
+    marginRight: 6,
+  },
+  fabText: {
+    color: '#fff',
+    fontFamily: FONTS.bold,
+    fontSize: 13,
     letterSpacing: 0.3,
   },
 });
