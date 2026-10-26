@@ -1,15 +1,15 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Platform, Image } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ActivityIndicator } from 'react-native';
-import HomeIcon from './assets/icons/home.svg';
-import ReceiptIcon from './assets/icons/receipt.svg';
-import CameraIcon from './assets/icons/camera.svg';
 import InsightsIcon from './assets/icons/insights.svg';
-import ProfileIcon from './assets/icons/profile.svg';
+const HomeImg = require('./assets/icons/home.png');
+const ReceiptImg = require('./assets/icons/receipt.png');
+const CameraImg = require('./assets/icons/camera.png');
+const ProfileImg = require('./assets/icons/profile.png');
 import { useFonts, PlusJakartaSans_400Regular, PlusJakartaSans_600SemiBold, PlusJakartaSans_700Bold } from '@expo-google-fonts/plus-jakarta-sans';
 
 // â”€â”€ Auth Screens â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -45,11 +45,11 @@ const Tab = createBottomTabNavigator();
 
 // â”€â”€â”€ Tab Icons â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const TAB_ICONS = {
-  Home: HomeIcon,
-  Receipts: ReceiptIcon,
-  Scan: CameraIcon,
-  Insights: InsightsIcon,
-  Profile: ProfileIcon,
+  Home: { type: 'image', source: HomeImg },
+  Receipts: { type: 'image', source: ReceiptImg },
+  Scan: { type: 'image', source: CameraImg },
+  Insights: { type: 'svg', component: InsightsIcon },
+  Profile: { type: 'image', source: ProfileImg },
 };
 
 // â”€â”€â”€ Custom Tab Bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -61,7 +61,7 @@ function CustomTabBar({ state, descriptors, navigation }) {
       {state.routes.map((route, index) => {
         const isFocused = state.index === index;
         const isScan = route.name === 'Scan';
-        const icon = TAB_ICONS[route.name];
+        const iconItem = TAB_ICONS[route.name];
 
         const onPress = () => {
           const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
@@ -71,21 +71,26 @@ function CustomTabBar({ state, descriptors, navigation }) {
         };
 
         if (isScan) {
-          const Icon = icon;
           return (
             <TouchableOpacity
               key={route.key}
-              style={tabStyles.scanBtn}
+              style={[tabStyles.scanBtn, isFocused && tabStyles.scanBtnActive]}
               onPress={onPress}
-              activeOpacity={0.8}
+              activeOpacity={0.85}
             >
-              <Icon width={20} height={20} fill="#fff" />
+              <Image
+                source={iconItem?.source}
+                style={tabStyles.scanImage}
+                resizeMode="contain"
+              />
               <Text style={tabStyles.scanLabel}>Scan</Text>
             </TouchableOpacity>
           );
         }
 
-        const Icon = icon;
+        const isImage = iconItem?.type === 'image';
+        const SvgComponent = iconItem?.component;
+
         return (
           <TouchableOpacity
             key={route.key}
@@ -93,8 +98,31 @@ function CustomTabBar({ state, descriptors, navigation }) {
             onPress={onPress}
             activeOpacity={0.7}
           >
-            {isFocused && <View style={tabStyles.activeDot} />}
-            <Icon width={30} height={30} fill={isFocused ? COLORS.primary : '#94B6EF'} style={tabStyles.tabIcon} />
+            {isImage ? (
+              <Image
+                source={iconItem.source}
+                style={[
+                  tabStyles.tabImage,
+                  {
+                    opacity: isFocused ? 1 : 0.45,
+                    transform: [{ scale: isFocused ? 1.08 : 0.95 }],
+                  },
+                ]}
+                resizeMode="contain"
+              />
+            ) : (
+              <SvgComponent
+                width={26}
+                height={26}
+                style={[
+                  tabStyles.tabIcon,
+                  {
+                    opacity: isFocused ? 1 : 0.45,
+                    transform: [{ scale: isFocused ? 1.08 : 0.95 }],
+                  },
+                ]}
+              />
+            )}
             <Text style={[tabStyles.tabLabel, isFocused && tabStyles.tabLabelActive]}>
               {route.name}
             </Text>
@@ -124,47 +152,57 @@ const tabStyles = StyleSheet.create({
     paddingVertical: 4,
     position: 'relative',
   },
-  activeDot: {
-    position: 'absolute',
-    top: -8,
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: COLORS.primary,
+  tabImage: {
+    width: 27,
+    height: 27,
+    marginBottom: 2,
   },
-  tabIcon: { width: 30, height: 30, marginBottom: 2 },
+  tabIcon: {
+    width: 27,
+    height: 27,
+    marginBottom: 2,
+  },
   tabLabel: {
-    fontFamily: FONTS.regular,
+    fontFamily: FONTS.semiBold,
     fontSize: 10,
-    color: '#9e9e9e',
-    letterSpacing: 0.3,
+    color: '#8A8A8A',
+    letterSpacing: 0.2,
   },
   tabLabelActive: {
     fontFamily: FONTS.bold,
     color: COLORS.primary,
   },
   scanBtn: {
-    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: -24,
+    marginTop: -20,
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: COLORS.primary,
-    shadowColor: COLORS.primary,
+    backgroundColor: '#FAF6F1',
+    borderWidth: 1.5,
+    borderColor: '#EDE6DE',
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 10,
-    elevation: 8,
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    elevation: 6,
     alignSelf: 'center',
   },
-  scanIcon: { fontSize: 22 },
+  scanBtnActive: {
+    borderColor: COLORS.primary,
+    backgroundColor: '#fff',
+  },
+  scanImage: {
+    width: 32,
+    height: 26,
+    marginBottom: 2,
+  },
   scanLabel: {
     fontFamily: FONTS.bold,
     fontSize: 9,
-    color: '#fff',
-    letterSpacing: 0.3,
+    color: COLORS.primary,
+    letterSpacing: 0.2,
   },
 });
 

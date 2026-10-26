@@ -8,9 +8,86 @@
     "format": "JPEG"
   },
   "ocr_results": {
-    "total_words": 0,
-    "words": [],
-    "sample_words_with_boxes": []
+    "total_words": 119,
+    "words": [
+      "+Explore",
+      "Enterprise",
+      "Fifty",
+      "One",
+      "cord-v1-train",
+      "+add",
+      "stage",
+      "?",
+      "Samples",
+      "Unsaved",
+      "03",
+      "Unsaved",
+      "view",
+      "d",
+      "<",
+      "Sort",
+      "by",
+      "II",
+      "800",
+      "samples",
+      "FILTER",
+      "TAGS",
+      "sample",
+      "tags",
+      "abel",
+      "tags",
+      "METADATA",
+      "metadatasize_bytes",
+      "metadatamime",
+      "type"
+    ],
+    "sample_words_with_boxes": [
+      {
+        "word": "+Explore",
+        "bounding_box": [
+          818,
+          25,
+          856,
+          48
+        ]
+      },
+      {
+        "word": "Enterprise",
+        "bounding_box": [
+          860,
+          25,
+          908,
+          48
+        ]
+      },
+      {
+        "word": "Fifty",
+        "bounding_box": [
+          39,
+          27,
+          70,
+          48
+        ]
+      },
+      {
+        "word": "One",
+        "bounding_box": [
+          76,
+          27,
+          94,
+          48
+        ]
+      },
+      {
+        "word": "cord-v1-train",
+        "bounding_box": [
+          93,
+          29,
+          155,
+          48
+        ]
+      }
+    ]
   },
   "entity_extraction": {
     "total_entities_detected": 0,

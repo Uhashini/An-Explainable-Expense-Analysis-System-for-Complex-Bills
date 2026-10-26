@@ -9,10 +9,10 @@ import { API_BASE_URL } from '../utils/apiConfig';
 
 const green = '#22C55E';
 const heroIcons = [
-  require('../assets/icons/profile.svg'),
-  require('../assets/icons/insights.svg'),
-  require('../assets/icons/camera.svg'),
-  require('../assets/icons/receipt.svg'),
+  require('../assets/icons/profile.png'),
+  require('../assets/icons/home.png'),
+  require('../assets/icons/camera.png'),
+  require('../assets/icons/receipt.png'),
   require('../assets/icons/settings.svg'),
 ];
 const goals = [
