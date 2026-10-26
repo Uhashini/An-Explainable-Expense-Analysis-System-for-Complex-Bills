@@ -50,25 +50,10 @@ async def upload_receipt(file: UploadFile = File(...)):
         # Stamp the original filename
         result["filename"] = file.filename
 
-        # Auto-match extracted items against database food & nutrition items
+        # Auto-match extracted items against database food & nutrition items (in threadpool with single session + cache)
         items = result.get("data", {}).get("receipt_info", {}).get("items", [])
-        for item in items:
-            try:
-                item_name = item.get("name", "")
-                if item_name:
-                    match = product_matcher.match_item(item_name)
-                    if match:
-                        item["food_id"] = match.get("food_id")
-                        item["matched_name"] = match.get("matched_name")
-                        item["display_name"] = match.get("display_name")
-                        item["category"] = match.get("category")
-                        item["subcategory"] = match.get("subcategory")
-                        item["serving_size"] = match.get("serving_size")
-                        item["serving_unit"] = match.get("serving_unit")
-                        item["nutrition"] = match.get("nutrition")
-                        item["health"] = match.get("health")
-            except Exception as match_err:
-                logger.warning(f"Failed to match item '{item.get('name')}': {match_err}")
+        if items:
+            await run_in_threadpool(product_matcher.enrich_items, items)
 
         return result
 
@@ -91,25 +76,7 @@ async def match_products(request: MatchProductsRequest):
     """
     try:
         from fastapi.concurrency import run_in_threadpool
-        
-        def _match_items():
-            enriched_items = []
-            for item in request.items:
-                match = product_matcher.match_item(item.get("name", ""))
-                if match:
-                    item["food_id"] = match.get("food_id")
-                    item["matched_name"] = match.get("matched_name")
-                    item["display_name"] = match.get("display_name")
-                    item["category"] = match.get("category")
-                    item["subcategory"] = match.get("subcategory")
-                    item["serving_size"] = match.get("serving_size")
-                    item["serving_unit"] = match.get("serving_unit")
-                    item["nutrition"] = match.get("nutrition")
-                    item["health"] = match.get("health")
-                enriched_items.append(item)
-            return enriched_items
-            
-        enriched_items = await run_in_threadpool(_match_items)
+        enriched_items = await run_in_threadpool(product_matcher.enrich_items, request.items)
         return {"status": "success", "items": enriched_items}
         
     except Exception as e:
@@ -212,27 +179,38 @@ def run_rematch(db: Session = Depends(get_db)):
         "message": f"Successfully rematched {updated_count} out of {len(unmatched_items)} unmatched items."
     }
 
+from sqlalchemy import func
+
 @router.get("/user/{user_id}", tags=["Receipts"])
 def get_user_receipts(user_id: int, db: Session = Depends(get_db)):
     user = db.query(UserProfile).filter(UserProfile.user_id == user_id).first()
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        return {"status": "success", "receipts": []}
         
     # Fetch receipts for the user, ordered by most recent first
     receipts = db.query(Receipt).filter(Receipt.user_id == user_id).order_by(Receipt.receipt_id.desc()).all()
+    if not receipts:
+        return {"status": "success", "receipts": []}
+
+    receipt_ids = [r.receipt_id for r in receipts]
+    # Single batch aggregation for item counts instead of N queries
+    counts = dict(
+        db.query(ReceiptItem.receipt_id, func.count(ReceiptItem.item_id))
+        .filter(ReceiptItem.receipt_id.in_(receipt_ids))
+        .group_by(ReceiptItem.receipt_id)
+        .all()
+    )
     
-    result = []
-    for r in receipts:
-        # Count items for each receipt
-        item_count = db.query(ReceiptItem).filter(ReceiptItem.receipt_id == r.receipt_id).count()
-        
-        result.append({
+    result = [
+        {
             "receipt_id": r.receipt_id,
             "merchant_name": r.merchant_name or "Unknown Store",
             "date": r.date or "Unknown Date",
             "total_amount": r.total_amount or 0.0,
-            "items_count": item_count
-        })
+            "items_count": counts.get(r.receipt_id, 0)
+        }
+        for r in receipts
+    ]
         
     return {"status": "success", "receipts": result}
 
@@ -246,6 +224,21 @@ def get_receipt(receipt_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Receipt not found")
         
     items = db.query(ReceiptItem).filter(ReceiptItem.receipt_id == receipt_id).all()
+
+    # Batch-load all matching food items in a single query instead of N queries
+    matched_ids = list({it.matched_food_id for it in items if it.matched_food_id})
+    foods_by_id = {}
+    if matched_ids:
+        foods = (
+            db.query(FoodItem)
+            .options(
+                joinedload(FoodItem.nutrition),
+                joinedload(FoodItem.health_indicators),
+            )
+            .filter(FoodItem.food_id.in_(matched_ids))
+            .all()
+        )
+        foods_by_id = {f.food_id: f for f in foods}
     
     formatted_items = []
     for item in items:
@@ -259,44 +252,35 @@ def get_receipt(receipt_id: int, db: Session = Depends(get_db)):
             "total_price": item.price,
         }
         
-        if item.matched_food_id:
-            food = (
-                db.query(FoodItem)
-                .options(
-                    joinedload(FoodItem.nutrition),
-                    joinedload(FoodItem.health_indicators),
-                )
-                .filter(FoodItem.food_id == item.matched_food_id)
-                .first()
-            )
-            if food:
-                item_data["matched_name"] = food.display_name or food.canonical_name
-                item_data["category"] = food.category
-                item_data["subcategory"] = food.subcategory
+        food = foods_by_id.get(item.matched_food_id) if item.matched_food_id else None
+        if food:
+            item_data["matched_name"] = food.display_name or food.canonical_name
+            item_data["category"] = food.category
+            item_data["subcategory"] = food.subcategory
+            
+            if food.nutrition:
+                item_data["nutrition"] = {
+                    "calories_kcal": float(food.nutrition.calories_kcal) if food.nutrition.calories_kcal is not None else None,
+                    "protein_g": float(food.nutrition.protein_g) if food.nutrition.protein_g is not None else None,
+                    "carbohydrates_g": float(food.nutrition.carbohydrates_g) if food.nutrition.carbohydrates_g is not None else None,
+                    "fat_g": float(food.nutrition.fat_g) if food.nutrition.fat_g is not None else None,
+                    "fiber_g": float(food.nutrition.fiber_g) if food.nutrition.fiber_g is not None else None,
+                    "sugar_g": float(food.nutrition.sugar_g) if food.nutrition.sugar_g is not None else None,
+                    "sodium_mg": float(food.nutrition.sodium_mg) if food.nutrition.sodium_mg is not None else None,
+                }
+            if food.health_indicators:
+                item_data["health"] = {
+                    "processed_level": food.health_indicators.processed_level,
+                    "is_processed": food.health_indicators.is_processed,
+                    "high_protein": food.health_indicators.high_protein,
+                    "high_fiber": food.health_indicators.high_fiber,
+                    "high_sugar": food.health_indicators.high_sugar,
+                    "high_fat": food.health_indicators.high_fat,
+                    "high_sodium": food.health_indicators.high_sodium,
+                    "vegetarian": food.health_indicators.vegetarian,
+                    "health_score": food.health_indicators.health_score,
+                }
                 
-                if food.nutrition:
-                    item_data["nutrition"] = {
-                        "calories_kcal": float(food.nutrition.calories_kcal) if food.nutrition.calories_kcal is not None else None,
-                        "protein_g": float(food.nutrition.protein_g) if food.nutrition.protein_g is not None else None,
-                        "carbohydrates_g": float(food.nutrition.carbohydrates_g) if food.nutrition.carbohydrates_g is not None else None,
-                        "fat_g": float(food.nutrition.fat_g) if food.nutrition.fat_g is not None else None,
-                        "fiber_g": float(food.nutrition.fiber_g) if food.nutrition.fiber_g is not None else None,
-                        "sugar_g": float(food.nutrition.sugar_g) if food.nutrition.sugar_g is not None else None,
-                        "sodium_mg": float(food.nutrition.sodium_mg) if food.nutrition.sodium_mg is not None else None,
-                    }
-                if food.health_indicators:
-                    item_data["health"] = {
-                        "processed_level": food.health_indicators.processed_level,
-                        "is_processed": food.health_indicators.is_processed,
-                        "high_protein": food.health_indicators.high_protein,
-                        "high_fiber": food.health_indicators.high_fiber,
-                        "high_sugar": food.health_indicators.high_sugar,
-                        "high_fat": food.health_indicators.high_fat,
-                        "high_sodium": food.health_indicators.high_sodium,
-                        "vegetarian": food.health_indicators.vegetarian,
-                        "health_score": food.health_indicators.health_score,
-                    }
-                    
         formatted_items.append(item_data)
         
     return {

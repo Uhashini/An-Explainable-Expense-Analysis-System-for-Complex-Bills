@@ -1,12 +1,25 @@
 import { Platform } from 'react-native';
+import Constants from 'expo-constants';
 import { getToken, getRefreshToken, saveAuthData, clearUser } from './authStorage';
 
 // ─── Backend API Configuration ──────────────────────────────────────────────
-// In local dev, use the machine's local IP or localhost.
-const HOST_IP = '127.0.0.1';
+//
+// Automatically picks the right URL based on environment:
+//   - Expo Web (browser)          → window.location.hostname
+//   - Android / iOS via Expo Go   → auto-detected Metro host IP
+//   - Physical device fallback    → machine's current LAN IP (192.168.116.124)
+//
+
+const debuggerHost = Constants?.expoConfig?.hostUri || Constants?.manifest2?.extra?.expoClient?.hostUri || Constants?.manifest?.debuggerHost;
+const detectedIp = debuggerHost ? debuggerHost.split(':')[0] : null;
+const HOST_IP = detectedIp || '192.168.116.124';
 
 export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? Platform.select({
-  web: `http://${HOST_IP}:8000/api/v1`,
+  web: typeof window !== 'undefined' && window.location?.hostname
+    ? (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+        ? 'http://127.0.0.1:8000/api/v1'
+        : `http://${window.location.hostname}:8000/api/v1`)
+    : 'http://127.0.0.1:8000/api/v1',
   android: `http://${HOST_IP}:8000/api/v1`,
   ios: `http://${HOST_IP}:8000/api/v1`,
   default: `http://${HOST_IP}:8000/api/v1`,

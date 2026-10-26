@@ -8,10 +8,17 @@ End-to-End Pipeline Test: Full Receipt Processing Demo
 """
 
 import os
+import sys
 import json
 import io
 from PIL import Image
 import numpy as np
+
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
 
 print("=" * 80)
 print("END-TO-END RECEIPT EXTRACTION PIPELINE TEST")
@@ -55,8 +62,9 @@ try:
     
     ocr_output = ocr_service.extract_structured_data(image_bytes)
     
-    words = ocr_output.get("words", [])
-    boxes = ocr_output.get("boxes", [])
+    ocr_data = ocr_output.get("data", ocr_output)
+    words = ocr_data.get("words", [])
+    boxes = ocr_data.get("boxes", [])
     
     print(f"✅ OCR completed successfully")
     print(f"   Total words detected: {len(words)}")
