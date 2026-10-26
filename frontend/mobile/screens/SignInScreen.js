@@ -6,7 +6,9 @@ import {
 import BackgroundLayout from '../components/BackgroundLayout';
 import OrDivider from '../components/OrDivider';
 import SocialButton from '../components/SocialButton';
-import { getUser, saveUser } from '../utils/authStorage';
+import GoogleConnectModal from '../components/GoogleConnectModal';
+import { getUser, saveAuthData, saveUser } from '../utils/authStorage';
+import { performOAuthLogin } from '../utils/oauthHelper';
 import { API_BASE_URL } from '../utils/apiConfig';
 import { COLORS, FONTS } from '../theme';
 
@@ -14,6 +16,8 @@ export default function SignInScreen({ navigation }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [showGoogleModal, setShowGoogleModal] = useState(false);
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
@@ -32,7 +36,11 @@ export default function SignInScreen({ navigation }) {
       });
       const data = await response.json();
       if (response.ok) {
-        await saveUser(data.user);
+        await saveAuthData({
+          user: data.user,
+          access_token: data.access_token,
+          refresh_token: data.refresh_token,
+        });
         if (navigation.replace) {
           navigation.replace('Main');
         }
@@ -113,8 +121,20 @@ export default function SignInScreen({ navigation }) {
           {/* Social Buttons */}
           <View style={styles.socialContainer}>
             <Text style={styles.continueWith}>Continue with</Text>
-            <SocialButton provider="google" onPress={() => console.log('Google')} />
-            <SocialButton provider="apple" onPress={() => console.log('Apple')} />
+            <SocialButton
+              provider="google"
+              actionText="Continue with Google"
+              onPress={() => setShowGoogleModal(true)}
+            />
+            <SocialButton
+              provider="apple"
+              actionText="Continue with Apple"
+              onPress={() => performOAuthLogin({
+                provider: 'apple',
+                email: email.trim() || undefined,
+                navigation,
+              })}
+            />
           </View>
 
           {/* Footer */}
@@ -127,6 +147,13 @@ export default function SignInScreen({ navigation }) {
 
         </View>
       </KeyboardAvoidingView>
+      <GoogleConnectModal
+        visible={showGoogleModal}
+        onClose={() => setShowGoogleModal(false)}
+        navigation={navigation}
+        initialEmail={email}
+        isSignUp={false}
+      />
     </BackgroundLayout>
   );
 }

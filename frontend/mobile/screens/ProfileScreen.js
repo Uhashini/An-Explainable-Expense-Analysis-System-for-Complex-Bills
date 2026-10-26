@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import ScreenLayout from '../components/ScreenLayout';
-import { getUser } from '../utils/authStorage';
+import { getUser, getGoogleAccount } from '../utils/authStorage';
 import { COLORS, FONTS } from '../theme';
 import { useEffect, useState } from 'react';
 
@@ -41,13 +41,18 @@ const MENU = [
 export default function ProfileScreen({ navigation }) {
   const [userName, setUserName] = useState('');
   const [userEmail, setUserEmail] = useState('');
+  const [isGoogleConnected, setIsGoogleConnected] = useState(false);
 
   useEffect(() => {
     let mounted = true;
-    getUser().then((user) => {
+    getUser().then(async (user) => {
       if (mounted && user) {
         setUserName(user.name || '');
         setUserEmail(user.email || '');
+        const gAcc = await getGoogleAccount();
+        if (gAcc || user.auth_provider === 'google' || user.email?.toLowerCase().includes('gmail.com')) {
+          setIsGoogleConnected(true);
+        }
       }
     });
     return () => { mounted = false; };
@@ -68,8 +73,16 @@ export default function ProfileScreen({ navigation }) {
             <Text style={styles.userName}>{userName || 'Pantrix User'}</Text>
             <Text style={styles.userEmail}>{userEmail || 'your@email.com'}</Text>
           </View>
-          <View style={styles.badgeBox}>
+          <View style={styles.badgeColumn}>
+            <View style={styles.badgeBox}>
             <Text style={styles.badgeText}>Member</Text>
+          </View>
+          {isGoogleConnected ? (
+            <View style={styles.googleBadge}>
+              <Text style={styles.googleBadgeIcon}>G</Text>
+              <Text style={styles.googleBadgeText}>Google</Text>
+            </View>
+          ) : null}
           </View>
         </View>
 
@@ -155,6 +168,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: 'rgba(244,242,239,0.75)',
   },
+  badgeColumn: {
+    alignItems: 'flex-end',
+    gap: 6,
+  },
   badgeBox: {
     backgroundColor: COLORS.accent,
     borderRadius: 20,
@@ -166,6 +183,26 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: COLORS.primary,
     letterSpacing: 0.5,
+  },
+  googleBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    gap: 4,
+  },
+  googleBadgeIcon: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#4285F4',
+  },
+  googleBadgeText: {
+    fontFamily: FONTS.bold,
+    fontSize: 10,
+    color: '#3C4043',
+    letterSpacing: 0.3,
   },
 
   // Menu

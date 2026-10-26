@@ -36,7 +36,10 @@ app.include_router(gain_muscle.router, prefix="/api/v1/gain-muscle", tags=["Gain
 app.include_router(chatbot.router, prefix="/api/v1/chatbot", tags=["Chatbot"])
 
 # Serve Static Files
-static_path = os.path.join(os.getcwd(), "static")
+backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+static_path = os.path.join(backend_dir, "static")
+if not os.path.exists(static_path):
+    os.makedirs(static_path, exist_ok=True)
 app.mount("/static", StaticFiles(directory=static_path), name="static")
 
 @app.get("/", tags=["UI"])

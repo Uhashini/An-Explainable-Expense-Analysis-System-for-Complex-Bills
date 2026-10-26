@@ -6,7 +6,9 @@ import {
 import BackgroundLayout from '../components/BackgroundLayout';
 import OrDivider from '../components/OrDivider';
 import SocialButton from '../components/SocialButton';
-import { saveUser } from '../utils/authStorage';
+import GoogleConnectModal from '../components/GoogleConnectModal';
+import { saveAuthData, saveUser } from '../utils/authStorage';
+import { performOAuthLogin } from '../utils/oauthHelper';
 import { API_BASE_URL } from '../utils/apiConfig';
 import { COLORS, FONTS } from '../theme';
 
@@ -40,6 +42,7 @@ export default function SignUpScreen({ navigation }) {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [showGoogleModal, setShowGoogleModal] = useState(false);
 
   const req = checkReq(password);
   const allReqsMet = req.length && req.uppercase && req.number;
@@ -72,7 +75,12 @@ export default function SignUpScreen({ navigation }) {
       });
       const data = await response.json();
       if (response.ok) {
-        await saveUser({ id: data.user_id, name: name.trim(), email: email.trim().toLowerCase() });
+        const userObj = data.user || { id: data.user_id, name: name.trim(), email: email.trim().toLowerCase() };
+        await saveAuthData({
+          user: userObj,
+          access_token: data.access_token,
+          refresh_token: data.refresh_token,
+        });
         if (navigation.replace) {
           navigation.replace('PersonalInfo', { name: name.trim(), userId: data.user_id });
         }
@@ -184,8 +192,22 @@ export default function SignUpScreen({ navigation }) {
           {/* Social Buttons */}
           <View style={styles.socialContainer}>
             <Text style={styles.continueWith}>Continue with</Text>
-            <SocialButton provider="google" onPress={() => console.log('Google')} />
-            <SocialButton provider="apple" onPress={() => console.log('Apple')} />
+            <SocialButton
+              provider="google"
+              actionText="Continue with Google"
+              onPress={() => setShowGoogleModal(true)}
+            />
+            <SocialButton
+              provider="apple"
+              actionText="Continue with Apple"
+              onPress={() => performOAuthLogin({
+                provider: 'apple',
+                email: email.trim() || undefined,
+                name: name.trim() || undefined,
+                navigation,
+                isSignUp: true,
+              })}
+            />
           </View>
 
           {/* Footer */}
@@ -198,6 +220,14 @@ export default function SignUpScreen({ navigation }) {
 
         </View>
       </KeyboardAvoidingView>
+      <GoogleConnectModal
+        visible={showGoogleModal}
+        onClose={() => setShowGoogleModal(false)}
+        navigation={navigation}
+        initialEmail={email}
+        initialName={name}
+        isSignUp={true}
+      />
     </BackgroundLayout>
   );
 }
