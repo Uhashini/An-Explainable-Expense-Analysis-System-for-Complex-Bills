@@ -51,6 +51,21 @@ export default function GoogleConnectModal({
     }
   }, [visible, initialEmail, initialName]);
 
+  const handleNavAfterLogin = (data) => {
+    onClose();
+    if (onSuccess) {
+      onSuccess(data);
+    } else if (navigation) {
+      if ((data.is_new_user || isSignUp) && navigation.replace) {
+        navigation.replace('PersonalInfo', { name: data.user?.name, userId: data.user?.id });
+      } else if (navigation.replace) {
+        navigation.replace('Main');
+      } else {
+        navigation.navigate('Main');
+      }
+    }
+  };
+
   const handleQuickConnect = async (accEmail, accName) => {
     setError('');
     setLoading(true);
@@ -63,8 +78,7 @@ export default function GoogleConnectModal({
       isSignUp,
       onSuccess: (data) => {
         setLoading(false);
-        onClose();
-        if (onSuccess) onSuccess(data);
+        handleNavAfterLogin(data);
       },
       onError: (msg) => {
         setLoading(false);
@@ -109,8 +123,7 @@ export default function GoogleConnectModal({
       isSignUp,
       onSuccess: (data) => {
         setLoading(false);
-        onClose();
-        if (onSuccess) onSuccess(data);
+        handleNavAfterLogin(data);
       },
       onError: (msg) => {
         setLoading(false);
