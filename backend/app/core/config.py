@@ -65,10 +65,19 @@ class Settings(BaseSettings):
     FORECAST_WINDOW_DAYS: int = 30
     MIN_HISTORY_DAYS: int = 14
 
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        case_sensitive = True
+    # File Storage
+    UPLOAD_DIR: str = "uploads/"
+    MAX_UPLOAD_SIZE: int = 10485760  # 10MB
+
+    # Logging
+    LOG_LEVEL: str = "INFO"
+
+    model_config = {
+        "env_file": ".env",
+        "env_file_encoding": "utf-8",
+        "case_sensitive": True,
+        "extra": "ignore",
+    }
 
 
 settings = Settings()
