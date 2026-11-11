@@ -35,6 +35,9 @@
     ],
     "experiments": {
       "reactCompiler": true
+    },
+    "extra": {
+      "googleClientId": ""
     }
   }
 }

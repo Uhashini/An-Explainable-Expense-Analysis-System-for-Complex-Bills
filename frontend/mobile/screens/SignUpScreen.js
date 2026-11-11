@@ -6,7 +6,8 @@ import {
 import BackgroundLayout from '../components/BackgroundLayout';
 import OrDivider from '../components/OrDivider';
 import SocialButton from '../components/SocialButton';
-import GoogleConnectModal from '../components/GoogleConnectModal';
+import { promptGoogleSignIn } from '../utils/googleAuth';
+import { showNotification } from '../utils/alertHelper';
 import { saveAuthData, saveUser } from '../utils/authStorage';
 import { performOAuthLogin } from '../utils/oauthHelper';
 import { API_BASE_URL } from '../utils/apiConfig';
@@ -42,7 +43,36 @@ export default function SignUpScreen({ navigation }) {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
-  const [showGoogleModal, setShowGoogleModal] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+
+  const handleGoogleSignIn = async () => {
+    if (googleLoading) return;
+    setGoogleLoading(true);
+    try {
+      await promptGoogleSignIn({
+        navigation,
+        isSignUp: true,
+        onStart: () => setGoogleLoading(true),
+        onSuccess: (authData) => {
+          setGoogleLoading(false);
+          const target = authData?.is_new_user ? 'PersonalInfo' : 'Main';
+          const params = authData?.is_new_user ? { name: authData?.user?.name, userId: authData?.user?.id } : undefined;
+          if (navigation.replace) {
+            navigation.replace(target, params);
+          } else if (navigation.navigate) {
+            navigation.navigate(target, params);
+          }
+        },
+        onError: (errorMsg) => {
+          setGoogleLoading(false);
+          showNotification('Google Sign-Up', errorMsg);
+        },
+      });
+    } catch (err) {
+      setGoogleLoading(false);
+      showNotification('Google Sign-Up', err?.message || 'Google Sign-Up failed.');
+    }
+  };
 
   const req = checkReq(password);
   const allReqsMet = req.length && req.uppercase && req.number;
@@ -195,7 +225,8 @@ export default function SignUpScreen({ navigation }) {
             <SocialButton
               provider="google"
               actionText="Continue with Google"
-              onPress={() => setShowGoogleModal(true)}
+              loading={googleLoading}
+              onPress={handleGoogleSignIn}
             />
             <SocialButton
               provider="apple"
@@ -220,14 +251,8 @@ export default function SignUpScreen({ navigation }) {
 
         </View>
       </KeyboardAvoidingView>
-      <GoogleConnectModal
-        visible={showGoogleModal}
-        onClose={() => setShowGoogleModal(false)}
-        navigation={navigation}
-        initialEmail={email}
-        initialName={name}
-        isSignUp={true}
-      />
+
+
     </BackgroundLayout>
   );
 }

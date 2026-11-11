@@ -6,7 +6,8 @@ import {
 import BackgroundLayout from '../components/BackgroundLayout';
 import OrDivider from '../components/OrDivider';
 import SocialButton from '../components/SocialButton';
-import GoogleConnectModal from '../components/GoogleConnectModal';
+import { promptGoogleSignIn } from '../utils/googleAuth';
+import { showNotification } from '../utils/alertHelper';
 import { getUser, saveAuthData, saveUser } from '../utils/authStorage';
 import { performOAuthLogin } from '../utils/oauthHelper';
 import { API_BASE_URL } from '../utils/apiConfig';
@@ -17,7 +18,34 @@ export default function SignInScreen({ navigation }) {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [showGoogleModal, setShowGoogleModal] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+
+  const handleGoogleSignIn = async () => {
+    if (googleLoading) return;
+    setGoogleLoading(true);
+    try {
+      await promptGoogleSignIn({
+        navigation,
+        isSignUp: false,
+        onStart: () => setGoogleLoading(true),
+        onSuccess: (authData) => {
+          setGoogleLoading(false);
+          if (navigation.replace) {
+            navigation.replace('Main');
+          } else if (navigation.navigate) {
+            navigation.navigate('Main');
+          }
+        },
+        onError: (errorMsg) => {
+          setGoogleLoading(false);
+          showNotification('Google Sign-In', errorMsg);
+        },
+      });
+    } catch (err) {
+      setGoogleLoading(false);
+      showNotification('Google Sign-In', err?.message || 'Google Sign-In failed.');
+    }
+  };
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
@@ -124,7 +152,8 @@ export default function SignInScreen({ navigation }) {
             <SocialButton
               provider="google"
               actionText="Continue with Google"
-              onPress={() => setShowGoogleModal(true)}
+              loading={googleLoading}
+              onPress={handleGoogleSignIn}
             />
             <SocialButton
               provider="apple"
@@ -147,13 +176,8 @@ export default function SignInScreen({ navigation }) {
 
         </View>
       </KeyboardAvoidingView>
-      <GoogleConnectModal
-        visible={showGoogleModal}
-        onClose={() => setShowGoogleModal(false)}
-        navigation={navigation}
-        initialEmail={email}
-        isSignUp={false}
-      />
+
+
     </BackgroundLayout>
   );
 }
