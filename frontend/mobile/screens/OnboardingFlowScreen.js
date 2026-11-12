@@ -47,6 +47,9 @@ export default function OnboardingFlowScreen({ navigation, route }) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             user_id: route.params?.userId,
+            full_name: data.fullName,
+            age: data.age ? parseInt(data.age, 10) : null,
+            gender: data.gender,
             height: data.height,
             weight: data.weight,
             activity_level: data.activity,
@@ -54,6 +57,8 @@ export default function OnboardingFlowScreen({ navigation, route }) {
             allergies: data.allergies.join(', '),
             medical_conditions: data.conditions.join(', '),
             goals: data.goals.join(', '),
+            monthly_budget: data.budget ? parseFloat(data.budget) : null,
+            preferred_stores: data.stores.join(', '),
             household_size: data.household,
             shopping_frequency: data.frequency,
             city: data.city,
