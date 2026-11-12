@@ -91,11 +91,7 @@ class Settings(BaseSettings):
         "extra": "ignore",
     }
 
-    class Config:
-        env_file = env_file_path if os.path.exists(env_file_path) else ".env"
-        env_file_encoding = "utf-8"
-        case_sensitive = True
-        extra = "ignore"
+
 
 
 settings = Settings()
