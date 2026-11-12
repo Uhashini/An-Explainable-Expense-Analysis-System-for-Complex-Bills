@@ -29,17 +29,17 @@ export default function GemmaChatScreen({ navigation }) {
       id: 'welcome',
       role: 'assistant',
       content:
-        "👋 Hi! I am **Pantrix AI**, powered by **Gemma 3 12B**.\n\nI have loaded your personal profile, health goals, and receipt history. Ask me anything about your grocery spending, protein & nutritional targets, or smart shopping recommendations!",
+        "👋 Hi! I am **Pantrix AI**, powered by **Gemma 3 12B**.\n\nI have loaded your personal profile, health targets, and receipt history. Ask me anything about your groceries, nutrition, or recent purchases!\n\n💡 *Note: I provide direct, brief answers by default. If you ever need a thorough breakdown or step-by-step guide, just ask for a 'detailed answer'!*",
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     },
   ]);
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [suggestions, setSuggestions] = useState([
-    'What is creatine and should I take it?',
     'How much protein do I need daily?',
+    'Did I buy milk recently?',
     'How can I save ₹500 on groceries?',
-    'Break down my spend on latest receipt',
+    'Explain my daily nutrition plan in detail',
   ]);
   const [userContext, setUserContext] = useState(null);
   const [userId, setUserId] = useState(1);

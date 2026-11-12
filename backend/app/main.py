@@ -11,6 +11,7 @@ try:
 except Exception as e:
     print(f"[DB Warning] Could not initialize DB tables: {e}")
 
+# Application initialization
 app = FastAPI(
     title="Receipt API",
     description="Backend API for Receipt Management System",
@@ -24,7 +25,26 @@ app.add_middleware(
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
+
+@app.on_event("startup")
+async def startup_warmup():
+    """Asynchronously warm up matcher and OCR in the background so uploads don't suffer cold-start delays."""
+    import asyncio
+    from fastapi.concurrency import run_in_threadpool
+    async def _do_warmup():
+        try:
+            from app.services.product_matcher import product_matcher
+            await run_in_threadpool(product_matcher.initialize)
+        except Exception as e:
+            print(f"[Warmup Warning] ProductMatcher warmup: {e}")
+        try:
+            from app.services.ocr_service import ocr_service
+            await run_in_threadpool(ocr_service.ocr._ensure_engine)
+        except Exception as e:
+            print(f"[Warmup Warning] OCREngine warmup: {e}")
+    asyncio.create_task(_do_warmup())
 
 # Include Routers
 app.include_router(receipts.router, prefix="/api/v1/receipts", tags=["Receipts"])

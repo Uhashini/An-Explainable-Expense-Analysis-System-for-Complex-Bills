@@ -11,6 +11,7 @@ import {
   TextInput,
 } from "react-native";
 import ScreenLayout from "../components/ScreenLayout";
+import { Feather } from "@expo/vector-icons";
 import { COLORS, FONTS } from "../theme";
 import { API_BASE_URL } from "../utils/apiConfig";
 import { getUser } from "../utils/authStorage";
@@ -154,10 +155,6 @@ export default function ReceiptDetailsScreen({ route, navigation }) {
     receiptData?.receipt_info?.receipt_id ||
     null
   );
-  const [showAnalysis, setShowAnalysis] = useState(false);
-  const [activeMode, setActiveMode] = useState(0); // 0=muscle, 1=healthy, 2=money
-
-  const currentMode = ANALYSIS_MODES[activeMode];
 
   const isMock = !receiptData && !receiptId;
   const initialInfo = receiptData?.data?.receipt_info || receiptData?.receipt_info || {};
@@ -226,7 +223,8 @@ export default function ReceiptDetailsScreen({ route, navigation }) {
       setTotalAmount(info.total_amount || 0.0);
       setDateStr(info.date || "Unknown Date");
       setExtractedItems(info.items ? [...info.items] : []);
-      setFoodDetailsLoaded(false);
+      const hasMatchedItems = (info.items || []).some(it => it.food_id || it.nutrition);
+      setFoodDetailsLoaded(hasMatchedItems);
     }
   }, [receiptId, receiptData]);
 
@@ -414,20 +412,24 @@ export default function ReceiptDetailsScreen({ route, navigation }) {
                 onPress={cancelEditing}
                 disabled={isUpdating}
                 style={styles.headerCancelBtn}
+                activeOpacity={0.7}
+                accessibilityRole="button"
                 accessibilityLabel="Cancel editing"
               >
-                <Text style={styles.headerCancelText}>✕</Text>
+                <Feather name="x" size={20} color={COLORS.primary} />
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={handleUpdateReceipt}
                 disabled={isUpdating}
                 style={styles.headerSaveBtn}
+                activeOpacity={0.7}
+                accessibilityRole="button"
                 accessibilityLabel="Save changes"
               >
                 {isUpdating ? (
                   <ActivityIndicator size="small" color="#fff" />
                 ) : (
-                  <Text style={styles.headerSaveText}>✓</Text>
+                  <Feather name="check" size={20} color="#fff" />
                 )}
               </TouchableOpacity>
             </>
@@ -436,20 +438,24 @@ export default function ReceiptDetailsScreen({ route, navigation }) {
               <TouchableOpacity
                 onPress={startEditing}
                 style={styles.headerEditBtn}
+                activeOpacity={0.7}
+                accessibilityRole="button"
                 accessibilityLabel="Edit receipt"
               >
-                <Text style={styles.headerEditText}>✏️</Text>
+                <Feather name="edit-2" size={20} color={COLORS.primary} />
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={handleDeleteReceipt}
                 disabled={isDeleting}
                 style={styles.headerDeleteBtn}
+                activeOpacity={0.7}
+                accessibilityRole="button"
                 accessibilityLabel={receiptId ? "Delete receipt" : "Discard receipt"}
               >
                 {isDeleting ? (
-                  <ActivityIndicator size="small" color="#c0392b" />
+                  <ActivityIndicator size="small" color="#D46A6A" />
                 ) : (
-                  <Text style={styles.headerDeleteText}>🗑</Text>
+                  <Feather name="trash-2" size={20} color="#D46A6A" />
                 )}
               </TouchableOpacity>
             </>
@@ -747,65 +753,11 @@ export default function ReceiptDetailsScreen({ route, navigation }) {
             })}
           >
             <Text style={[styles.primaryButtonText, { color: '#7a4800' }]}>
-              📊 View AI Spending Analytics
+              View AI Spending Analytics
             </Text>
           </TouchableOpacity>
 
-          {/* ── Receipt Analysis CTA ── */}
-          <TouchableOpacity
-            style={styles.analysisButton}
-            activeOpacity={0.85}
-            onPress={() => setShowAnalysis(!showAnalysis)}
-          >
-            <View style={styles.analysisButtonInner}>
-              <View style={styles.analysisBtnAccent} />
-              <Text style={styles.analysisButtonText}>
-                {showAnalysis ? "Hide Analysis" : "Receipt Analysis"}
-              </Text>
-            </View>
-            <Text style={styles.analysisChevron}>{showAnalysis ? "▲" : "▼"}</Text>
-          </TouchableOpacity>
 
-          {/* ── Analysis Panel ── */}
-          {showAnalysis && (
-            <View style={styles.analysisPanel}>
-              {/* Mode Segmented Control */}
-              <View style={styles.modeSegment}>
-                {ANALYSIS_MODES.map((mode, idx) => (
-                  <TouchableOpacity
-                    key={mode.key}
-                    style={[
-                      styles.modeTab,
-                      activeMode === idx && styles.modeTabActive,
-                    ]}
-                    onPress={() => setActiveMode(idx)}
-                    activeOpacity={0.8}
-                  >
-                    <Text
-                      style={[
-                        styles.modeTabText,
-                        activeMode === idx && styles.modeTabTextActive,
-                      ]}
-                    >
-                      {mode.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              {/* Active Mode Insights */}
-              <View style={styles.insightsContainer}>
-                {currentMode.insights.map((insight, i) => (
-                  <InsightCard
-                    key={i}
-                    title={insight.title}
-                    detail={insight.detail}
-                    accent={currentMode.accentColor}
-                  />
-                ))}
-              </View>
-            </View>
-          )}
 
 
 
@@ -1188,58 +1140,62 @@ const styles = StyleSheet.create({
   headerActions: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: 10,
   },
   headerEditBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 42,
+    height: 42,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(148, 182, 239, 0.2)",
+    backgroundColor: "#FAF6F1",
     borderWidth: 1,
-    borderColor: "rgba(148, 182, 239, 0.45)",
-  },
-  headerEditText: {
-    fontSize: 16,
-    color: COLORS.primary,
+    borderColor: "#EDE6DE",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 2,
+    elevation: 1,
   },
   headerDeleteBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 42,
+    height: 42,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#fff5f5",
+    backgroundColor: "#FAF6F1",
     borderWidth: 1,
-    borderColor: "#f5c6cb",
-  },
-  headerDeleteText: {
-    fontSize: 16,
-    color: "#c0392b",
+    borderColor: "#EDE6DE",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 2,
+    elevation: 1,
   },
   headerCancelBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 42,
+    height: 42,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#fff",
-    borderWidth: 1.5,
-    borderColor: "rgba(153,8,8,0.35)",
-  },
-  headerCancelText: {
-    fontSize: 15,
-    color: COLORS.primary,
-    fontFamily: FONTS.bold,
+    backgroundColor: "#FAF6F1",
+    borderWidth: 1,
+    borderColor: "#EDE6DE",
   },
   headerSaveBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 42,
+    height: 42,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: COLORS.primary,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 2,
   },
   headerSaveText: {
     fontSize: 16,

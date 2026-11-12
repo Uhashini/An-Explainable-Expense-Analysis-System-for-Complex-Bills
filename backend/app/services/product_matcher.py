@@ -2,8 +2,9 @@ import os
 import logging
 import re
 import difflib
+from typing import List, Dict, Any, Optional
 from sqlalchemy import text
-from app.database.postgres_client import SessionLocal, FoodItem, Nutrition, HealthIndicators, POSTGRES_URL
+from app.database.postgres_client import SessionLocal, FoodItem, Nutrition, HealthIndicators, POSTGRES_URL, engine
 
 logger = logging.getLogger(__name__)
 
@@ -90,24 +91,27 @@ def _normalize(name: str) -> str:
     return " ".join(tokens).strip()
 
 
-def _is_postgres(url: str) -> bool:
-    return url and not url.startswith("sqlite")
+def _is_postgres(url: Optional[str] = None) -> bool:
+    try:
+        return engine.dialect.name == "postgresql"
+    except Exception:
+        return False
 
 
 class ProductMatcher:
     def __init__(self):
         self.is_initialized = False
-        self.use_pg_trgm = _is_postgres(POSTGRES_URL)
+        self.use_pg_trgm = _is_postgres()
         # Fallback: in-memory product list for SQLite
         self._fallback_items = []
         self._fallback_names = []
+        self._match_cache = {}
 
     def initialize(self):
         if self.is_initialized:
             return
 
-        postgres_url = os.environ.get("POSTGRES_URL", "")
-        if postgres_url and not postgres_url.startswith("sqlite"):
+        if _is_postgres():
             db = SessionLocal()
             try:
                 db.execute(text("CREATE EXTENSION IF NOT EXISTS pg_trgm"))
@@ -151,7 +155,7 @@ class ProductMatcher:
         finally:
             db.close()
 
-    def match_item(self, item_name: str, similarity_threshold: float = 0.20):
+    def match_item(self, item_name: str, similarity_threshold: float = 0.20, db=None):
         """
         Match a receipt item name to the closest food item in the database.
         Returns a dict with food details, nutrition, and health indicators, or None.
@@ -160,25 +164,70 @@ class ProductMatcher:
             self.initialize()
 
         # Skip garbage/noise names
-        if item_name.strip().lower() in _GARBAGE_NAMES:
+        if not item_name or item_name.strip().lower() in _GARBAGE_NAMES:
             return None
 
         normalized_query = _normalize(item_name)
         if not normalized_query:
             return None
 
+        if normalized_query in self._match_cache:
+            return self._match_cache[normalized_query]
+
         if self.use_pg_trgm:
-            res = self._match_pg_trgm(item_name, normalized_query, similarity_threshold)
+            res = self._match_pg_trgm(item_name, normalized_query, similarity_threshold, db=db)
             if res:
+                self._match_cache[normalized_query] = res
                 return res
 
-        return self._match_sqlite(item_name, normalized_query)
+        res = self._match_sqlite(item_name, normalized_query)
+        self._match_cache[normalized_query] = res
+        return res
+
+    def enrich_items(self, items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Enrich a list of receipt items in a single pass using a single DB session and cache.
+        """
+        if not self.is_initialized:
+            self.initialize()
+
+        db = SessionLocal()
+        try:
+            for item in items:
+                try:
+                    name = item.get("name", "")
+                    if name:
+                        match = self.match_item(name, db=db)
+                        if match:
+                            item["food_id"] = match.get("food_id")
+                            item["matched_name"] = match.get("matched_name")
+                            item["display_name"] = match.get("display_name")
+                            item["category"] = match.get("category")
+                            item["subcategory"] = match.get("subcategory")
+                            item["serving_size"] = match.get("serving_size")
+                            item["serving_unit"] = match.get("serving_unit")
+                            item["nutrition"] = match.get("nutrition")
+                            item["health"] = match.get("health")
+                except Exception as err:
+                    logger.warning(f"Error enriching item '{item.get('name')}': {err}")
+            return items
+        finally:
+            try:
+                db.close()
+            except Exception:
+                pass
 
     def _match_sqlite(self, original_name: str, normalized_query: str):
         """SQLite compatible matching using score-based fuzzy token & substring matching."""
-        db = SessionLocal()
         try:
-            items = db.query(FoodItem).all()
+            if not self._fallback_items:
+                db_init = SessionLocal()
+                try:
+                    self._fallback_items = db_init.query(FoodItem).all()
+                finally:
+                    db_init.close()
+
+            items = self._fallback_items
             if not items:
                 return None
 
@@ -215,44 +264,50 @@ class ProductMatcher:
                     best_item = item
 
             if best_item and best_score >= 0.45:
-                nut = db.query(Nutrition).filter(Nutrition.food_id == best_item.food_id).first()
-                h = db.query(HealthIndicators).filter(HealthIndicators.food_id == best_item.food_id).first()
+                db = SessionLocal()
+                try:
+                    nut = db.query(Nutrition).filter(Nutrition.food_id == best_item.food_id).first()
+                    h = db.query(HealthIndicators).filter(HealthIndicators.food_id == best_item.food_id).first()
 
-                return {
-                    "food_id": best_item.food_id,
-                    "matched_name": best_item.canonical_name,
-                    "display_name": best_item.display_name,
-                    "category": best_item.category,
-                    "subcategory": best_item.subcategory,
-                    "serving_size": float(best_item.serving_size) if best_item.serving_size else None,
-                    "serving_unit": best_item.serving_unit,
-                    "nutrition": {
-                        "calories_kcal": float(nut.calories_kcal) if nut and nut.calories_kcal is not None else None,
-                        "protein_g": float(nut.protein_g) if nut and nut.protein_g is not None else None,
-                        "carbohydrates_g": float(nut.carbohydrates_g) if nut and nut.carbohydrates_g is not None else None,
-                        "fat_g": float(nut.fat_g) if nut and nut.fat_g is not None else None,
-                        "fiber_g": float(nut.fiber_g) if nut and nut.fiber_g is not None else None,
-                        "sugar_g": float(nut.sugar_g) if nut and nut.sugar_g is not None else None,
-                    },
-                    "health": {
-                        "health_score": h.health_score if h else None,
-                        "is_processed": h.is_processed if h else False,
+                    return {
+                        "food_id": best_item.food_id,
+                        "matched_name": best_item.canonical_name,
+                        "display_name": best_item.display_name,
+                        "category": best_item.category,
+                        "subcategory": best_item.subcategory,
+                        "serving_size": float(best_item.serving_size) if best_item.serving_size else None,
+                        "serving_unit": best_item.serving_unit,
+                        "nutrition": {
+                            "calories_kcal": float(nut.calories_kcal) if nut and nut.calories_kcal is not None else None,
+                            "protein_g": float(nut.protein_g) if nut and nut.protein_g is not None else None,
+                            "carbohydrates_g": float(nut.carbohydrates_g) if nut and nut.carbohydrates_g is not None else None,
+                            "fat_g": float(nut.fat_g) if nut and nut.fat_g is not None else None,
+                            "fiber_g": float(nut.fiber_g) if nut and nut.fiber_g is not None else None,
+                            "sugar_g": float(nut.sugar_g) if nut and nut.sugar_g is not None else None,
+                        },
+                        "health": {
+                            "health_score": h.health_score if h else None,
+                            "is_processed": h.is_processed if h else False,
+                        }
                     }
-                }
+                finally:
+                    db.close()
 
             return None
         except Exception as e:
             logger.error(f"Error in _match_sqlite for '{original_name}': {e}")
             return None
-        finally:
-            db.close()
 
-    def _match_pg_trgm(self, original_name: str, normalized_query: str, threshold: float):
+    def _match_pg_trgm(self, original_name: str, normalized_query: str, threshold: float, db=None):
         """
         Use PostgreSQL pg_trgm to find the best matching food item.
         Joins nutrition + healthindicators to return rich data.
         """
-        db = SessionLocal()
+        local_db = None
+        session = db
+        if session is None:
+            local_db = SessionLocal()
+            session = local_db
         try:
             sql = text("""
                 SELECT
@@ -296,7 +351,7 @@ class ProductMatcher:
                 LIMIT 1
             """)
 
-            result = db.execute(sql, {"query": normalized_query, "threshold": threshold}).fetchone()
+            result = session.execute(sql, {"query": normalized_query, "threshold": threshold}).fetchone()
 
             if not result:
                 logger.debug(f"No pg_trgm match for '{original_name}' (normalized: '{normalized_query}')")
@@ -312,7 +367,11 @@ class ProductMatcher:
             logger.error(f"Error matching item '{original_name}': {e}")
             return None
         finally:
-            db.close()
+            if local_db is not None:
+                try:
+                    local_db.close()
+                except Exception:
+                    pass
 
     def _match_semantic(self, original_name: str, normalized_query: str, threshold: float = 0.4):
         """Fallback: in-memory Semantic NLP matching."""

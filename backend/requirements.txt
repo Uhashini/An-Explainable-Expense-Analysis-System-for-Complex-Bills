@@ -21,3 +21,4 @@ email-validator
 statsmodels
 scikit-learn
 pandas
+google-auth

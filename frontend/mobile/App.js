@@ -12,16 +12,16 @@ import InsightsIcon from './assets/icons/insights.svg';
 import ProfileIcon from './assets/icons/profile.svg';
 import { useFonts, PlusJakartaSans_400Regular, PlusJakartaSans_600SemiBold, PlusJakartaSans_700Bold } from '@expo-google-fonts/plus-jakarta-sans';
 
-// â”€â”€ Auth Screens â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Auth Screens ────────────────────────────────────────────────────────────
 import LandingScreen from './screens/LandingScreen';
 import SignInScreen from './screens/SignInScreen';
 import SignUpScreen from './screens/SignUpScreen';
 
-// â”€â”€ Onboarding Screens â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Onboarding Screens ──────────────────────────────────────────────────────
 import PersonalInfoScreen from './screens/OnboardingFlowScreen';
 import GoalsScreen from './screens/GoalsScreen';
 
-// â”€â”€ Main App Screens â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Main App Screens ────────────────────────────────────────────────────────
 import DashboardScreen from './screens/DashboardScreen';
 import ReceiptHistoryScreen from './screens/ReceiptHistoryScreen';
 import UploadReceiptScreen from './screens/UploadReceiptScreen';
@@ -43,7 +43,7 @@ import { COLORS, FONTS } from './theme';
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
-// â”€â”€â”€ Tab Icons â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Tab Icons ───────────────────────────────────────────────────────────────
 const TAB_ICONS = {
   Home: HomeIcon,
   Receipts: ReceiptIcon,
@@ -52,7 +52,7 @@ const TAB_ICONS = {
   Profile: ProfileIcon,
 };
 
-// â”€â”€â”€ Custom Tab Bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Custom Tab Bar ──────────────────────────────────────────────────────────
 function CustomTabBar({ state, descriptors, navigation }) {
   const insets = useSafeAreaInsets();
 
@@ -167,6 +167,7 @@ const tabStyles = StyleSheet.create({
     letterSpacing: 0.3,
   },
 });
+
 
 // â”€â”€â”€ Receipt Stack (Nested in Tabs) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const ReceiptStack = createNativeStackNavigator();

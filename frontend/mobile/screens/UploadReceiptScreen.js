@@ -82,7 +82,12 @@ export default function UploadReceiptScreen({ navigation }) {
         const blob = await blobResponse.blob();
         formData.append('file', blob, 'receipt.jpg');
         const res = await fetch(uploadUrl, { method: 'POST', body: formData });
-        responseData = await res.json();
+        const text = await res.text();
+        try {
+          responseData = JSON.parse(text);
+        } catch {
+          responseData = { detail: text };
+        }
         if (!res.ok) throw new Error(responseData.detail || `Server error ${res.status}`);
       } else {
         // Use native XMLHttpRequest for mobile — correctly streams binary files via Android/iOS OkHttp

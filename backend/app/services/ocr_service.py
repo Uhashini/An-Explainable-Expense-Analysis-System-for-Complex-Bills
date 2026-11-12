@@ -47,7 +47,7 @@ class OCRService:
             orig_h, orig_w = img.shape[:2]
 
             # Resize large images to dramatically speed up PaddleOCR on CPU
-            max_dim = 1200
+            max_dim = 1000
             if max(orig_h, orig_w) > max_dim:
                 scale = max_dim / max(orig_h, orig_w)
                 new_width = int(orig_w * scale)

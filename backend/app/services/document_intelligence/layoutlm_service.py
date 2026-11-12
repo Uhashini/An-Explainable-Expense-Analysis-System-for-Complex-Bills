@@ -76,7 +76,7 @@ class LayoutLMService:
                 boxes=boxes, 
                 return_tensors="pt", 
                 truncation=True, 
-                padding="max_length"
+                padding=True
             )
             
             # Move to device
