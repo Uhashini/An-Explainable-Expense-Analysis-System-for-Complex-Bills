@@ -1,5 +1,14 @@
 """Configuration settings for the Smart Receipt Analysis system."""
 
+import os
+from dotenv import load_dotenv
+
+# Resolve absolute path to backend/.env
+backend_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+env_file_path = os.path.join(backend_dir, ".env")
+if os.path.exists(env_file_path):
+    load_dotenv(env_file_path)
+
 try:
     from pydantic_settings import BaseSettings
 except ImportError:
@@ -43,6 +52,9 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30  # 30 days
 
+    # Google OAuth Configuration
+    GOOGLE_CLIENT_ID: Optional[str] = None
+
     # Feature Flags
     ENABLE_RECIPE_ASSISTANT: bool = True
     ENABLE_CHATBOT: bool = True
@@ -73,11 +85,17 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
 
     model_config = {
-        "env_file": ".env",
+        "env_file": env_file_path if os.path.exists(env_file_path) else ".env",
         "env_file_encoding": "utf-8",
         "case_sensitive": True,
         "extra": "ignore",
     }
+
+    class Config:
+        env_file = env_file_path if os.path.exists(env_file_path) else ".env"
+        env_file_encoding = "utf-8"
+        case_sensitive = True
+        extra = "ignore"
 
 
 settings = Settings()
