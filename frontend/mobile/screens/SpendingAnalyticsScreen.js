@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   RefreshControl,
   Dimensions,
+  Platform,
 } from 'react-native';
 import Svg, {
   Path,
@@ -19,6 +20,7 @@ import Svg, {
   Line,
 } from 'react-native-svg';
 import { Feather } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import ScreenLayout from '../components/ScreenLayout';
 import ErrorBoundary from '../components/ErrorBoundary';
@@ -29,7 +31,6 @@ import { getUser } from '../utils/authStorage';
 const STORAGE_BUDGET_KEY = 'PANTRIX_MONTHLY_BUDGET';
 const DEFAULT_BUDGET = 6000;
 const screenWidth = Dimensions.get('window').width;
-
 const BUDGET_PRESETS = [3000, 5000, 6000, 8000, 10000];
 
 function parseSafeDate(dateStr) {
@@ -37,11 +38,9 @@ function parseSafeDate(dateStr) {
   const trimmed = dateStr.trim();
   if (trimmed.toLowerCase().includes('unknown')) return null;
 
-  // Try standard parse
   const d = new Date(trimmed);
   if (!isNaN(d.getTime())) return d;
 
-  // Try DD/MM/YYYY or DD-MM-YYYY
   const dmyMatch = trimmed.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
   if (dmyMatch) {
     const day = parseInt(dmyMatch[1], 10);
@@ -50,7 +49,6 @@ function parseSafeDate(dateStr) {
     const custom = new Date(year, month, day);
     if (!isNaN(custom.getTime())) return custom;
   }
-
   return null;
 }
 
@@ -59,7 +57,8 @@ function SpendingAnalyticsContent({ navigation }) {
   const [monthlyBudget, setMonthlyBudget] = useState(DEFAULT_BUDGET);
   const [isEditingBudget, setIsEditingBudget] = useState(false);
   const [budgetInput, setBudgetInput] = useState(String(DEFAULT_BUDGET));
-  const [receipts, setReceipts] = useState([]);
+  const [spendingData, setSpendingData] = useState(null);
+  const [rawReceipts, setRawReceipts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedPoint, setSelectedPoint] = useState(null);
@@ -82,34 +81,59 @@ function SpendingAnalyticsContent({ navigation }) {
     })();
   }, []);
 
-  // Fetch receipts from backend
-  const fetchReceipts = useCallback(async () => {
+  // Fetch receipts and real analytics from backend
+  const fetchSpendingAnalytics = useCallback(async () => {
     try {
       const user = await getUser();
       const userId = user?.id || 1;
-      const res = await fetch(`${API_BASE_URL}/receipts/user/${userId}`);
-      const data = await res.json();
-      if (res.ok && data && Array.isArray(data.receipts)) {
-        setReceipts(data.receipts);
+
+      // 1. Try dedicated spending analytics endpoint
+      try {
+        const res = await fetch(`${API_BASE_URL}/analytics/spending/${userId}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.status === 'success') {
+            setSpendingData(data);
+            setIsLoading(false);
+            setIsRefreshing(false);
+            return;
+          }
+        }
+      } catch (err) {
+        console.log('Spending endpoint fetch notice:', err);
+      }
+
+      // 2. Fallback: fetch raw receipts list
+      const recRes = await fetch(`${API_BASE_URL}/receipts/user/${userId}`);
+      if (recRes.ok) {
+        const recData = await recRes.json();
+        if (recData && Array.isArray(recData.receipts)) {
+          setRawReceipts(recData.receipts);
+        } else {
+          setRawReceipts([]);
+        }
       } else {
-        setReceipts([]);
+        setRawReceipts([]);
       }
     } catch (e) {
-      console.warn('Could not fetch user receipts, using default analytics:', e);
-      setReceipts([]);
+      console.warn('Could not fetch user receipts/analytics:', e);
+      setRawReceipts([]);
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
     }
   }, []);
 
-  useEffect(() => {
-    fetchReceipts();
-  }, [fetchReceipts]);
+  // Re-fetch automatically whenever the screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      fetchSpendingAnalytics();
+    }, [fetchSpendingAnalytics])
+  );
 
   const onRefresh = () => {
     setIsRefreshing(true);
-    fetchReceipts();
+    fetchSpendingAnalytics();
   };
 
   const handleSaveBudget = async () => {
@@ -128,7 +152,18 @@ function SpendingAnalyticsContent({ navigation }) {
     }
   };
 
-  // ─── Cumulative Financial Calculations (Rock Solid) ─────────────────────────
+  // Determine if user has actual receipt data
+  const hasData = useMemo(() => {
+    if (spendingData && spendingData.has_data && spendingData.total_receipts > 0) {
+      return true;
+    }
+    if (rawReceipts && rawReceipts.length > 0) {
+      return true;
+    }
+    return false;
+  }, [spendingData, rawReceipts]);
+
+  // Rock-solid calculations
   const analytics = useMemo(() => {
     const now = new Date();
     const currentYear = now.getFullYear();
@@ -141,22 +176,87 @@ function SpendingAnalyticsContent({ navigation }) {
         ? monthlyBudget
         : DEFAULT_BUDGET;
 
-    const safeReceipts = Array.isArray(receipts) ? receipts : [];
+    // If we have backend spending data with receipts
+    if (spendingData && spendingData.has_data && spendingData.total_receipts > 0) {
+      const isMonth = timeFilter === 'This Month';
+      const currentSpend = isMonth ? spendingData.this_month_spend : spendingData.total_spend;
+      const totalSpend = spendingData.total_spend;
+      const trips = isMonth ? spendingData.this_month_receipts : spendingData.total_receipts;
+      const remaining = safeBudget - currentSpend;
+      const rawPct = safeBudget > 0 ? (currentSpend / safeBudget) * 100 : 0;
+      const clampedPct = Math.min(Math.max(rawPct, 0), 100);
 
-    let totalSpend = 0;
-    let thisMonthSpend = 0;
-    let thisMonthCount = 0;
+      const dailyBurn = isMonth ? spendingData.daily_burn : Math.round(totalSpend / Math.max(1, trips * 4));
+      const projected = Math.round(dailyBurn * daysInMonth);
 
-    const parsedPoints = [];
+      let statColor = '#2E7D32';
+      let statTxt = 'On Track';
+      let statBg = 'rgba(46, 125, 50, 0.12)';
+      if (rawPct > 100) {
+        statColor = '#D32F2F';
+        statTxt = 'Exceeded';
+        statBg = 'rgba(211, 47, 47, 0.12)';
+      } else if (rawPct >= 85) {
+        statColor = '#E65100';
+        statTxt = 'Near Limit';
+        statBg = 'rgba(230, 81, 0, 0.12)';
+      } else if (rawPct >= 65) {
+        statColor = '#F57C00';
+        statTxt = 'Moderate';
+        statBg = 'rgba(245, 124, 0, 0.12)';
+      }
 
-    if (safeReceipts.length > 0) {
-      // Sort oldest to newest for cumulative accumulation
-      const sorted = [...safeReceipts].sort((a, b) => {
+      const rawTimeline = isMonth
+        ? spendingData.timeline_this_month || []
+        : spendingData.timeline_all || [];
+
+      let timelinePoints = [...rawTimeline];
+      if (timelinePoints.length === 1) {
+        timelinePoints = [
+          { id: 0, date: 'Start', merchant: 'Initial', amount: 0, cumulative: 0, is_this_month: true },
+          timelinePoints[0],
+        ];
+      }
+
+      const categories = isMonth
+        ? spendingData.categories_this_month && spendingData.categories_this_month.length > 0
+          ? spendingData.categories_this_month
+          : spendingData.categories_all || []
+        : spendingData.categories_all || [];
+
+      const avgBasket = trips > 0 ? Math.round(currentSpend / trips) : spendingData.avg_basket || 0;
+
+      return {
+        monthlyBudget: safeBudget,
+        currentSpend,
+        totalSpend,
+        remaining,
+        utilizationPct: clampedPct,
+        rawPct: Math.round(rawPct),
+        statusColor: statColor,
+        statusText: statTxt,
+        statusBg: statBg,
+        burnRate: dailyBurn,
+        projectedMonthEnd: projected,
+        timelinePoints,
+        avgBasket,
+        tripCount: trips,
+        categories,
+        aiTip: spendingData.ai_tip,
+      };
+    }
+
+    // Client-side fallback if raw receipts exist
+    if (rawReceipts && rawReceipts.length > 0) {
+      let totalSpend = 0;
+      let thisMonthSpend = 0;
+      let thisMonthCount = 0;
+      const parsedPoints = [];
+
+      const sorted = [...rawReceipts].sort((a, b) => {
         const dA = parseSafeDate(a.date);
         const dB = parseSafeDate(b.date);
-        const tA = dA ? dA.getTime() : 0;
-        const tB = dB ? dB.getTime() : 0;
-        return tA - tB;
+        return (dA ? dA.getTime() : 0) - (dB ? dB.getTime() : 0);
       });
 
       let rolling = 0;
@@ -167,7 +267,6 @@ function SpendingAnalyticsContent({ navigation }) {
 
         let isThisMonth = false;
         let dateLabel = `Trip ${idx + 1}`;
-
         const parsedDate = parseSafeDate(r.date);
         if (parsedDate) {
           dateLabel = parsedDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
@@ -187,97 +286,89 @@ function SpendingAnalyticsContent({ navigation }) {
           isThisMonth,
         });
       });
-    }
 
-    let activePoints = parsedPoints;
-    if (timeFilter === 'This Month') {
-      const filtered = parsedPoints.filter((p) => p.isThisMonth);
-      if (filtered.length > 0) {
-        activePoints = filtered;
-      } else if (parsedPoints.length > 0) {
-        // If current month has no receipts yet, display all available receipts with helpful banner
-        activePoints = parsedPoints;
-        thisMonthSpend = totalSpend;
-        thisMonthCount = parsedPoints.length;
+      let activePoints = parsedPoints;
+      if (timeFilter === 'This Month') {
+        const filtered = parsedPoints.filter((p) => p.isThisMonth);
+        activePoints = filtered.length > 0 ? filtered : parsedPoints;
       }
+
+      if (activePoints.length === 1) {
+        activePoints = [
+          { id: 0, date: 'Start', merchant: 'Initial', amount: 0, cumulative: 0, isThisMonth: true },
+          activePoints[0],
+        ];
+      }
+
+      const currentSpend = timeFilter === 'This Month' ? thisMonthSpend : totalSpend;
+      const remaining = safeBudget - currentSpend;
+      const rawPct = safeBudget > 0 ? (currentSpend / safeBudget) * 100 : 0;
+      const clampedPct = Math.min(Math.max(rawPct, 0), 100);
+      const dailyBurn = Math.round(currentSpend / currentDay);
+      const projected = Math.round(dailyBurn * daysInMonth);
+
+      let statColor = '#2E7D32';
+      let statTxt = 'On Track';
+      let statBg = 'rgba(46, 125, 50, 0.12)';
+      if (rawPct > 100) {
+        statColor = '#D32F2F';
+        statTxt = 'Exceeded';
+        statBg = 'rgba(211, 47, 47, 0.12)';
+      } else if (rawPct >= 85) {
+        statColor = '#E65100';
+        statTxt = 'Near Limit';
+        statBg = 'rgba(230, 81, 0, 0.12)';
+      } else if (rawPct >= 65) {
+        statColor = '#F57C00';
+        statTxt = 'Moderate';
+        statBg = 'rgba(245, 124, 0, 0.12)';
+      }
+
+      const trips = timeFilter === 'This Month' ? thisMonthCount : sorted.length;
+      const avgBasket = trips > 0 ? Math.round(currentSpend / trips) : currentSpend;
+
+      return {
+        monthlyBudget: safeBudget,
+        currentSpend,
+        totalSpend,
+        remaining,
+        utilizationPct: clampedPct,
+        rawPct: Math.round(rawPct),
+        statusColor: statColor,
+        statusText: statTxt,
+        statusBg: statBg,
+        burnRate: dailyBurn,
+        projectedMonthEnd: projected,
+        timelinePoints: activePoints,
+        avgBasket,
+        tripCount: trips,
+        categories: [],
+        aiTip: `You have tracked ${trips} receipt${trips > 1 ? 's' : ''}. Keep uploading to unlock full category intelligence!`,
+      };
     }
 
-    // Baseline fallback if user has 0 receipts
-    if (activePoints.length === 0) {
-      thisMonthSpend = 4280;
-      totalSpend = 4280;
-      thisMonthCount = 6;
-      activePoints = [
-        { id: 1, date: '2 Apr', merchant: 'Reliance Fresh', amount: 620, cumulative: 620, isThisMonth: true },
-        { id: 2, date: '6 Apr', merchant: 'Nature Basket', amount: 940, cumulative: 1560, isThisMonth: true },
-        { id: 3, date: '11 Apr', merchant: 'Local Mart', amount: 510, cumulative: 2070, isThisMonth: true },
-        { id: 4, date: '16 Apr', merchant: 'BigBasket', amount: 890, cumulative: 2960, isThisMonth: true },
-        { id: 5, date: '21 Apr', merchant: 'Reliance Smart', amount: 720, cumulative: 3680, isThisMonth: true },
-        { id: 6, date: '25 Apr', merchant: 'Organic Store', amount: 600, cumulative: 4280, isThisMonth: true },
-      ];
-    } else if (activePoints.length === 1) {
-      const single = activePoints[0];
-      activePoints = [
-        { id: 0, date: 'Start', merchant: 'Initial', amount: 0, cumulative: 0, isThisMonth: true },
-        single,
-      ];
-    }
-
-    const currentSpend = timeFilter === 'This Month' ? thisMonthSpend : totalSpend;
-    const remaining = safeBudget - currentSpend;
-    const rawPct = safeBudget > 0 ? (currentSpend / safeBudget) * 100 : 0;
-    const clampedPct = Math.min(Math.max(rawPct, 0), 100);
-
-    const dailyBurn = Math.round(currentSpend / currentDay);
-    const projected = Math.round(dailyBurn * daysInMonth);
-
-    let statColor = '#2E7D32';
-    let statTxt = 'On Track';
-    let statBg = 'rgba(46, 125, 50, 0.12)';
-    if (rawPct > 100) {
-      statColor = '#D32F2F';
-      statTxt = 'Exceeded';
-      statBg = 'rgba(211, 47, 47, 0.12)';
-    } else if (rawPct >= 85) {
-      statColor = '#E65100';
-      statTxt = 'Near Limit';
-      statBg = 'rgba(230, 81, 0, 0.12)';
-    } else if (rawPct >= 65) {
-      statColor = '#F57C00';
-      statTxt = 'Moderate';
-      statBg = 'rgba(245, 124, 0, 0.12)';
-    }
-
-    const categories = [
-      { label: 'Fresh Produce & Fruits', pct: 28, amount: Math.round(currentSpend * 0.28), color: '#388E3C' },
-      { label: 'Dairy & Farm Eggs', pct: 24, amount: Math.round(currentSpend * 0.24), color: COLORS.secondary },
-      { label: 'Meat & High Protein', pct: 22, amount: Math.round(currentSpend * 0.22), color: COLORS.primary },
-      { label: 'Pantry, Flours & Grains', pct: 16, amount: Math.round(currentSpend * 0.16), color: '#F57C00' },
-      { label: 'Snacks & Beverages', pct: 10, amount: Math.round(currentSpend * 0.10), color: '#8E24AA' },
-    ];
-
-    const trips = thisMonthCount > 0 ? thisMonthCount : activePoints.length;
-    const avgBasket = trips > 0 ? Math.round(currentSpend / trips) : currentSpend;
-
+    // Default 0-data object for new user (NO FAKE DATA)
     return {
       monthlyBudget: safeBudget,
-      currentSpend,
-      totalSpend,
-      remaining,
-      utilizationPct: clampedPct,
-      statusColor: statColor,
-      statusText: statTxt,
-      statusBg: statBg,
-      burnRate: dailyBurn,
-      projectedMonthEnd: projected,
-      timelinePoints: activePoints,
-      avgBasket,
-      tripCount: trips,
-      categories,
+      currentSpend: 0,
+      totalSpend: 0,
+      remaining: safeBudget,
+      utilizationPct: 0,
+      rawPct: 0,
+      statusColor: '#2E7D32',
+      statusText: 'No Data',
+      statusBg: 'rgba(46, 125, 50, 0.12)',
+      burnRate: 0,
+      projectedMonthEnd: 0,
+      timelinePoints: [],
+      avgBasket: 0,
+      tripCount: 0,
+      categories: [],
+      aiTip: null,
     };
-  }, [receipts, monthlyBudget, timeFilter]);
+  }, [spendingData, rawReceipts, monthlyBudget, timeFilter]);
 
-  // ─── SVG Chart Coordinates (Safe & Clamped) ─────────────────────────────────
+  // SVG Chart Coordinates (Safe & Clamped)
   const chartHeight = 150;
   const chartWidth = Math.max(screenWidth - 68, 280);
   const paddingBottom = 20;
@@ -334,26 +425,28 @@ function SpendingAnalyticsContent({ navigation }) {
           <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} colors={[COLORS.primary]} />
         }
       >
-        {/* ─── 1. Monthly Budget Hub ─── */}
+        {/* ─── 1. Monthly Budget Hub (Always available to set goals) ─── */}
         <View style={styles.budgetCard}>
           <View style={styles.budgetCardTop}>
             <View style={styles.budgetTitleRow}>
               <View style={[styles.iconPill, { backgroundColor: '#FBEBEB' }]}>
-                <Feather name="target" size={16} color={COLORS.primary} />
+                <Feather name="target" size={17} color={COLORS.primary} />
               </View>
               <View>
-                <Text style={styles.budgetHeaderTitle}>Monthly Budget</Text>
-                <Text style={styles.budgetHeaderSubtitle}>Active Grocery Spending Goal</Text>
+                <Text style={styles.budgetHeaderTitle}>Monthly Budget Goal</Text>
+                <Text style={styles.budgetHeaderSubtitle}>Active Grocery Spending Target</Text>
               </View>
             </View>
 
             <View style={styles.budgetHeaderRight}>
-              <View style={[styles.statusBadge, { backgroundColor: analytics.statusBg }]}>
-                <View style={[styles.statusDot, { backgroundColor: analytics.statusColor }]} />
-                <Text style={[styles.statusBadgeText, { color: analytics.statusColor }]}>
-                  {analytics.statusText}
-                </Text>
-              </View>
+              {hasData && (
+                <View style={[styles.statusBadge, { backgroundColor: analytics.statusBg }]}>
+                  <View style={[styles.statusDot, { backgroundColor: analytics.statusColor }]} />
+                  <Text style={[styles.statusBadgeText, { color: analytics.statusColor }]}>
+                    {analytics.statusText}
+                  </Text>
+                </View>
+              )}
               <TouchableOpacity
                 style={styles.editBudgetPill}
                 onPress={() => {
@@ -362,7 +455,7 @@ function SpendingAnalyticsContent({ navigation }) {
                 }}
                 activeOpacity={0.7}
               >
-                <Feather name="edit-2" size={13} color={COLORS.primary} />
+                <Feather name={isEditingBudget ? 'x' : 'edit-2'} size={13} color={COLORS.primary} />
                 <Text style={styles.editBudgetText}>{isEditingBudget ? 'Close' : 'Set Budget'}</Text>
               </TouchableOpacity>
             </View>
@@ -371,7 +464,7 @@ function SpendingAnalyticsContent({ navigation }) {
           {/* Inline Budget Quick Editor */}
           {isEditingBudget && (
             <View style={styles.budgetEditorBox}>
-              <Text style={styles.editorBoxTitle}>Set Your Monthly Budget Target</Text>
+              <Text style={styles.editorBoxTitle}>Configure Monthly Grocery Target</Text>
               <View style={styles.editorInputRow}>
                 <Text style={styles.currencyPrefix}>₹</Text>
                 <TextInput
@@ -410,334 +503,426 @@ function SpendingAnalyticsContent({ navigation }) {
             </View>
           )}
 
-          {/* Large Budget Numbers */}
-          <View style={styles.numbersGrid}>
-            <View>
-              <Text style={styles.numLabel}>Spent This Period</Text>
-              <Text style={styles.numLarge}>₹{analytics.currentSpend.toLocaleString('en-IN')}</Text>
-              <Text style={styles.numSub}>of ₹{analytics.monthlyBudget.toLocaleString('en-IN')} Target</Text>
-            </View>
-            <View style={styles.numRightBox}>
-              <Text style={styles.numLabel}>Remaining Budget</Text>
-              <Text style={[styles.numLarge, { color: analytics.remaining >= 0 ? '#2E7D32' : '#D32F2F' }]}>
-                {analytics.remaining >= 0
-                  ? `₹${analytics.remaining.toLocaleString('en-IN')}`
-                  : `-₹${Math.abs(analytics.remaining).toLocaleString('en-IN')}`}
-              </Text>
-              <Text style={styles.numSub}>
-                {analytics.remaining >= 0 ? 'Left to spend' : 'Over budget'}
-              </Text>
-            </View>
-          </View>
-
-          {/* Progress Bar */}
-          <View style={styles.progressContainer}>
-            <View style={styles.progressTrack}>
-              <View
-                style={[
-                  styles.progressFill,
-                  { width: `${analytics.utilizationPct}%`, backgroundColor: analytics.statusColor },
-                ]}
-              />
-            </View>
-            <View style={styles.progressMetaRow}>
-              <Text style={styles.metaPct}>{Math.round(analytics.utilizationPct)}% Utilized</Text>
-              <Text style={styles.metaPace}>
-                {analytics.projectedMonthEnd > analytics.monthlyBudget
-                  ? `Pacing ₹${analytics.projectedMonthEnd.toLocaleString('en-IN')} (Over)`
-                  : `Pacing ₹${analytics.projectedMonthEnd.toLocaleString('en-IN')} (Safe)`}
-              </Text>
-            </View>
-          </View>
-
-          {/* Daily Burn Rate Banner */}
-          <View style={styles.burnRateRow}>
-            <View style={styles.burnItem}>
-              <Feather name="activity" size={14} color={COLORS.mutedText} style={{ marginRight: 6 }} />
-              <Text style={styles.burnText}>Burn Rate: <Text style={styles.burnBold}>₹{analytics.burnRate}/day</Text></Text>
-            </View>
-            <View style={styles.burnDivider} />
-            <View style={styles.burnItem}>
-              <Feather name="shopping-bag" size={14} color={COLORS.mutedText} style={{ marginRight: 6 }} />
-              <Text style={styles.burnText}>Avg Run: <Text style={styles.burnBold}>₹{analytics.avgBasket}</Text></Text>
-            </View>
-          </View>
-        </View>
-
-        {/* ─── 2. Cumulative Financial Spending Trends ─── */}
-        <View style={styles.sectionCard}>
-          <View style={styles.sectionHeader}>
-            <View style={{ flex: 1, paddingRight: 8 }}>
-              <Text style={styles.sectionTitle}>Cumulative Financial Trends</Text>
-              <Text style={styles.sectionSubtitle}>
-                Progression of total grocery expenses adding up over time
-              </Text>
-            </View>
-            <View style={styles.filterPillGroup}>
-              {['All Receipts', 'This Month'].map((opt) => (
-                <TouchableOpacity
-                  key={opt}
-                  style={[styles.filterPill, timeFilter === opt && styles.filterPillActive]}
-                  onPress={() => {
-                    setTimeFilter(opt);
-                    setSelectedPoint(null);
-                  }}
-                  activeOpacity={0.8}
-                >
-                  <Text
-                    style={[
-                      styles.filterPillText,
-                      timeFilter === opt && styles.filterPillTextActive,
-                    ]}
-                  >
-                    {opt}
+          {/* If user has data, show live numbers */}
+          {hasData ? (
+            <>
+              {/* Large Budget Numbers */}
+              <View style={styles.numbersGrid}>
+                <View>
+                  <Text style={styles.numLabel}>Spent This Period</Text>
+                  <Text style={styles.numLarge}>₹{analytics.currentSpend.toLocaleString('en-IN')}</Text>
+                  <Text style={styles.numSub}>of ₹{analytics.monthlyBudget.toLocaleString('en-IN')} Target</Text>
+                </View>
+                <View style={styles.numRightBox}>
+                  <Text style={styles.numLabel}>Remaining Budget</Text>
+                  <Text style={[styles.numLarge, { color: analytics.remaining >= 0 ? '#2E7D32' : '#D32F2F' }]}>
+                    {analytics.remaining >= 0
+                      ? `₹${analytics.remaining.toLocaleString('en-IN')}`
+                      : `-₹${Math.abs(analytics.remaining).toLocaleString('en-IN')}`}
                   </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
-          {/* Interactive Tooltip Card if point is clicked */}
-          {selectedPoint && (
-            <View style={styles.pointTooltip}>
-              <View style={styles.tooltipIconBox}>
-                <Feather name="check-circle" size={14} color={COLORS.primary} />
+                  <Text style={styles.numSub}>
+                    {analytics.remaining >= 0 ? 'Left to spend' : 'Over budget limit'}
+                  </Text>
+                </View>
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.tooltipStore}>{selectedPoint.merchant}</Text>
-                <Text style={styles.tooltipDate}>
-                  {selectedPoint.date} • Run: ₹{selectedPoint.amount.toLocaleString('en-IN')}
-                </Text>
-              </View>
-              <View style={{ alignItems: 'flex-end' }}>
-                <Text style={styles.tooltipCumLabel}>Cumulative</Text>
-                <Text style={styles.tooltipCumVal}>₹{selectedPoint.cumulative.toLocaleString('en-IN')}</Text>
-              </View>
-            </View>
-          )}
 
-          {/* SVG Cumulative Graph */}
-          {isLoading ? (
-            <View style={[styles.chartContainer, { justifyContent: 'center' }]}>
-              <ActivityIndicator size="small" color={COLORS.primary} />
-            </View>
-          ) : (
-            <View style={styles.chartWrapper}>
-              <View style={styles.chartContainer}>
-                <Svg width={chartWidth} height={chartHeight}>
-                  <Defs>
-                    <LinearGradient id="cumGradient" x1="0" y1="0" x2="0" y2="1">
-                      <Stop offset="0%" stopColor={COLORS.primary} stopOpacity="0.22" />
-                      <Stop offset="80%" stopColor={COLORS.primary} stopOpacity="0.04" />
-                      <Stop offset="100%" stopColor={COLORS.primary} stopOpacity="0.0" />
-                    </LinearGradient>
-                  </Defs>
-
-                  {/* Baseline grid */}
-                  <Line
-                    x1={0}
-                    y1={chartHeight - paddingBottom}
-                    x2={chartWidth}
-                    y2={chartHeight - paddingBottom}
-                    stroke="#E8DFD8"
-                    strokeWidth={1}
-                  />
-
-                  {/* Dashed Target Monthly Budget Line */}
-                  {chartData.budgetLineY > 10 && chartData.budgetLineY < chartHeight - paddingBottom ? (
-                    <Line
-                      x1={0}
-                      y1={chartData.budgetLineY}
-                      x2={chartWidth}
-                      y2={chartData.budgetLineY}
-                      stroke="#c0392b"
-                      strokeWidth={1.5}
-                      strokeDasharray={[4, 4]}
-                      strokeOpacity={0.6}
-                    />
-                  ) : null}
-
-                  {/* Area Gradient */}
-                  {chartData.areaD ? <Path d={chartData.areaD} fill="url(#cumGradient)" /> : null}
-
-                  {/* Line Path */}
-                  {chartData.pathD ? (
-                    <Path
-                      d={chartData.pathD}
-                      fill="none"
-                      stroke={COLORS.primary}
-                      strokeWidth={2.8}
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  ) : null}
-
-                  {/* Point Circles */}
-                  {chartData.coords.map((pt, i) => {
-                    const isSel = selectedPoint?.id === pt.id;
-                    return (
-                      <Circle
-                        key={`pt-${pt.id || i}`}
-                        cx={pt.x}
-                        cy={pt.y}
-                        r={isSel ? 6 : 4}
-                        fill="#FFFFFF"
-                        stroke={isSel ? COLORS.primary : '#A50000'}
-                        strokeWidth={isSel ? 3 : 2}
-                      />
-                    );
-                  })}
-                </Svg>
-
-                {/* Target Budget Line Tag Overlay */}
-                {chartData.budgetLineY > 10 && chartData.budgetLineY < chartHeight - paddingBottom ? (
+              {/* Progress Bar */}
+              <View style={styles.progressContainer}>
+                <View style={styles.progressTrack}>
                   <View
                     style={[
-                      styles.budgetGoalLineBadge,
-                      { top: Math.max(chartData.budgetLineY - 18, 2) },
+                      styles.progressFill,
+                      { width: `${analytics.utilizationPct}%`, backgroundColor: analytics.statusColor },
                     ]}
-                  >
-                    <Text style={styles.budgetGoalLineText}>
-                      Target: ₹{analytics.monthlyBudget.toLocaleString('en-IN')}
-                    </Text>
-                  </View>
-                ) : null}
+                  />
+                </View>
+                <View style={styles.progressMetaRow}>
+                  <Text style={styles.metaPct}>{analytics.rawPct}% Utilized</Text>
+                  <Text style={styles.metaPace}>
+                    {analytics.projectedMonthEnd > analytics.monthlyBudget
+                      ? `Pacing ₹${analytics.projectedMonthEnd.toLocaleString('en-IN')} (Over)`
+                      : `Pacing ₹${analytics.projectedMonthEnd.toLocaleString('en-IN')} (Safe)`}
+                  </Text>
+                </View>
+              </View>
 
-                {/* Touch overlay hit targets */}
-                <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
-                  {chartData.coords.map((pt, i) => (
+              {/* Daily Burn Rate & Avg Basket Banner */}
+              <View style={styles.burnRateRow}>
+                <View style={styles.burnItem}>
+                  <Feather name="activity" size={14} color={COLORS.mutedText} style={{ marginRight: 6 }} />
+                  <Text style={styles.burnText}>Burn Rate: <Text style={styles.burnBold}>₹{analytics.burnRate}/day</Text></Text>
+                </View>
+                <View style={styles.burnDivider} />
+                <View style={styles.burnItem}>
+                  <Feather name="shopping-bag" size={14} color={COLORS.mutedText} style={{ marginRight: 6 }} />
+                  <Text style={styles.burnText}>Avg Run: <Text style={styles.burnBold}>₹{analytics.avgBasket}</Text></Text>
+                </View>
+              </View>
+            </>
+          ) : (
+            /* New user zero-state budget view */
+            <View style={styles.newUserBudgetNotice}>
+              <View style={styles.targetRow}>
+                <Text style={styles.targetLabel}>Target Limit:</Text>
+                <Text style={styles.targetValue}>₹{analytics.monthlyBudget.toLocaleString('en-IN')}</Text>
+              </View>
+              <Text style={styles.targetDesc}>
+                Set your monthly grocery spending limit above. As you upload receipts, your real-time spend pace and remaining balance will track here automatically.
+              </Text>
+            </View>
+          )}
+        </View>
+
+        {/* ─── 2. Conditional View: Empty State vs Full Analytics ─── */}
+        {isLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={COLORS.primary} />
+            <Text style={styles.loadingText}>Loading financial insights...</Text>
+          </View>
+        ) : !hasData ? (
+          /* ─── NEW USER EMPTY STATE (ZERO FAKE DATA) ─── */
+          <View style={styles.emptyContainer}>
+            <View style={styles.emptyCard}>
+              <View style={styles.emptyIconCircle}>
+                <Feather name="pie-chart" size={32} color={COLORS.primary} />
+              </View>
+              <Text style={styles.emptyTitle}>No Spending Insights Yet</Text>
+              <Text style={styles.emptySubtitle}>
+                Pantrix calculates your real grocery spending trends, category allocations, daily burn rate, and personalized AI tips once you scan or upload your receipts.
+              </Text>
+
+              {/* CTA Button */}
+              <TouchableOpacity
+                style={styles.emptyCtaBtn}
+                onPress={() => navigation.navigate('Scan')}
+                activeOpacity={0.88}
+              >
+                <Feather name="camera" size={18} color="#fff" style={{ marginRight: 8 }} />
+                <Text style={styles.emptyCtaText}>Scan Your First Receipt</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Feature Highlights Grid */}
+            <View style={styles.featuresSection}>
+              <Text style={styles.featuresHeader}>WHAT YOU’LL UNLOCK</Text>
+
+              <View style={styles.featureGrid}>
+                <View style={styles.featureItem}>
+                  <View style={[styles.featureIconBg, { backgroundColor: '#E8F5E9' }]}>
+                    <Feather name="trending-up" size={18} color="#2E7D32" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.featureItemTitle}>Real-Time Budget Pace</Text>
+                    <Text style={styles.featureItemDesc}>Track live burn rate and projected month-end grocery spend.</Text>
+                  </View>
+                </View>
+
+                <View style={styles.featureItem}>
+                  <View style={[styles.featureIconBg, { backgroundColor: '#E3F2FD' }]}>
+                    <Feather name="layers" size={18} color="#1565C0" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.featureItemTitle}>True Category Breakdown</Text>
+                    <Text style={styles.featureItemDesc}>Auto-categorized into produce, dairy, protein, grains, and snacks.</Text>
+                  </View>
+                </View>
+
+                <View style={styles.featureItem}>
+                  <View style={[styles.featureIconBg, { backgroundColor: '#F3E5F5' }]}>
+                    <Feather name="activity" size={18} color="#7B1FA2" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.featureItemTitle}>Cumulative Trend Timeline</Text>
+                    <Text style={styles.featureItemDesc}>Interactive graph tracking each grocery run adding up over time.</Text>
+                  </View>
+                </View>
+
+                <View style={styles.featureItem}>
+                  <View style={[styles.featureIconBg, { backgroundColor: '#FFF3E0' }]}>
+                    <Feather name="zap" size={18} color="#E65100" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.featureItemTitle}>AI Cost-Saving Swaps</Text>
+                    <Text style={styles.featureItemDesc}>Data-backed suggestions on family packs and budget-friendly staples.</Text>
+                  </View>
+                </View>
+              </View>
+            </View>
+          </View>
+        ) : (
+          /* ─── FULL ANALYTICS DASHBOARD (REAL USER DATA) ─── */
+          <>
+            {/* ─── Cumulative Financial Spending Trends ─── */}
+            <View style={styles.sectionCard}>
+              <View style={styles.sectionHeader}>
+                <View style={{ flex: 1, paddingRight: 8 }}>
+                  <Text style={styles.sectionTitle}>Cumulative Financial Trends</Text>
+                  <Text style={styles.sectionSubtitle}>
+                    Progression of total grocery expenses adding up over time
+                  </Text>
+                </View>
+                <View style={styles.filterPillGroup}>
+                  {['All Receipts', 'This Month'].map((opt) => (
                     <TouchableOpacity
-                      key={`hit-${pt.id || i}`}
-                      style={[styles.chartTouchPoint, { left: Math.max(0, pt.x - 18), top: Math.max(0, pt.y - 18) }]}
-                      onPress={() => setSelectedPoint(pt)}
-                      activeOpacity={0.6}
-                    />
+                      key={opt}
+                      style={[styles.filterPill, timeFilter === opt && styles.filterPillActive]}
+                      onPress={() => {
+                        setTimeFilter(opt);
+                        setSelectedPoint(null);
+                      }}
+                      activeOpacity={0.8}
+                    >
+                      <Text
+                        style={[
+                          styles.filterPillText,
+                          timeFilter === opt && styles.filterPillTextActive,
+                        ]}
+                      >
+                        {opt}
+                      </Text>
+                    </TouchableOpacity>
                   ))}
                 </View>
               </View>
 
-              {/* X-Axis Dates Row (100% Native Crash-Proof Text) */}
-              <View style={styles.xAxisRow}>
-                <Text style={styles.xAxisText}>{chartData.firstDate}</Text>
-                {chartData.midDate ? <Text style={styles.xAxisText}>{chartData.midDate}</Text> : null}
-                <Text style={styles.xAxisText}>{chartData.lastDate}</Text>
-              </View>
-            </View>
-          )}
-
-          <View style={styles.chartFootnote}>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendSquare, { backgroundColor: COLORS.primary }]} />
-              <Text style={styles.legendLabel}>Cumulative Spend</Text>
-            </View>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendDash, { borderColor: '#c0392b' }]} />
-              <Text style={styles.legendLabel}>Budget Goal Line</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* ─── 3. Financial Shopping Velocity ─── */}
-        <View style={styles.kpiRow}>
-          <View style={styles.kpiCard}>
-            <View style={[styles.kpiIconBox, { backgroundColor: '#E3F2FD' }]}>
-              <Feather name="shopping-bag" size={16} color="#1976D2" />
-            </View>
-            <Text style={styles.kpiValue}>₹{analytics.avgBasket.toLocaleString('en-IN')}</Text>
-            <Text style={styles.kpiLabel}>Avg Basket Value</Text>
-            <Text style={styles.kpiSub}>Across {analytics.tripCount} trips</Text>
-          </View>
-
-          <View style={styles.kpiCard}>
-            <View style={[styles.kpiIconBox, { backgroundColor: '#EDE7F6' }]}>
-              <Feather name="calendar" size={16} color="#5E35B1" />
-            </View>
-            <Text style={styles.kpiValue}>{analytics.tripCount} Trips</Text>
-            <Text style={styles.kpiLabel}>Shopping Trips</Text>
-            <Text style={styles.kpiSub}>Tracked in view</Text>
-          </View>
-
-          <View style={styles.kpiCard}>
-            <View style={[styles.kpiIconBox, { backgroundColor: '#E8F5E9' }]}>
-              <Feather name="trending-up" size={16} color="#2E7D32" />
-            </View>
-            <Text style={styles.kpiValue}>₹{analytics.totalSpend.toLocaleString('en-IN')}</Text>
-            <Text style={styles.kpiLabel}>Total Tracked</Text>
-            <Text style={styles.kpiSub}>All-time cumulative</Text>
-          </View>
-        </View>
-
-        {/* ─── 4. Cumulative Category Spending Distribution ─── */}
-        <View style={styles.sectionCard}>
-          <View style={styles.sectionHeader}>
-            <View>
-              <Text style={styles.sectionTitle}>Category Spending Distribution</Text>
-              <Text style={styles.sectionSubtitle}>
-                Where your cumulative grocery money is allocated
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.categoryList}>
-            {analytics.categories.map((item, idx) => (
-              <View key={idx} style={styles.categoryItem}>
-                <View style={styles.categoryItemTop}>
-                  <View style={styles.categoryLabelRow}>
-                    <View style={[styles.categoryColorDot, { backgroundColor: item.color }]} />
-                    <Text style={styles.categoryName}>{item.label}</Text>
+              {/* Interactive Tooltip Card if point is clicked */}
+              {selectedPoint && (
+                <View style={styles.pointTooltip}>
+                  <View style={styles.tooltipIconBox}>
+                    <Feather name="check-circle" size={14} color={COLORS.primary} />
                   </View>
-                  <View style={styles.categoryAmountRow}>
-                    <Text style={styles.categoryAmount}>₹{item.amount.toLocaleString('en-IN')}</Text>
-                    <Text style={styles.categoryPct}>({item.pct}%)</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.tooltipStore}>{selectedPoint.merchant}</Text>
+                    <Text style={styles.tooltipDate}>
+                      {selectedPoint.date} • Run: ₹{selectedPoint.amount?.toLocaleString('en-IN')}
+                    </Text>
+                  </View>
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <Text style={styles.tooltipCumLabel}>Cumulative</Text>
+                    <Text style={styles.tooltipCumVal}>₹{selectedPoint.cumulative?.toLocaleString('en-IN')}</Text>
                   </View>
                 </View>
-                <View style={styles.categoryTrack}>
-                  <View
-                    style={[
-                      styles.categoryFill,
-                      { width: `${item.pct}%`, backgroundColor: item.color },
-                    ]}
-                  />
+              )}
+
+              {/* SVG Cumulative Graph */}
+              <View style={styles.chartWrapper}>
+                <View style={styles.chartContainer}>
+                  <Svg width={chartWidth} height={chartHeight}>
+                    <Defs>
+                      <LinearGradient id="cumGradient" x1="0" y1="0" x2="0" y2="1">
+                        <Stop offset="0%" stopColor={COLORS.primary} stopOpacity="0.22" />
+                        <Stop offset="80%" stopColor={COLORS.primary} stopOpacity="0.04" />
+                        <Stop offset="100%" stopColor={COLORS.primary} stopOpacity="0.0" />
+                      </LinearGradient>
+                    </Defs>
+
+                    {/* Baseline grid */}
+                    <Line
+                      x1={0}
+                      y1={chartHeight - paddingBottom}
+                      x2={chartWidth}
+                      y2={chartHeight - paddingBottom}
+                      stroke="#E8DFD8"
+                      strokeWidth={1}
+                    />
+
+                    {/* Dashed Target Monthly Budget Line */}
+                    {chartData.budgetLineY > 10 && chartData.budgetLineY < chartHeight - paddingBottom ? (
+                      <Line
+                        x1={0}
+                        y1={chartData.budgetLineY}
+                        x2={chartWidth}
+                        y2={chartData.budgetLineY}
+                        stroke="#c0392b"
+                        strokeWidth={1.5}
+                        strokeDasharray={[4, 4]}
+                        strokeOpacity={0.6}
+                      />
+                    ) : null}
+
+                    {/* Area Gradient */}
+                    {chartData.areaD ? <Path d={chartData.areaD} fill="url(#cumGradient)" /> : null}
+
+                    {/* Line Path */}
+                    {chartData.pathD ? (
+                      <Path
+                        d={chartData.pathD}
+                        fill="none"
+                        stroke={COLORS.primary}
+                        strokeWidth={2.8}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    ) : null}
+
+                    {/* Point Circles */}
+                    {chartData.coords.map((pt, i) => {
+                      const isSel = selectedPoint?.id === pt.id;
+                      return (
+                        <Circle
+                          key={`pt-${pt.id || i}`}
+                          cx={pt.x}
+                          cy={pt.y}
+                          r={isSel ? 6 : 4}
+                          fill="#FFFFFF"
+                          stroke={isSel ? COLORS.primary : '#A50000'}
+                          strokeWidth={isSel ? 3 : 2}
+                        />
+                      );
+                    })}
+                  </Svg>
+
+                  {/* Target Budget Line Tag Overlay */}
+                  {chartData.budgetLineY > 10 && chartData.budgetLineY < chartHeight - paddingBottom ? (
+                    <View
+                      style={[
+                        styles.budgetGoalLineBadge,
+                        { top: Math.max(chartData.budgetLineY - 18, 2) },
+                      ]}
+                    >
+                      <Text style={styles.budgetGoalLineText}>
+                        Target: ₹{analytics.monthlyBudget.toLocaleString('en-IN')}
+                      </Text>
+                    </View>
+                  ) : null}
+
+                  {/* Touch overlay hit targets */}
+                  <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+                    {chartData.coords.map((pt, i) => (
+                      <TouchableOpacity
+                        key={`hit-${pt.id || i}`}
+                        style={[styles.chartTouchPoint, { left: Math.max(0, pt.x - 18), top: Math.max(0, pt.y - 18) }]}
+                        onPress={() => setSelectedPoint(pt)}
+                        activeOpacity={0.6}
+                      />
+                    ))}
+                  </View>
+                </View>
+
+                {/* X-Axis Dates Row */}
+                <View style={styles.xAxisRow}>
+                  <Text style={styles.xAxisText}>{chartData.firstDate}</Text>
+                  {chartData.midDate ? <Text style={styles.xAxisText}>{chartData.midDate}</Text> : null}
+                  <Text style={styles.xAxisText}>{chartData.lastDate}</Text>
                 </View>
               </View>
-            ))}
-          </View>
-        </View>
 
-        {/* ─── 5. Smart AI Savings Tip ─── */}
-        <View style={styles.aiTipCard}>
-          <View style={styles.aiTipHeader}>
-            <View style={styles.aiTipIconBox}>
-              <Feather name="zap" size={16} color="#B7791F" />
+              <View style={styles.chartFootnote}>
+                <View style={styles.legendItem}>
+                  <View style={[styles.legendSquare, { backgroundColor: COLORS.primary }]} />
+                  <Text style={styles.legendLabel}>Cumulative Spend</Text>
+                </View>
+                <View style={styles.legendItem}>
+                  <View style={[styles.legendDash, { borderColor: '#c0392b' }]} />
+                  <Text style={styles.legendLabel}>Budget Goal Line</Text>
+                </View>
+              </View>
             </View>
-            <Text style={styles.aiTipTitle}>AI Budget Optimization Tip</Text>
-          </View>
-          <Text style={styles.aiTipText}>
-            Based on your cumulative spending of ₹{analytics.currentSpend.toLocaleString('en-IN')}, buying staples like Grains and Cooking Oils in 5kg bulk packs can save approximately{' '}
-            <Text style={{ fontFamily: FONTS.bold, color: COLORS.primary }}>₹450–₹700</Text> before the month concludes.
-          </Text>
-        </View>
 
-        {/* ─── 6. Fast Action Buttons ─── */}
-        <View style={styles.actionRow}>
-          <TouchableOpacity
-            style={styles.scanActionBtn}
-            onPress={() => navigation.navigate('Scan')}
-            activeOpacity={0.85}
-          >
-            <Feather name="camera" size={16} color="#fff" style={{ marginRight: 8 }} />
-            <Text style={styles.scanActionBtnText}>Scan New Receipt</Text>
-          </TouchableOpacity>
+            {/* ─── Financial Shopping Velocity KPIs ─── */}
+            <View style={styles.kpiRow}>
+              <View style={styles.kpiCard}>
+                <View style={[styles.kpiIconBox, { backgroundColor: '#E3F2FD' }]}>
+                  <Feather name="shopping-bag" size={16} color="#1976D2" />
+                </View>
+                <Text style={styles.kpiValue}>₹{analytics.avgBasket.toLocaleString('en-IN')}</Text>
+                <Text style={styles.kpiLabel}>Avg Basket Value</Text>
+                <Text style={styles.kpiSub}>Across {analytics.tripCount} trip{analytics.tripCount !== 1 ? 's' : ''}</Text>
+              </View>
 
-          <TouchableOpacity
-            style={styles.historyActionBtn}
-            onPress={() => navigation.navigate('Receipts')}
-            activeOpacity={0.85}
-          >
-            <Feather name="list" size={16} color={COLORS.primary} style={{ marginRight: 8 }} />
-            <Text style={styles.historyActionBtnText}>View All Receipts</Text>
-          </TouchableOpacity>
-        </View>
+              <View style={styles.kpiCard}>
+                <View style={[styles.kpiIconBox, { backgroundColor: '#EDE7F6' }]}>
+                  <Feather name="calendar" size={16} color="#5E35B1" />
+                </View>
+                <Text style={styles.kpiValue}>{analytics.tripCount} Trips</Text>
+                <Text style={styles.kpiLabel}>Shopping Trips</Text>
+                <Text style={styles.kpiSub}>Tracked in period</Text>
+              </View>
+
+              <View style={styles.kpiCard}>
+                <View style={[styles.kpiIconBox, { backgroundColor: '#E8F5E9' }]}>
+                  <Feather name="trending-up" size={16} color="#2E7D32" />
+                </View>
+                <Text style={styles.kpiValue}>₹{analytics.totalSpend.toLocaleString('en-IN')}</Text>
+                <Text style={styles.kpiLabel}>Total Tracked</Text>
+                <Text style={styles.kpiSub}>All-time cumulative</Text>
+              </View>
+            </View>
+
+            {/* ─── Real Category Spending Distribution ─── */}
+            {analytics.categories && analytics.categories.length > 0 && (
+              <View style={styles.sectionCard}>
+                <View style={styles.sectionHeader}>
+                  <View>
+                    <Text style={styles.sectionTitle}>Category Spending Distribution</Text>
+                    <Text style={styles.sectionSubtitle}>
+                      Authentic allocation computed from your itemized receipts
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.categoryList}>
+                  {analytics.categories.map((item, idx) => (
+                    <View key={idx} style={styles.categoryItem}>
+                      <View style={styles.categoryItemTop}>
+                        <View style={styles.categoryLabelRow}>
+                          <View style={[styles.categoryColorDot, { backgroundColor: item.color || '#455A64' }]} />
+                          <Text style={styles.categoryName}>{item.label}</Text>
+                        </View>
+                        <View style={styles.categoryAmountRow}>
+                          <Text style={styles.categoryAmount}>₹{Number(item.amount || 0).toLocaleString('en-IN')}</Text>
+                          <Text style={styles.categoryPct}>({item.pct}%)</Text>
+                        </View>
+                      </View>
+                      <View style={styles.categoryTrack}>
+                        <View
+                          style={[
+                            styles.categoryFill,
+                            { width: `${Math.min(Math.max(item.pct, 0), 100)}%`, backgroundColor: item.color || '#455A64' },
+                          ]}
+                        />
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
+
+            {/* ─── Smart AI Savings Tip ─── */}
+            {analytics.aiTip && (
+              <View style={styles.aiTipCard}>
+                <View style={styles.aiTipHeader}>
+                  <View style={styles.aiTipIconBox}>
+                    <Feather name="zap" size={16} color="#B7791F" />
+                  </View>
+                  <Text style={styles.aiTipTitle}>AI Budget Optimization Tip</Text>
+                </View>
+                <Text style={styles.aiTipText}>{analytics.aiTip}</Text>
+              </View>
+            )}
+
+            {/* ─── Fast Action Buttons ─── */}
+            <View style={styles.actionRow}>
+              <TouchableOpacity
+                style={styles.scanActionBtn}
+                onPress={() => navigation.navigate('Scan')}
+                activeOpacity={0.85}
+              >
+                <Feather name="camera" size={16} color="#fff" style={{ marginRight: 8 }} />
+                <Text style={styles.scanActionBtnText}>Scan New Receipt</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.historyActionBtn}
+                onPress={() => navigation.navigate('Receipts')}
+                activeOpacity={0.85}
+              >
+                <Feather name="list" size={16} color={COLORS.primary} style={{ marginRight: 8 }} />
+                <Text style={styles.historyActionBtnText}>View Receipt History</Text>
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
 
         <View style={{ height: 28 }} />
       </ScrollView>
@@ -762,15 +947,15 @@ const styles = StyleSheet.create({
   // Budget Card
   budgetCard: {
     backgroundColor: '#fff',
-    borderRadius: 16,
+    borderRadius: 18,
     padding: 18,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#EDE6DE',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    borderColor: '#EDE4DA',
+    shadowColor: '#2C1010',
+    shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.05,
-    shadowRadius: 8,
+    shadowRadius: 10,
     elevation: 2,
   },
   budgetCardTop: {
@@ -786,9 +971,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   iconPill: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
+    width: 38,
+    height: 38,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -801,6 +986,7 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.regular,
     fontSize: 11,
     color: COLORS.mutedText,
+    marginTop: 1,
   },
   budgetHeaderRight: {
     flexDirection: 'row',
@@ -832,8 +1018,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#FAF6F1',
     borderWidth: 1,
     borderColor: '#EDE6DE',
-    paddingHorizontal: 8,
-    paddingVertical: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
     borderRadius: 10,
   },
   editBudgetText: {
@@ -846,7 +1032,7 @@ const styles = StyleSheet.create({
   budgetEditorBox: {
     backgroundColor: '#FAF6F1',
     borderRadius: 12,
-    padding: 12,
+    padding: 14,
     marginBottom: 14,
     borderWidth: 1,
     borderColor: '#EDE6DE',
@@ -875,7 +1061,7 @@ const styles = StyleSheet.create({
     borderColor: '#EDE6DE',
     borderRadius: 8,
     paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingVertical: 8,
     fontFamily: FONTS.bold,
     fontSize: 16,
     color: '#2C1010',
@@ -883,7 +1069,7 @@ const styles = StyleSheet.create({
   saveBudgetBtn: {
     backgroundColor: COLORS.primary,
     paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingVertical: 9,
     borderRadius: 8,
   },
   saveBudgetBtnText: {
@@ -897,9 +1083,9 @@ const styles = StyleSheet.create({
   },
   presetChip: {
     backgroundColor: '#fff',
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: 6,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: '#EDE6DE',
   },
@@ -1003,17 +1189,169 @@ const styles = StyleSheet.create({
     marginHorizontal: 8,
   },
 
+  // New User Budget Notice
+  newUserBudgetNotice: {
+    backgroundColor: '#FAF6F1',
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#EDE6DE',
+  },
+  targetRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4,
+  },
+  targetLabel: {
+    fontFamily: FONTS.semiBold,
+    fontSize: 13,
+    color: '#555',
+  },
+  targetValue: {
+    fontFamily: FONTS.bold,
+    fontSize: 18,
+    color: COLORS.primary,
+  },
+  targetDesc: {
+    fontFamily: FONTS.regular,
+    fontSize: 12,
+    color: '#7A6666',
+    lineHeight: 18,
+  },
+
+  // Loading
+  loadingContainer: {
+    paddingVertical: 60,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingText: {
+    fontFamily: FONTS.regular,
+    fontSize: 13,
+    color: COLORS.mutedText,
+    marginTop: 12,
+  },
+
+  // Empty State
+  emptyContainer: {
+    marginTop: 4,
+  },
+  emptyCard: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 24,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#EDE4DA',
+    shadowColor: '#2C1010',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 12,
+    elevation: 2,
+    marginBottom: 20,
+  },
+  emptyIconCircle: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    backgroundColor: '#FDEEE9',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  emptyTitle: {
+    fontFamily: FONTS.bold,
+    fontSize: 19,
+    color: '#2C1010',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  emptySubtitle: {
+    fontFamily: FONTS.regular,
+    fontSize: 13,
+    color: '#7A6666',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 20,
+    paddingHorizontal: 8,
+  },
+  emptyCtaBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 22,
+    paddingVertical: 13,
+    borderRadius: 14,
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  emptyCtaText: {
+    fontFamily: FONTS.bold,
+    fontSize: 14,
+    color: '#fff',
+  },
+
+  // Features Section
+  featuresSection: {
+    marginBottom: 16,
+  },
+  featuresHeader: {
+    fontFamily: FONTS.bold,
+    fontSize: 11,
+    letterSpacing: 0.8,
+    color: COLORS.mutedText,
+    marginBottom: 12,
+    marginLeft: 4,
+  },
+  featureGrid: {
+    gap: 10,
+  },
+  featureItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#EDE4DA',
+    gap: 12,
+  },
+  featureIconBg: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  featureItemTitle: {
+    fontFamily: FONTS.bold,
+    fontSize: 13,
+    color: '#2C1010',
+    marginBottom: 2,
+  },
+  featureItemDesc: {
+    fontFamily: FONTS.regular,
+    fontSize: 11,
+    color: '#7A6666',
+    lineHeight: 16,
+  },
+
   // Section Card
   sectionCard: {
     backgroundColor: '#fff',
-    borderRadius: 16,
+    borderRadius: 18,
     padding: 18,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#EDE6DE',
-    shadowColor: '#000',
+    borderColor: '#EDE4DA',
+    shadowColor: '#2C1010',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.04,
     shadowRadius: 8,
     elevation: 2,
   },
@@ -1046,8 +1384,8 @@ const styles = StyleSheet.create({
     borderColor: '#EDE6DE',
   },
   filterPill: {
-    paddingVertical: 4,
-    paddingHorizontal: 8,
+    paddingVertical: 5,
+    paddingHorizontal: 9,
     borderRadius: 6,
   },
   filterPillActive: {
@@ -1184,8 +1522,8 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 12,
     borderWidth: 1,
-    borderColor: '#EDE6DE',
-    shadowColor: '#000',
+    borderColor: '#EDE4DA',
+    shadowColor: '#2C1010',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.04,
     shadowRadius: 4,
@@ -1274,7 +1612,7 @@ const styles = StyleSheet.create({
   // AI Tip
   aiTipCard: {
     backgroundColor: '#FEFCF5',
-    borderRadius: 14,
+    borderRadius: 16,
     padding: 16,
     marginBottom: 16,
     borderWidth: 1,
@@ -1318,7 +1656,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: COLORS.primary,
     paddingVertical: 14,
-    borderRadius: 12,
+    borderRadius: 14,
     shadowColor: COLORS.primary,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
@@ -1337,9 +1675,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: '#FAF6F1',
     borderWidth: 1,
-    borderColor: '#EDE6DE',
+    borderColor: '#EDE4DA',
     paddingVertical: 14,
-    borderRadius: 12,
+    borderRadius: 14,
   },
   historyActionBtnText: {
     fontFamily: FONTS.bold,

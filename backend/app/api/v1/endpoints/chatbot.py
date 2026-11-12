@@ -67,14 +67,14 @@ def get_chat_suggestions(user_id: int, db: Session = Depends(get_db)):
 
     # 2. Goal-specific suggestions
     if "muscle" in goals.lower():
-        suggestions.append("What is creatine and how do I take it?")
         suggestions.append("Am I meeting my daily protein target?")
-    elif "healthy" in goals.lower():
-        suggestions.append("How many calories should I eat to lose fat?")
-        suggestions.append("Give me 3 clean eating food swaps")
+        suggestions.append("Explain my muscle-gain nutrition plan in detail")
+    elif "healthy" in goals.lower() or "weight" in goals.lower():
+        suggestions.append("How many calories should I eat daily?")
+        suggestions.append("Explain 3 clean food swaps in detail")
     else:
-        suggestions.append("How can I save ₹500 on my next grocery run?")
-        suggestions.append("Analyze my spending pattern across stores")
+        suggestions.append("How can I save ₹500 on groceries?")
+        suggestions.append("Analyze my monthly spending pattern in detail")
 
     return {
         "status": "success",

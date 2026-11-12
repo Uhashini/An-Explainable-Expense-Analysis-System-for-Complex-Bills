@@ -1,19 +1,24 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, Image, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import BackgroundLayout from '../components/BackgroundLayout';
 import ProgressBar from '../components/ProgressBar';
 import PreferenceChip from '../components/PreferenceChip';
 import GoalCard from '../components/GoalCard';
 import ReviewCard from '../components/ReviewCard';
 import { API_BASE_URL } from '../utils/apiConfig';
+import ProfileIcon from '../assets/icons/profile.svg';
+import HomeIcon from '../assets/icons/home.svg';
+import CameraIcon from '../assets/icons/camera.svg';
+import ReceiptIcon from '../assets/icons/receipt.svg';
+import SettingsIcon from '../assets/icons/settings.svg';
 
 const green = '#22C55E';
-const heroIcons = [
-  require('../assets/icons/profile.png'),
-  require('../assets/icons/home.png'),
-  require('../assets/icons/camera.png'),
-  require('../assets/icons/receipt.png'),
-  require('../assets/icons/settings.svg'),
+const HERO_ICONS = [
+  ProfileIcon,
+  HomeIcon,
+  CameraIcon,
+  ReceiptIcon,
+  SettingsIcon,
 ];
 const goals = [
   { icon: '💰', title: 'Save Money', description: 'Track grocery spending and reduce unnecessary expenses.' },
@@ -68,7 +73,8 @@ export default function OnboardingFlowScreen({ navigation, route }) {
     }
   };
   const edit = (target) => setStep(target);
-  return <BackgroundLayout><KeyboardAvoidingView style={{ flex: 1, width: '100%' }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}><ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}><ProgressBar step={step} total={5} /><View style={styles.hero}><View style={styles.icon}><Image source={heroIcons[step - 1]} style={styles.heroIcon} resizeMode="contain" /></View><Text style={styles.title}>{['Tell Us About You', 'Your Lifestyle', 'What are your goals?', 'Shopping Preferences', 'Review & Finish'][step - 1]}</Text><Text style={styles.subtitle}>{['This helps us provide smarter shopping insights.', 'Help us personalize nutrition recommendations.', 'Choose one or more goals.', 'Tell us about your grocery habits.', 'Verify your information before continuing.'][step - 1]}</Text></View>
+  const StepIcon = HERO_ICONS[step - 1] || ProfileIcon;
+  return <BackgroundLayout><KeyboardAvoidingView style={{ flex: 1, width: '100%' }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}><ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}><ProgressBar step={step} total={5} /><View style={styles.hero}><View style={styles.icon}><StepIcon width={36} height={36} /></View><Text style={styles.title}>{['Tell Us About You', 'Your Lifestyle', 'What are your goals?', 'Shopping Preferences', 'Review & Finish'][step - 1]}</Text><Text style={styles.subtitle}>{['This helps us provide smarter shopping insights.', 'Help us personalize nutrition recommendations.', 'Choose one or more goals.', 'Tell us about your grocery habits.', 'Verify your information before continuing.'][step - 1]}</Text></View>
   {step === 1 && <View><Label>FULL NAME</Label><Input value={data.fullName} onChangeText={(v) => update('fullName', v)} placeholder="Your full name" /><Label>AGE</Label><Input value={data.age} onChangeText={(v) => update('age', v)} placeholder="Your age" keyboardType="numeric" /><Label>GENDER</Label><Chips items={['Male', 'Female', 'Other', 'Prefer not to say']} value={data.gender ? [data.gender] : []} setValue={(v) => update('gender', v[0] || '')} /><Label>HEIGHT (CM)</Label><Input value={data.height} onChangeText={(v) => update('height', v)} placeholder="e.g. 170" keyboardType="decimal-pad" /><Label>WEIGHT (KG)</Label><Input value={data.weight} onChangeText={(v) => update('weight', v)} placeholder="e.g. 65" keyboardType="decimal-pad" /></View>}
   {step === 2 && <View><Label>ACTIVITY LEVEL</Label><Chips items={['Sedentary', 'Lightly Active', 'Moderately Active', 'Very Active', 'Athlete']} value={data.activity ? [data.activity] : []} setValue={(v) => update('activity', v[0] || '')} /><Label>FOOD PREFERENCE</Label><Chips items={['Vegetarian', 'Non-Vegetarian', 'Vegan', 'Eggetarian', 'Pescatarian']} value={data.food ? [data.food] : []} setValue={(v) => update('food', v[0] || '')} /><Label>ALLERGIES (OPTIONAL)</Label><Chips items={['Nuts', 'Dairy', 'Gluten', 'Soy', 'Seafood', 'Eggs', 'None']} value={data.allergies} setValue={(v) => update('allergies', v)} /><Label>MEDICAL CONDITIONS (OPTIONAL)</Label><Chips items={['Diabetes', 'Hypertension', 'High Cholesterol', 'PCOS', 'Thyroid', 'None']} value={data.conditions} setValue={(v) => update('conditions', v)} /></View>}
   {step === 3 && <View>{goals.map((goal) => <GoalCard key={goal.title} goal={goal} selected={data.goals.includes(goal.title)} onPress={() => update('goals', data.goals.includes(goal.title) ? data.goals.filter((g) => g !== goal.title) : [...data.goals, goal.title])} />)}</View>}

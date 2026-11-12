@@ -8,9 +8,71 @@ export const DEFAULT_SAMPLE_ITEMS = [
   { name: 'Roasted Almond Cookies', category: 'Processed Snacks', price: 110, quantity: 1 },
 ];
 
-export const calculateSaveMoneyMetrics = (rawItems, monthlyBudget = 3000, previousSpend = 1800) => {
-  const isDefault = !rawItems || !Array.isArray(rawItems) || rawItems.length === 0;
-  const items = isDefault ? DEFAULT_SAMPLE_ITEMS : rawItems;
+export const calculateSaveMoneyMetrics = (rawItems, monthlyBudget = 3000, previousSpend = 0) => {
+  if (!rawItems || !Array.isArray(rawItems) || rawItems.length === 0) {
+    const bNum = parseFloat(monthlyBudget) || 3000;
+    const pNum = parseFloat(previousSpend) || 0;
+    return {
+      has_items: false,
+      category_spending: {
+        analysis_id: 'SM-01',
+        total_spending: 0,
+        total_spend: 0,
+        categories: [],
+        category_spending: [],
+        highest_category: null,
+        highest_spend_category: null,
+      },
+      item_breakdown: {
+        analysis_id: 'SM-02',
+        items: [],
+        sorted_items: [],
+        most_expensive_item: null,
+        highest_expense: null,
+      },
+      budget_utilization: {
+        analysis_id: 'SM-03',
+        monthly_budget: bNum,
+        previous_spend: pNum,
+        current_receipt_total: 0,
+        total_spent: pNum,
+        remaining: bNum - pNum,
+        remaining_budget: bNum - pNum,
+        utilization: bNum > 0 ? Math.round((pNum / bNum) * 100) : 0,
+        utilization_percentage: bNum > 0 ? Math.round((pNum / bNum) * 100) : 0,
+        status: 'SAFE',
+      },
+      spending_trend: {
+        analysis_id: 'SM-04',
+        current_spending: 0,
+        previous_average: 0,
+        change_percentage: 0,
+        trend: 'STABLE',
+        is_over_spending: false,
+        monthly_history: [],
+      },
+      price_deviation: {
+        analysis_id: 'SM-05',
+        price_deviations: [],
+        deviations: [],
+        highest_deviation: null,
+      },
+      category_anomalies: {
+        analysis_id: 'SM-06',
+        is_anomalous: false,
+        anomaly_score: 0,
+        anomalies: [],
+        shap_contributions: [],
+      },
+      purchase_frequency: {
+        analysis_id: 'SM-07',
+        frequent_staples: [],
+        staple_items: [],
+      },
+    };
+  }
+
+  const items = rawItems;
 
   let totalSpending = 0;
   const categoryMap = {};

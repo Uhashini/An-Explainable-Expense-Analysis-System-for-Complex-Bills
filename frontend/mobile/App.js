@@ -1,27 +1,27 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Platform, Image } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ActivityIndicator } from 'react-native';
+import HomeIcon from './assets/icons/home.svg';
+import ReceiptIcon from './assets/icons/receipt.svg';
+import CameraIcon from './assets/icons/camera.svg';
 import InsightsIcon from './assets/icons/insights.svg';
-const HomeImg = require('./assets/icons/home.png');
-const ReceiptImg = require('./assets/icons/receipt.png');
-const CameraImg = require('./assets/icons/camera.png');
-const ProfileImg = require('./assets/icons/profile.png');
+import ProfileIcon from './assets/icons/profile.svg';
 import { useFonts, PlusJakartaSans_400Regular, PlusJakartaSans_600SemiBold, PlusJakartaSans_700Bold } from '@expo-google-fonts/plus-jakarta-sans';
 
-// â”€â”€ Auth Screens â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Auth Screens ────────────────────────────────────────────────────────────
 import LandingScreen from './screens/LandingScreen';
 import SignInScreen from './screens/SignInScreen';
 import SignUpScreen from './screens/SignUpScreen';
 
-// â”€â”€ Onboarding Screens â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Onboarding Screens ──────────────────────────────────────────────────────
 import PersonalInfoScreen from './screens/OnboardingFlowScreen';
 import GoalsScreen from './screens/GoalsScreen';
 
-// â”€â”€ Main App Screens â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Main App Screens ────────────────────────────────────────────────────────
 import DashboardScreen from './screens/DashboardScreen';
 import ReceiptHistoryScreen from './screens/ReceiptHistoryScreen';
 import UploadReceiptScreen from './screens/UploadReceiptScreen';
@@ -43,16 +43,16 @@ import { COLORS, FONTS } from './theme';
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
-// â”€â”€â”€ Tab Icons â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Tab Icons ───────────────────────────────────────────────────────────────
 const TAB_ICONS = {
-  Home: { type: 'image', source: HomeImg },
-  Receipts: { type: 'image', source: ReceiptImg },
-  Scan: { type: 'image', source: CameraImg },
-  Insights: { type: 'svg', component: InsightsIcon },
-  Profile: { type: 'image', source: ProfileImg },
+  Home: HomeIcon,
+  Receipts: ReceiptIcon,
+  Scan: CameraIcon,
+  Insights: InsightsIcon,
+  Profile: ProfileIcon,
 };
 
-// â”€â”€â”€ Custom Tab Bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Custom Tab Bar ──────────────────────────────────────────────────────────
 function CustomTabBar({ state, descriptors, navigation }) {
   const insets = useSafeAreaInsets();
 
@@ -61,7 +61,7 @@ function CustomTabBar({ state, descriptors, navigation }) {
       {state.routes.map((route, index) => {
         const isFocused = state.index === index;
         const isScan = route.name === 'Scan';
-        const iconItem = TAB_ICONS[route.name];
+        const icon = TAB_ICONS[route.name];
 
         const onPress = () => {
           const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
@@ -71,26 +71,21 @@ function CustomTabBar({ state, descriptors, navigation }) {
         };
 
         if (isScan) {
+          const Icon = icon;
           return (
             <TouchableOpacity
               key={route.key}
-              style={[tabStyles.scanBtn, isFocused && tabStyles.scanBtnActive]}
+              style={tabStyles.scanBtn}
               onPress={onPress}
-              activeOpacity={0.85}
+              activeOpacity={0.8}
             >
-              <Image
-                source={iconItem?.source}
-                style={tabStyles.scanImage}
-                resizeMode="contain"
-              />
+              <Icon width={20} height={20} fill="#fff" />
               <Text style={tabStyles.scanLabel}>Scan</Text>
             </TouchableOpacity>
           );
         }
 
-        const isImage = iconItem?.type === 'image';
-        const SvgComponent = iconItem?.component;
-
+        const Icon = icon;
         return (
           <TouchableOpacity
             key={route.key}
@@ -98,31 +93,8 @@ function CustomTabBar({ state, descriptors, navigation }) {
             onPress={onPress}
             activeOpacity={0.7}
           >
-            {isImage ? (
-              <Image
-                source={iconItem.source}
-                style={[
-                  tabStyles.tabImage,
-                  {
-                    opacity: isFocused ? 1 : 0.45,
-                    transform: [{ scale: isFocused ? 1.08 : 0.95 }],
-                  },
-                ]}
-                resizeMode="contain"
-              />
-            ) : (
-              <SvgComponent
-                width={26}
-                height={26}
-                style={[
-                  tabStyles.tabIcon,
-                  {
-                    opacity: isFocused ? 1 : 0.45,
-                    transform: [{ scale: isFocused ? 1.08 : 0.95 }],
-                  },
-                ]}
-              />
-            )}
+            {isFocused && <View style={tabStyles.activeDot} />}
+            <Icon width={30} height={30} fill={isFocused ? COLORS.primary : '#94B6EF'} style={tabStyles.tabIcon} />
             <Text style={[tabStyles.tabLabel, isFocused && tabStyles.tabLabelActive]}>
               {route.name}
             </Text>
@@ -152,59 +124,50 @@ const tabStyles = StyleSheet.create({
     paddingVertical: 4,
     position: 'relative',
   },
-  tabImage: {
-    width: 27,
-    height: 27,
-    marginBottom: 2,
+  activeDot: {
+    position: 'absolute',
+    top: -8,
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: COLORS.primary,
   },
-  tabIcon: {
-    width: 27,
-    height: 27,
-    marginBottom: 2,
-  },
+  tabIcon: { width: 30, height: 30, marginBottom: 2 },
   tabLabel: {
-    fontFamily: FONTS.semiBold,
+    fontFamily: FONTS.regular,
     fontSize: 10,
-    color: '#8A8A8A',
-    letterSpacing: 0.2,
+    color: '#9e9e9e',
+    letterSpacing: 0.3,
   },
   tabLabelActive: {
     fontFamily: FONTS.bold,
     color: COLORS.primary,
   },
   scanBtn: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: -20,
+    marginTop: -24,
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: '#FAF6F1',
-    borderWidth: 1.5,
-    borderColor: '#EDE6DE',
-    shadowColor: '#000',
+    backgroundColor: COLORS.primary,
+    shadowColor: COLORS.primary,
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 6,
-    elevation: 6,
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
+    elevation: 8,
     alignSelf: 'center',
   },
-  scanBtnActive: {
-    borderColor: COLORS.primary,
-    backgroundColor: '#fff',
-  },
-  scanImage: {
-    width: 32,
-    height: 26,
-    marginBottom: 2,
-  },
+  scanIcon: { fontSize: 22 },
   scanLabel: {
     fontFamily: FONTS.bold,
     fontSize: 9,
-    color: COLORS.primary,
-    letterSpacing: 0.2,
+    color: '#fff',
+    letterSpacing: 0.3,
   },
 });
+
 
 // â”€â”€â”€ Receipt Stack (Nested in Tabs) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const ReceiptStack = createNativeStackNavigator();

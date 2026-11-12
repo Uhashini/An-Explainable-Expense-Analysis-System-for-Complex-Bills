@@ -6,8 +6,15 @@ import secrets
 from typing import Optional, Dict, Any
 import bcrypt
 import requests as http_requests
-from google.oauth2 import id_token as google_id_token
-from google.auth.transport import requests as google_requests
+
+try:
+    from google.oauth2 import id_token as google_id_token
+    from google.auth.transport import requests as google_requests
+    HAS_GOOGLE_AUTH = True
+except ImportError:
+    HAS_GOOGLE_AUTH = False
+    google_id_token = None
+    google_requests = None
 
 from app.core.config import settings
 from app.database.postgres_client import get_db, UserProfile, UserOnboarding
@@ -27,34 +34,42 @@ def verify_google_id_token(token: str) -> Dict[str, Any]:
     """
     Cryptographically verify Google ID token using Google public certificates.
     Validates signature, issuer, expiration, and audience (client_id).
+    Falls back to Google tokeninfo API if google-auth is not installed or fails.
     """
-    transport_req = google_requests.Request()
     google_client_id = getattr(settings, "GOOGLE_CLIENT_ID", None)
-    
-    # 1. Primary: Google official cryptographic verification
-    try:
-        payload = google_id_token.verify_oauth2_token(
-            token,
-            transport_req,
-            audience=google_client_id if google_client_id else None
-        )
-        if payload.get("iss") not in ["accounts.google.com", "https://accounts.google.com"]:
-            raise ValueError(f"Invalid Google token issuer: {payload.get('iss')}")
-        return payload
-    except Exception as err:
-        # 2. Fallback: Google tokeninfo verification API
+    last_err = "Verification failed"
+
+    # 1. Primary: Google official cryptographic verification (if google-auth library available)
+    if HAS_GOOGLE_AUTH and google_requests and google_id_token:
         try:
-            resp = http_requests.get(f"https://oauth2.googleapis.com/tokeninfo?id_token={token}", timeout=6)
-            if resp.status_code == 200:
-                data = resp.json()
-                if data.get("iss") in ["accounts.google.com", "https://accounts.google.com"]:
-                    return data
-        except Exception:
-            pass
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Google ID token verification failed: {str(err)}"
-        )
+            transport_req = google_requests.Request()
+            payload = google_id_token.verify_oauth2_token(
+                token,
+                transport_req,
+                audience=google_client_id if google_client_id else None
+            )
+            if payload.get("iss") not in ["accounts.google.com", "https://accounts.google.com"]:
+                raise ValueError(f"Invalid Google token issuer: {payload.get('iss')}")
+            return payload
+        except Exception as err:
+            last_err = err
+    else:
+        last_err = "google-auth library not available"
+
+    # 2. Fallback: Google tokeninfo verification API
+    try:
+        resp = http_requests.get(f"https://oauth2.googleapis.com/tokeninfo?id_token={token}", timeout=6)
+        if resp.status_code == 200:
+            data = resp.json()
+            if data.get("iss") in ["accounts.google.com", "https://accounts.google.com"]:
+                return data
+    except Exception:
+        pass
+
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail=f"Google ID token verification failed: {str(last_err)}"
+    )
 
 def verify_google_access_token(access_token: str) -> Dict[str, Any]:
     """
