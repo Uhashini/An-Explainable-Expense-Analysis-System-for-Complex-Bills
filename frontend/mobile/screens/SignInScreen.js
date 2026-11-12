@@ -49,7 +49,7 @@ export default function SignInScreen({ navigation }) {
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
-      Alert.alert('Sign In Required', 'Please enter both email and password to continue.');
+      showNotification('Sign In Required', 'Please enter both email and password to continue.');
       return;
     }
 
@@ -73,10 +73,10 @@ export default function SignInScreen({ navigation }) {
           navigation.replace('Main');
         }
       } else {
-        Alert.alert('Login Failed', data.detail || 'Invalid email or password.');
+        showNotification('Login Failed', data.detail || 'Invalid email or password.');
       }
     } catch (error) {
-      Alert.alert('Network Error', 'Could not connect to the server.');
+      showNotification('Network Error', 'Could not connect to the server.');
     }
   };
 

@@ -163,7 +163,9 @@ def login(user: UserLogin, db: Session = Depends(get_db)):
     clean_email = user.email.strip().lower()
     from sqlalchemy import func
     db_user = db.query(UserProfile).filter(func.lower(UserProfile.email) == clean_email).first()
-    if not db_user or not db_user.password_hash:
+    if not db_user:
+        raise HTTPException(status_code=401, detail="No account found with this email. If you used Google to sign up, please click 'Continue with Google', or click 'Sign Up' to create a password account.")
+    if not db_user.password_hash:
         raise HTTPException(status_code=401, detail="Invalid email or password")
         
     raw_pwd_bytes = user.password.encode('utf-8')
