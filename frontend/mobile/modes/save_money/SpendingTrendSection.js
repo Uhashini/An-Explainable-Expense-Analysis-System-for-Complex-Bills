@@ -267,31 +267,32 @@ export default function SpendingTrendSection({ spendingTrendData, isLoading }) {
 
             {/* SVG Canvas */}
             <View style={{ height: chartHeight + 40, alignItems: 'center' }}>
-              <Svg width={chartWidth} height={chartHeight} style={{ overflow: 'visible' }}>
-                <Defs>
-                  <LinearGradient id="trendAreaGrad" x1="0" y1="0" x2="0" y2="1">
-                    <Stop offset="0%" stopColor={COLORS.primary} stopOpacity="0.18" />
-                    <Stop offset="100%" stopColor={COLORS.primary} stopOpacity="0.0" />
-                  </LinearGradient>
-                </Defs>
+              <View style={{ width: chartWidth, height: chartHeight, position: 'relative' }}>
+                <Svg width={chartWidth} height={chartHeight} style={{ overflow: 'visible' }}>
+                  <Defs>
+                    <LinearGradient id="trendAreaGrad" x1="0" y1="0" x2="0" y2="1">
+                      <Stop offset="0%" stopColor={COLORS.primary} stopOpacity="0.18" />
+                      <Stop offset="100%" stopColor={COLORS.primary} stopOpacity="0.0" />
+                    </LinearGradient>
+                  </Defs>
 
-                {/* Area Fill */}
-                <Path d={areaPath} fill="url(#trendAreaGrad)" />
+                  {/* Area Fill */}
+                  <Path d={areaPath} fill="url(#trendAreaGrad)" />
 
-                {/* 1. Normal Gray STL Baseline Line (Dotted Gray #7F8C8D) */}
-                <Path
-                  d={expectedPath}
-                  fill="none"
-                  stroke="#7F8C8D"
-                  strokeWidth="2.5"
-                  strokeDasharray="6, 4"
-                  strokeLinecap="round"
-                />
+                  {/* 1. Normal Gray STL Baseline Line (Dotted Gray #7F8C8D) */}
+                  <Path
+                    d={expectedPath}
+                    fill="none"
+                    stroke="#7F8C8D"
+                    strokeWidth="2.5"
+                    strokeDasharray="6, 4"
+                    strokeLinecap="round"
+                  />
 
-                {/* STL Baseline Data Dots (Gray squares / diamonds) */}
-                {points.map((p, idx) => (
-                  <G key={`stl-${idx}`}>
+                  {/* STL Baseline Data Dots (Gray squares / diamonds) */}
+                  {points.map((p, idx) => (
                     <Circle
+                      key={`stl-${idx}`}
                       cx={p.x}
                       cy={p.expectedY}
                       r="3.5"
@@ -299,97 +300,118 @@ export default function SpendingTrendSection({ spendingTrendData, isLoading }) {
                       stroke="#7F8C8D"
                       strokeWidth="2"
                     />
-                  </G>
-                ))}
+                  ))}
 
-                {/* 2. Actual Spending Line (Solid Maroon/Primary) */}
-                <Path
-                  d={actualPath}
-                  fill="none"
-                  stroke={COLORS.primary}
-                  strokeWidth="3.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
+                  {/* 2. Actual Spending Line (Solid Maroon/Primary) */}
+                  <Path
+                    d={actualPath}
+                    fill="none"
+                    stroke={COLORS.primary}
+                    strokeWidth="3.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
 
-                {/* Actual Spending Data Points & Labels */}
+                  {/* Actual Spending Data Points & Labels */}
+                  {points.map((p, idx) => {
+                    const dotColor = p.isAnomaly ? '#D32F2F' : COLORS.primary;
+                    const isSelected = selectedPoint && selectedPoint.month === p.month;
+                    return (
+                      <G key={`act-${idx}`}>
+                        {isSelected && (
+                          <Circle cx={p.x} cy={p.y} r="10" fill={dotColor} fillOpacity="0.25" />
+                        )}
+                        <Circle
+                          cx={p.x}
+                          cy={p.y}
+                          r={p.isAnomaly ? '6' : '4.5'}
+                          fill="#fff"
+                          stroke={dotColor}
+                          strokeWidth={isSelected ? '3' : '2'}
+                        />
+                        {!isSelected && (
+                          <SvgText
+                            x={p.x}
+                            y={p.y - 10}
+                            fontSize="9"
+                            fill={dotColor}
+                            textAnchor="middle"
+                            fontWeight="bold"
+                          >
+                            ₹{Math.round(p.amount)}
+                          </SvgText>
+                        )}
+                      </G>
+                    );
+                  })}
+                </Svg>
+
+                {/* Touch Hitboxes for Data Points (Cross-platform Web & Mobile friendly) */}
                 {points.map((p, idx) => {
-                  const dotColor = p.isAnomaly ? '#D32F2F' : COLORS.primary;
                   const isSelected = selectedPoint && selectedPoint.month === p.month;
                   return (
-                    <G key={`act-${idx}`} onPress={() => setSelectedPoint(isSelected ? null : p)}>
-                      <Circle cx={p.x} cy={p.y} r="22" fill="transparent" />
-                      {isSelected && (
-                        <Circle cx={p.x} cy={p.y} r="10" fill={dotColor} fillOpacity="0.25" />
-                      )}
-                      <Circle
-                        cx={p.x}
-                        cy={p.y}
-                        r={p.isAnomaly ? '6' : '4.5'}
-                        fill="#fff"
-                        stroke={dotColor}
-                        strokeWidth={isSelected ? '3' : '2'}
-                      />
-                      {!isSelected && (
-                        <SvgText
-                          x={p.x}
-                          y={p.y - 10}
-                          fontSize="9"
-                          fill={dotColor}
-                          textAnchor="middle"
-                          fontWeight="bold"
-                        >
-                          ₹{Math.round(p.amount)}
-                        </SvgText>
-                      )}
-                    </G>
+                    <TouchableOpacity
+                      key={`hit-${idx}`}
+                      style={{
+                        position: 'absolute',
+                        left: p.x - 22,
+                        top: p.y - 22,
+                        width: 44,
+                        height: 44,
+                        borderRadius: 22,
+                        backgroundColor: 'transparent',
+                        zIndex: 5,
+                      }}
+                      onPress={() => setSelectedPoint(isSelected ? null : p)}
+                      activeOpacity={0.7}
+                    />
                   );
                 })}
-              </Svg>
 
-              {/* Tooltip Overlay */}
-              {selectedPoint && (() => {
-                const p = selectedPoint;
-                let leftPos = p.x - 55;
-                if (leftPos < 0) leftPos = 0;
-                if (leftPos + 110 > chartWidth) leftPos = chartWidth - 110;
+                {/* Tooltip Overlay */}
+                {selectedPoint && (() => {
+                  const p = selectedPoint;
+                  let leftPos = p.x - 55;
+                  if (leftPos < 0) leftPos = 0;
+                  if (leftPos + 110 > chartWidth) leftPos = chartWidth - 110;
 
-                return (
-                  <View
-                    style={{
-                      position: 'absolute',
-                      left: leftPos,
-                      top: Math.max(0, p.y - 65),
-                      backgroundColor: '#2d3436',
-                      padding: 8,
-                      borderRadius: 8,
-                      width: 110,
-                      shadowColor: '#000',
-                      shadowOffset: { width: 0, height: 2 },
-                      shadowOpacity: 0.2,
-                      shadowRadius: 4,
-                      elevation: 4,
-                      zIndex: 10,
-                    }}
-                  >
-                    <Text style={{ color: '#fff', fontSize: 10, fontFamily: FONTS.bold, textAlign: 'center' }}>
-                      {formatMonth(p.month)}
-                    </Text>
-                    <Text style={{ color: '#b2bec3', fontSize: 9, fontFamily: FONTS.regular, marginTop: 2 }}>
-                      Normal (STL): ₹{Math.round(p.trend_val || p.amount)}
-                    </Text>
-                    <Text
+                  return (
+                    <View
                       style={{
-                        color: p.isAnomaly ? '#ff7675' : '#55efc4',
-                        fontSize: 10,
-                        fontFamily: FONTS.bold,
+                        position: 'absolute',
+                        left: leftPos,
+                        top: Math.max(0, p.y - 65),
+                        backgroundColor: '#2d3436',
+                        padding: 8,
+                        borderRadius: 8,
+                        width: 110,
+                        shadowColor: '#000',
+                        shadowOffset: { width: 0, height: 2 },
+                        shadowOpacity: 0.2,
+                        shadowRadius: 4,
+                        elevation: 4,
+                        zIndex: 10,
                       }}
                     >
-                      Actual Spend: ₹{Math.round(p.amount)}
-                    </Text>
-                  </View>
-                );
-              })()}
+                      <Text style={{ color: '#fff', fontSize: 10, fontFamily: FONTS.bold, textAlign: 'center' }}>
+                        {formatMonth(p.month)}
+                      </Text>
+                      <Text style={{ color: '#b2bec3', fontSize: 9, fontFamily: FONTS.regular, marginTop: 2 }}>
+                        Normal (STL): ₹{Math.round(p.trend_val || p.amount)}
+                      </Text>
+                      <Text
+                        style={{
+                          color: p.isAnomaly ? '#ff7675' : '#55efc4',
+                          fontSize: 10,
+                          fontFamily: FONTS.bold,
+                        }}
+                      >
+                        Actual Spend: ₹{Math.round(p.amount)}
+                      </Text>
+                    </View>
+                  );
+                })()}
+              </View>
 
               {/* X-Axis Month Labels */}
               <View
