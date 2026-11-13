@@ -9,6 +9,7 @@ import AnalyticsStoryDeck from '../../components/AnalyticsStoryDeck';
 import StoryQuestionBanner from '../../components/StoryQuestionBanner';
 
 import {
+  ProteinOverviewCard,
   ProteinAvailabilitySection,
   ProteinQualitySection,
   ProteinCostSection,
@@ -210,6 +211,9 @@ export default function GainMuscleView({ navigation, receiptData, nutritionData 
         categoryIcon="🥩"
         themeColor="#1976D2"
       />
+      <View style={{ marginBottom: 12 }}>
+        <ProteinOverviewCard gm01={gm01} gm02={gm02} gm03={gm03} gm05={gm05} />
+      </View>
       <ProteinAvailabilitySection data={gm01} />
     </View>,
 
@@ -294,6 +298,7 @@ export default function GainMuscleView({ navigation, receiptData, nutritionData 
       ) : (
         /* ── Full Audit Feed Mode ── */
         <View style={styles.contentContainer}>
+          <ProteinOverviewCard gm01={gm01} gm02={gm02} gm03={gm03} gm05={gm05} />
           <ProteinAvailabilitySection data={gm01} />
           <ProteinQualitySection data={gm02} />
           <ProteinCostSection data={gm03} />
