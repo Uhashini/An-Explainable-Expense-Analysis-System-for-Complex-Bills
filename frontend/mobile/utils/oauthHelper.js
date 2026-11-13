@@ -54,7 +54,7 @@ export async function performOAuthLogin({
         access_token: accessToken || null,
         provider_id: `${provider}_${Date.now()}`,
       }),
-    }, 8000);
+    }, 15000);
 
     const data = await response.json();
 
@@ -88,9 +88,13 @@ export async function performOAuthLogin({
       return null;
     }
   } catch (err) {
-    const isTimeout = err?.message && err.message.includes('timed out');
+    const isTimeout = err?.message && (
+      err.message.includes('timed out') ||
+      err.message.toLowerCase().includes('cancel') ||
+      err.message.toLowerCase().includes('abort')
+    );
     const errorMsg = isTimeout
-      ? 'Connection timed out. Please ensure the backend server is running on port 8000 and your phone is on the same Wi-Fi.'
+      ? 'Connection timed out. Please ensure the backend server is running on port 8000 (python -m uvicorn app.main:app --host 0.0.0.0 --port 8000) and your phone is connected to the same Wi-Fi.'
       : (err?.message || 'Could not connect to authentication server. Please check your network connection.');
     if (onError) onError(errorMsg);
     else showNotification('Connection Error', errorMsg);

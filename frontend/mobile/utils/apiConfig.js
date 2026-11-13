@@ -58,12 +58,16 @@ export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? Platform.select({
 });
 
 /**
- * Fetch wrapper with configurable timeout (default 8s) to prevent requests
+ * Fetch wrapper with configurable timeout (default 15s) to prevent requests
  * from hanging indefinitely when backend is offline or unreachable over Wi-Fi.
  */
-export async function fetchWithTimeout(url, options = {}, timeoutMs = 8000) {
+export async function fetchWithTimeout(url, options = {}, timeoutMs = 15000) {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, timeoutMs);
 
   try {
     const response = await fetch(url, {
@@ -74,8 +78,14 @@ export async function fetchWithTimeout(url, options = {}, timeoutMs = 8000) {
     return response;
   } catch (err) {
     clearTimeout(timer);
-    if (err.name === 'AbortError') {
-      throw new Error(`Connection timed out (${timeoutMs / 1000}s). Please verify your backend server is running.`);
+    if (
+      timedOut ||
+      controller.signal.aborted ||
+      err.name === 'AbortError' ||
+      err?.message?.toLowerCase().includes('cancel') ||
+      err?.message?.toLowerCase().includes('abort')
+    ) {
+      throw new Error(`Connection timed out (${timeoutMs / 1000}s). Could not connect to backend at ${url}. Please ensure the backend server is running on port 8000.`);
     }
     throw err;
   }

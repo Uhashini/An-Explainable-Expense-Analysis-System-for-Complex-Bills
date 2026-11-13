@@ -72,8 +72,8 @@ export default function GoogleConnectModal({
 
     const safetyTimer = setTimeout(() => {
       setLoading(false);
-      setError('Connection timed out. Please check that your backend server is running on port 8000.');
-    }, 9000);
+      setError('Connection timed out (16s). Please ensure your backend server is running on port 8000 and your phone is on the same Wi-Fi.');
+    }, 16000);
 
     try {
       const result = await performOAuthLogin({
@@ -129,8 +129,8 @@ export default function GoogleConnectModal({
 
     const safetyTimer = setTimeout(() => {
       setLoading(false);
-      setError('Connection timed out. Please check that your backend server is running on port 8000.');
-    }, 9000);
+      setError('Connection timed out (16s). Please ensure your backend server is running on port 8000 and your phone is on the same Wi-Fi.');
+    }, 16000);
 
     const targetName = name.trim() || targetEmail.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
 
