@@ -280,9 +280,6 @@ export default function GemmaChatScreen({ navigation }) {
           </View>
         </View>
         <View style={styles.headerRightActions}>
-          <TouchableOpacity onPress={() => setSettingsVisible(true)} style={styles.iconBtn}>
-            <Text style={styles.iconBtnText}>⚙️</Text>
-          </TouchableOpacity>
           <TouchableOpacity onPress={clearChat} style={styles.clearBtn}>
             <Text style={styles.clearBtnText}>Reset</Text>
           </TouchableOpacity>
