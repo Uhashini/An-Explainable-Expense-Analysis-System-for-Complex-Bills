@@ -36,7 +36,11 @@ def verify_google_id_token(token: str) -> Dict[str, Any]:
     Validates signature, issuer, expiration, and audience (client_id).
     Falls back to Google tokeninfo API if google-auth is not installed or fails.
     """
-    google_client_id = getattr(settings, "GOOGLE_CLIENT_ID", None)
+    google_client_id = (
+        getattr(settings, "GOOGLE_CLIENT_ID", None)
+        or getattr(settings, "EXPO_PUBLIC_GOOGLE_CLIENT_ID", None)
+        or "1041758891518-egk6ur8n7nq13plvjh8hej95f97lblhf.apps.googleusercontent.com"
+    )
     last_err = "Verification failed"
 
     # 1. Primary: Google official cryptographic verification (if google-auth library available)

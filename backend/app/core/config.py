@@ -54,6 +54,7 @@ class Settings(BaseSettings):
 
     # Google OAuth Configuration
     GOOGLE_CLIENT_ID: Optional[str] = None
+    EXPO_PUBLIC_GOOGLE_CLIENT_ID: Optional[str] = None
 
     # Feature Flags
     ENABLE_RECIPE_ASSISTANT: bool = True

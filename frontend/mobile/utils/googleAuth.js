@@ -128,12 +128,15 @@ function logSafeDiagnostic(resolvedId, resolvedSource) {
   }
 }
 
+const DEFAULT_GOOGLE_CLIENT_ID = '1041758891518-egk6ur8n7nq13plvjh8hej95f97lblhf.apps.googleusercontent.com';
+
 /**
  * Retrieve the Google OAuth Client ID across all supported configuration paths:
  * 1. Metro compile-time inlined direct expression: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID
  * 2. Expo app.json / app.config.js extra configuration: Constants.expoConfig?.extra?.googleClientId
  * 3. Manifest fallbacks: Constants.manifest?.extra?.googleClientId
  * 4. Web runtime fallbacks: window.EXPO_PUBLIC_GOOGLE_CLIENT_ID / localStorage / sessionStorage
+ * 5. Default built-in Client ID
  */
 export function getGoogleClientId() {
   let resolvedId = '';
@@ -178,6 +181,12 @@ export function getGoogleClientId() {
       resolvedId = webCandidate;
       resolvedSource = 'window/localStorage';
     }
+  }
+
+  // 5. Default built-in fallback
+  if (!resolvedId) {
+    resolvedId = DEFAULT_GOOGLE_CLIENT_ID;
+    resolvedSource = 'DEFAULT_GOOGLE_CLIENT_ID';
   }
 
   // Safe diagnostic: strictly reports presence and lengths, NEVER the client ID
