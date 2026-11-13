@@ -55,9 +55,6 @@ function SpendingForecastCard({ data, loading, error }) {
   const [expanded, setExpanded] = useState(false);
 
   const toggleExpand = () => {
-    if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-      UIManager.setLayoutAnimationEnabledExperimental(true);
-    }
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setExpanded(prev => !prev);
   };
@@ -243,9 +240,11 @@ function SpendingForecastCard({ data, loading, error }) {
   );
 }
 
-// Enable LayoutAnimation on Android
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
+// Enable LayoutAnimation on Android for legacy architecture (no-op on New Architecture)
+if (Platform.OS === 'android' && !global._IS_FABRIC && UIManager.setLayoutAnimationEnabledExperimental) {
+  try {
+    UIManager.setLayoutAnimationEnabledExperimental(true);
+  } catch (e) {}
 }
 
 // ─── Live forecast hooks ──────────────────────────────────────────────────────
@@ -341,9 +340,6 @@ function NutritionForecastCard({ data, loading, error }) {
   const [expanded, setExpanded] = useState(false);
 
   const toggleExpand = () => {
-    if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-      UIManager.setLayoutAnimationEnabledExperimental(true);
-    }
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setExpanded(prev => !prev);
   };

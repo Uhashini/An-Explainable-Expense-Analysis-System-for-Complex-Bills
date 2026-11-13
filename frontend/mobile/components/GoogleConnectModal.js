@@ -70,24 +70,38 @@ export default function GoogleConnectModal({
     setError('');
     setLoading(true);
 
-    const result = await performOAuthLogin({
-      provider: 'google',
-      email: accEmail,
-      name: accName,
-      navigation,
-      isSignUp,
-      onSuccess: (data) => {
-        setLoading(false);
-        handleNavAfterLogin(data);
-      },
-      onError: (msg) => {
-        setLoading(false);
-        setError(msg);
-      },
-    });
-
-    if (!result) {
+    const safetyTimer = setTimeout(() => {
       setLoading(false);
+      setError('Connection timed out. Please check that your backend server is running on port 8000.');
+    }, 9000);
+
+    try {
+      const result = await performOAuthLogin({
+        provider: 'google',
+        email: accEmail,
+        name: accName,
+        navigation,
+        isSignUp,
+        onSuccess: (data) => {
+          clearTimeout(safetyTimer);
+          setLoading(false);
+          handleNavAfterLogin(data);
+        },
+        onError: (msg) => {
+          clearTimeout(safetyTimer);
+          setLoading(false);
+          setError(msg);
+        },
+      });
+
+      if (!result) {
+        clearTimeout(safetyTimer);
+        setLoading(false);
+      }
+    } catch (err) {
+      clearTimeout(safetyTimer);
+      setLoading(false);
+      setError(err?.message || 'Failed to connect. Please check backend connection.');
     }
   };
 
@@ -113,26 +127,40 @@ export default function GoogleConnectModal({
 
     setLoading(true);
 
+    const safetyTimer = setTimeout(() => {
+      setLoading(false);
+      setError('Connection timed out. Please check that your backend server is running on port 8000.');
+    }, 9000);
+
     const targetName = name.trim() || targetEmail.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
 
-    const result = await performOAuthLogin({
-      provider: 'google',
-      email: targetEmail,
-      name: targetName,
-      navigation,
-      isSignUp,
-      onSuccess: (data) => {
-        setLoading(false);
-        handleNavAfterLogin(data);
-      },
-      onError: (msg) => {
-        setLoading(false);
-        setError(msg);
-      },
-    });
+    try {
+      const result = await performOAuthLogin({
+        provider: 'google',
+        email: targetEmail,
+        name: targetName,
+        navigation,
+        isSignUp,
+        onSuccess: (data) => {
+          clearTimeout(safetyTimer);
+          setLoading(false);
+          handleNavAfterLogin(data);
+        },
+        onError: (msg) => {
+          clearTimeout(safetyTimer);
+          setLoading(false);
+          setError(msg);
+        },
+      });
 
-    if (!result) {
+      if (!result) {
+        clearTimeout(safetyTimer);
+        setLoading(false);
+      }
+    } catch (err) {
+      clearTimeout(safetyTimer);
       setLoading(false);
+      setError(err?.message || 'Failed to connect. Please check backend connection.');
     }
   };
 
