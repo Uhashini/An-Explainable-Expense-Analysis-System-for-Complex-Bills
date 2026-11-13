@@ -224,6 +224,7 @@ async function sendGoogleTokenToBackend({ idToken, accessToken }) {
 export async function promptGoogleSignIn({
   navigation,
   isSignUp = false,
+  openModal,
   onStart,
   onSuccess,
   onError,
@@ -237,6 +238,11 @@ export async function promptGoogleSignIn({
     if (safetyTimeout) clearTimeout(safetyTimeout);
     if (onError) onError(errorMsg);
   };
+
+  if (Platform.OS !== 'web' && typeof openModal === 'function') {
+    openModal();
+    return;
+  }
 
   const finishSuccess = (authData) => {
     if (isDone) return;
@@ -467,6 +473,14 @@ export async function promptGoogleSignIn({
   // ───────────────────────────────────────────────────────────────────────────
   try {
     const redirectUri = Linking.createURL('oauth');
+
+    // Google strictly blocks custom scheme URIs (exp://) for Web client IDs with Error 400.
+    // If running inside Expo Go, report a clear and actionable message instead of showing Google's error page.
+    if (redirectUri.startsWith('exp:') || Constants.appOwnership === 'expo') {
+      finishError('Google OAuth redirects are blocked in Expo Go because Google disallows custom exp:// schemes for Web client IDs. Please use the Google Connect Modal on mobile or test via Expo Web.');
+      return;
+    }
+
     const nonce = Math.random().toString(36).substring(2);
     const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token%20id_token&scope=${encodeURIComponent('openid email profile')}&prompt=select_account&nonce=${nonce}`;
 
