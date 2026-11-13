@@ -15,6 +15,8 @@ export default function EatHealthyView({
   comparisonViewMode,
   setComparisonViewMode,
   savedReceiptsList,
+  receiptId,
+  receiptData,
 }) {
   const data = nutritionData || getDefaultNutritionData();
 
@@ -52,7 +54,12 @@ export default function EatHealthyView({
           savedReceiptsList={savedReceiptsList}
         />
       ) : (
-        <HealthIntelligenceSection data={data} />
+        <HealthIntelligenceSection
+          data={data}
+          receiptId={receiptId}
+          receiptData={receiptData}
+          savedReceiptsList={savedReceiptsList}
+        />
       )}
     </View>
   );

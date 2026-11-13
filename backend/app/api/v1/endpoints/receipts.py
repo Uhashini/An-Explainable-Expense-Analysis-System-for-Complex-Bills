@@ -1,7 +1,7 @@
 import logging
 from fastapi import APIRouter, UploadFile, File, HTTPException, Body
 from pydantic import BaseModel
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from app.services.ocr_service import ocr_service
 from app.services.product_matcher import product_matcher
 
@@ -67,8 +67,17 @@ async def upload_receipt(file: UploadFile = File(...)):
                         item["serving_unit"] = match.get("serving_unit")
                         item["nutrition"] = match.get("nutrition")
                         item["health"] = match.get("health")
+                    else:
+                        item["food_id"] = None
+                        item["matched_name"] = None
+                        item["nutrition"] = None
+                        item["health"] = None
             except Exception as match_err:
                 logger.warning(f"Failed to match item '{item.get('name')}': {match_err}")
+                item["food_id"] = None
+                item["matched_name"] = None
+                item["nutrition"] = None
+                item["health"] = None
 
         return result
 
@@ -106,6 +115,11 @@ async def match_products(request: MatchProductsRequest):
                     item["serving_unit"] = match.get("serving_unit")
                     item["nutrition"] = match.get("nutrition")
                     item["health"] = match.get("health")
+                else:
+                    item["food_id"] = None
+                    item["matched_name"] = None
+                    item["nutrition"] = None
+                    item["health"] = None
                 enriched_items.append(item)
             return enriched_items
             
@@ -127,7 +141,6 @@ async def match_products(request: MatchProductsRequest):
 from sqlalchemy.orm import Session
 from fastapi import Depends
 from app.database.postgres_client import get_db, UserProfile, Receipt, ReceiptItem, AnalysisResult
-from typing import Optional
 
 class ReceiptItemCreate(BaseModel):
     name: str
@@ -454,4 +467,3 @@ async def analyze_save_money(request: SaveMoneyAnalysisRequest, db: Session = De
             status_code=500,
             detail=f"Error analyzing save money mode: {str(e)}",
         )
-

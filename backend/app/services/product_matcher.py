@@ -24,7 +24,6 @@ _GARBAGE_NAMES = {
     "gst", "rounding", "balance", "tender", "receipt", "qty",
 }
 
-
 # Indian Grocery Brand and Abbreviation Mapping
 _BRAND_STRIP_LIST = [
     "gowardhan", "aul", "goodzife", "goodlife", "double horse", "amul", 
@@ -52,6 +51,66 @@ _CATEGORY_HINTS = {
     "colgate": "toothpaste",
     "baginoroast": "roasted beans"
 }
+
+# Major animal protein terms to prevent cross-category false positive matches
+ANIMAL_PROTEINS = {
+    "tuna", "salmon", "mackerel", "sardine", "crab", "shrimp", "prawn", "clam", "oyster",
+    "beef", "pork", "bacon", "ham", "sausage", "lamb", "mutton", "anchovy", "halibut",
+    "cod", "tilapia", "catfish", "squid", "octopus", "lobster"
+}
+
+PACKING_PATTERNS = [
+    " in water", " in oil", " in brine", " in juice", " packed in water",
+    " in light syrup", " in heavy syrup"
+]
+
+STOP_WORDS = {
+    "the", "and", "for", "with", "canned", "drained", "solids", "pack", "pkt", "net",
+    "each", "per", "approx", "kroger", "brand", "style", "item", "fresh"
+}
+
+def clean_tokens(text: str) -> set:
+    words = re.findall(r'[a-z0-9]+', text.lower())
+    expanded = []
+    for w in words:
+        if w == "veg": expanded.extend(["veg", "vegetable"])
+        elif w in ("bottle", "bottled"): expanded.extend(["bottle", "bottled"])
+        else: expanded.append(w)
+    return set(expanded)
+
+def _is_valid_match(query: str, candidate: str, score: float, threshold: float = 0.55) -> bool:
+    """
+    Semantic gatekeeper: verifies that a database match is actually relevant to the queried item.
+    Rejects packaging traps (e.g. 'water bottle' matching 'tuna canned in water') and protein mismatches.
+    """
+    if score < threshold:
+        return False
+
+    q_tokens = clean_tokens(query)
+    c_tokens = clean_tokens(candidate)
+
+    # 1. Reject Animal Protein / Meat Mismatch
+    # If candidate is a meat/fish and query does not explicitly mention that protein
+    for protein in ANIMAL_PROTEINS:
+        if protein in c_tokens and protein not in q_tokens:
+            return False
+
+    # 2. Reject Packing Medium False Positive
+    c_lower = candidate.lower()
+    for pat in PACKING_PATTERNS:
+        if pat in c_lower:
+            # Extract substantive ingredients from candidate excluding packing terms
+            non_packing = c_tokens - {"in", "water", "oil", "brine", "juice", "syrup", "light", "heavy", "canned", "drained", "solids", "kroger", "brand"}
+            if non_packing and not non_packing.intersection(q_tokens):
+                return False
+
+    # 3. Reject if no substantive content word overlaps
+    common = q_tokens.intersection(c_tokens)
+    substantive = [t for t in common if len(t) >= 3 and t not in STOP_WORDS]
+    if not substantive:
+        return False
+
+    return True
 
 def _normalize(name: str) -> str:
     """
@@ -130,37 +189,35 @@ class ProductMatcher:
         logger.info("ProductMatcher initialization complete.")
 
     def _load_fallback_items(self):
-        """Load items for in-memory Semantic NLP matching."""
+        """Load items for in-memory Semantic NLP matching if cached locally."""
+        os.environ["TRANSFORMERS_OFFLINE"] = "1"
         try:
             from sentence_transformers import SentenceTransformer, util
             self.util = util
             logger.info("Loading SentenceTransformer (all-MiniLM-L6-v2)...")
-            # Load the lightweight semantic model
-            self.model = SentenceTransformer('all-MiniLM-L6-v2')
+            self.model = SentenceTransformer('all-MiniLM-L6-v2', local_files_only=True)
+            db = SessionLocal()
+            try:
+                self._fallback_items = db.query(FoodItem).all()
+                self._fallback_names = [_normalize(f.canonical_name) for f in self._fallback_items]
+                self._fallback_embeddings = self.model.encode(self._fallback_names, convert_to_tensor=True)
+                logger.info("Embeddings cached successfully.")
+            finally:
+                db.close()
         except Exception as e:
-            logger.warning(f"SentenceTransformer not loaded ({e}). Using SQLite substring & pattern matching.")
+            logger.info(f"SentenceTransformer not loaded or offline ({e}). Using optimized fuzzy token matching.")
             return
 
-        db = SessionLocal()
-        try:
-            self._fallback_items = db.query(FoodItem).all()
-            self._fallback_names = [_normalize(f.canonical_name) for f in self._fallback_items]
-            logger.info(f"Computing embeddings for {len(self._fallback_names)} food items...")
-            self._fallback_embeddings = self.model.encode(self._fallback_names, convert_to_tensor=True)
-            logger.info("Embeddings cached successfully.")
-        finally:
-            db.close()
-
-    def match_item(self, item_name: str, similarity_threshold: float = 0.20):
+    def match_item(self, item_name: str, similarity_threshold: float = 0.55):
         """
         Match a receipt item name to the closest food item in the database.
         Returns a dict with food details, nutrition, and health indicators, or None.
+        Enforces strict semantic validation so non-food or mismatched items are not falsely linked.
         """
         if not self.is_initialized:
             self.initialize()
 
-        # Skip garbage/noise names
-        if item_name.strip().lower() in _GARBAGE_NAMES:
+        if not item_name or item_name.strip().lower() in _GARBAGE_NAMES:
             return None
 
         normalized_query = _normalize(item_name)
@@ -172,9 +229,9 @@ class ProductMatcher:
             if res:
                 return res
 
-        return self._match_sqlite(item_name, normalized_query)
+        return self._match_sqlite(item_name, normalized_query, similarity_threshold)
 
-    def _match_sqlite(self, original_name: str, normalized_query: str):
+    def _match_sqlite(self, original_name: str, normalized_query: str, threshold: float = 0.55):
         """SQLite compatible matching using score-based fuzzy token & substring matching."""
         db = SessionLocal()
         try:
@@ -182,63 +239,69 @@ class ProductMatcher:
             if not items:
                 return None
 
-            best_item = None
-            best_score = 0.0
-
-            query_tokens = set(normalized_query.split())
+            candidates = []
+            query_tokens = clean_tokens(normalized_query)
 
             for item in items:
                 cname = (item.canonical_name or '').lower()
                 dname = (item.display_name or '').lower()
                 norm_cname = _normalize(cname)
+                c_tokens = clean_tokens(norm_cname)
 
                 score = 0.0
                 if normalized_query == norm_cname or normalized_query == cname:
                     score = 1.0
+                elif normalized_query == dname or (dname and normalized_query == _normalize(dname)):
+                    score = 0.95
                 elif normalized_query in cname or cname in normalized_query:
-                    score = 0.85
+                    ratio = min(len(normalized_query), len(cname)) / max(len(normalized_query), len(cname))
+                    score = 0.70 + (ratio * 0.25)
                 elif dname and (normalized_query in dname or dname in normalized_query):
-                    score = 0.80
+                    ratio = min(len(normalized_query), len(dname)) / max(len(normalized_query), len(dname))
+                    score = 0.65 + (ratio * 0.25)
                 else:
-                    c_tokens = set(norm_cname.split())
                     common = query_tokens.intersection(c_tokens)
                     if common:
-                        jaccard = len(common) / len(query_tokens.union(c_tokens))
-                        score = 0.50 + (jaccard * 0.40)
+                        substantive = [t for t in common if len(t) >= 3 and t not in STOP_WORDS]
+                        if substantive:
+                            jaccard = len(common) / len(query_tokens.union(c_tokens))
+                            score = 0.40 + (jaccard * 0.50)
                     else:
                         ratio = difflib.SequenceMatcher(None, normalized_query, norm_cname).ratio()
-                        if ratio > 0.60:
-                            score = ratio * 0.75
+                        if ratio > 0.65:
+                            score = ratio * 0.80
 
-                if score > best_score:
-                    best_score = score
-                    best_item = item
+                if score >= threshold:
+                    candidates.append((score, item))
 
-            if best_item and best_score >= 0.45:
-                nut = db.query(Nutrition).filter(Nutrition.food_id == best_item.food_id).first()
-                h = db.query(HealthIndicators).filter(HealthIndicators.food_id == best_item.food_id).first()
+            candidates.sort(key=lambda x: x[0], reverse=True)
 
-                return {
-                    "food_id": best_item.food_id,
-                    "matched_name": best_item.canonical_name,
-                    "display_name": best_item.display_name,
-                    "category": best_item.category,
-                    "subcategory": best_item.subcategory,
-                    "serving_size": float(best_item.serving_size) if best_item.serving_size else None,
-                    "serving_unit": best_item.serving_unit,
-                    "nutrition": {
-                        "calories_kcal": float(nut.calories_kcal) if nut and nut.calories_kcal is not None else None,
-                        "protein_g": float(nut.protein_g) if nut and nut.protein_g is not None else None,
-                        "carbohydrates_g": float(nut.carbohydrates_g) if nut and nut.carbohydrates_g is not None else None,
-                        "fat_g": float(nut.fat_g) if nut and nut.fat_g is not None else None,
-                        "fiber_g": float(nut.fiber_g) if nut and nut.fiber_g is not None else None,
-                        "sugar_g": float(nut.sugar_g) if nut and nut.sugar_g is not None else None,
-                    },
-                    "health": {
-                        "health_score": h.health_score if h else None,
-                        "is_processed": h.is_processed if h else False,
+            for score, best_item in candidates:
+                if _is_valid_match(original_name, best_item.canonical_name, score, threshold):
+                    nut = db.query(Nutrition).filter(Nutrition.food_id == best_item.food_id).first()
+                    h = db.query(HealthIndicators).filter(HealthIndicators.food_id == best_item.food_id).first()
+
+                    return {
+                        "food_id": best_item.food_id,
+                        "matched_name": best_item.canonical_name,
+                        "display_name": best_item.display_name,
+                        "category": best_item.category,
+                        "subcategory": best_item.subcategory,
+                        "serving_size": float(best_item.serving_size) if best_item.serving_size else None,
+                        "serving_unit": best_item.serving_unit,
+                        "nutrition": {
+                            "calories_kcal": float(nut.calories_kcal) if nut and nut.calories_kcal is not None else None,
+                            "protein_g": float(nut.protein_g) if nut and nut.protein_g is not None else None,
+                            "carbohydrates_g": float(nut.carbohydrates_g) if nut and nut.carbohydrates_g is not None else None,
+                            "fat_g": float(nut.fat_g) if nut and nut.fat_g is not None else None,
+                            "fiber_g": float(nut.fiber_g) if nut and nut.fiber_g is not None else None,
+                            "sugar_g": float(nut.sugar_g) if nut and nut.sugar_g is not None else None,
+                        },
+                        "health": {
+                            "health_score": h.health_score if h else None,
+                            "is_processed": h.is_processed if h else False,
+                        }
                     }
-                }
 
             return None
         except Exception as e:
@@ -251,6 +314,7 @@ class ProductMatcher:
         """
         Use PostgreSQL pg_trgm to find the best matching food item.
         Joins nutrition + healthindicators to return rich data.
+        Enforces _is_valid_match semantic validation to prevent cross-category false positives.
         """
         db = SessionLocal()
         try:
@@ -291,55 +355,54 @@ class ProductMatcher:
                 FROM fooditem f
                 LEFT JOIN nutrition n ON f.food_id = n.food_id
                 LEFT JOIN healthindicators h ON f.food_id = h.food_id
-                WHERE similarity(f.canonical_name, :query) > :threshold
+                WHERE similarity(f.canonical_name, :query) >= :threshold
                 ORDER BY sim DESC
-                LIMIT 1
+                LIMIT 5
             """)
 
-            result = db.execute(sql, {"query": normalized_query, "threshold": threshold}).fetchone()
+            rows = db.execute(sql, {"query": normalized_query, "threshold": threshold}).fetchall()
 
-            if not result:
-                logger.debug(f"No pg_trgm match for '{original_name}' (normalized: '{normalized_query}')")
-                return None
+            for row in rows:
+                sim_score = float(row.sim)
+                if _is_valid_match(original_name, row.canonical_name, sim_score, threshold):
+                    logger.info(
+                        f"pg_trgm verified match (sim={sim_score:.2f}): "
+                        f"'{original_name}' → '{row.canonical_name}'"
+                    )
+                    return self._row_to_dict(row)
 
-            logger.info(
-                f"pg_trgm match (sim={float(result.sim):.2f}): "
-                f"'{original_name}' → '{result.canonical_name}'"
-            )
-
-            return self._row_to_dict(result)
+            logger.debug(f"No pg_trgm match passed semantic validation for '{original_name}'")
+            return None
         except Exception as e:
             logger.error(f"Error matching item '{original_name}': {e}")
             return None
         finally:
             db.close()
 
-    def _match_semantic(self, original_name: str, normalized_query: str, threshold: float = 0.4):
+    def _match_semantic(self, original_name: str, normalized_query: str, threshold: float = 0.55):
         """Fallback: in-memory Semantic NLP matching."""
         if not self._fallback_items or not hasattr(self, 'model'):
             return None
 
-        # Encode the query
         query_embedding = self.model.encode(normalized_query, convert_to_tensor=True)
-        
-        # Compute cosine similarity against all food items
         cos_scores = self.util.cos_sim(query_embedding, self._fallback_embeddings)[0]
         
         import torch
-        best_match_idx = torch.argmax(cos_scores).item()
-        best_match_score = cos_scores[best_match_idx].item()
-        
-        if best_match_score >= threshold:
-            food = self._fallback_items[best_match_idx]
-            logger.info(f"Semantic match (score={best_match_score:.2f}): '{original_name}' -> '{food.canonical_name}'")
-            return {
-                "food_id": food.food_id,
-                "matched_name": food.canonical_name,
-                "display_name": food.display_name,
-                "category": food.category,
-            }
+        top_k = min(5, len(self._fallback_items))
+        top_indices = torch.topk(cos_scores, k=top_k).indices.tolist()
+
+        for idx in top_indices:
+            score = cos_scores[idx].item()
+            food = self._fallback_items[idx]
+            if _is_valid_match(original_name, food.canonical_name, score, threshold):
+                logger.info(f"Semantic match (score={score:.2f}): '{original_name}' -> '{food.canonical_name}'")
+                return {
+                    "food_id": food.food_id,
+                    "matched_name": food.canonical_name,
+                    "display_name": food.display_name,
+                    "category": food.category,
+                }
             
-        logger.debug(f"No semantic match for '{original_name}' (best score: {best_match_score:.2f})")
         return None
 
     @staticmethod
@@ -387,7 +450,6 @@ class ProductMatcher:
                 "allergen": row.allergen,
             },
         }
-
 
 # Singleton instance
 product_matcher = ProductMatcher()

@@ -62,9 +62,11 @@ class OCRService:
                 corrected = img
             new_h, new_w = corrected.shape[:2]
 
-            # 3. OCR Extraction
-            ocr_input = self.preprocessor.denoise_and_sharpen(corrected) if preprocess else corrected
-            raw_results = self.ocr.extract_text(ocr_input)
+            # 3. OCR Extraction (run on corrected clean image, fallback to sharpened if sparse)
+            raw_results = self.ocr.extract_text(corrected)
+            if not raw_results or len(raw_results) < 3:
+                ocr_input = self.preprocessor.denoise_and_sharpen(corrected) if preprocess else corrected
+                raw_results = self.ocr.extract_text(ocr_input)
             
             words = []
             boxes = []

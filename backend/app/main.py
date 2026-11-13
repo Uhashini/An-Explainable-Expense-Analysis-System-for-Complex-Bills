@@ -1,10 +1,12 @@
+import os
+os.environ["PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION"] = "python"
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from app.api.v1.endpoints import receipts, demo, auth, products, analytics, gain_muscle, chatbot, forecast, nutrition_forecast
 from app.database.postgres_client import init_db
-import os
 
 try:
     init_db()
@@ -47,7 +49,3 @@ app.mount("/static", StaticFiles(directory=static_path), name="static")
 @app.get("/", tags=["UI"])
 async def read_index():
     return FileResponse(os.path.join(static_path, "index.html"))
-
-@app.get("/health", tags=["Health"])
-async def health_check():
-    return {"status": "healthy", "version": "0.1.0"}
