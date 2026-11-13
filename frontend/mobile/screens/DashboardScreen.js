@@ -697,18 +697,8 @@ export default function DashboardScreen({ navigation }) {
             </TouchableOpacity>
           </View>
 
-          <View style={{ height: 60 }} />
+          <View style={{ height: 20 }} />
         </ScrollView>
-
-        {/* Floating AI Button (FAB) */}
-        <TouchableOpacity
-          style={styles.fab}
-          onPress={() => navigation.navigate('GemmaChat')}
-          activeOpacity={0.85}
-        >
-          <Text style={styles.fabIcon}>✦</Text>
-          <Text style={styles.fabText}>Ask Gemma</Text>
-        </TouchableOpacity>
       </View>
     </ScreenLayout>
   );
