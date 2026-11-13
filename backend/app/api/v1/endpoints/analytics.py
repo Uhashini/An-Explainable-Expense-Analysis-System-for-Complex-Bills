@@ -1,3 +1,5 @@
+from app.services.health_intelligence_service import health_intelligence_service
+from typing import List, Optional, Dict, Any
 import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, date
@@ -402,3 +404,40 @@ def get_user_spending_analytics(user_id: int, db: Session = Depends(get_db)):
         "ai_tip": ai_tip,
     }
 
+
+
+# ── Health Intelligence Endpoints ─────────────────────────────────────────────
+
+class HealthIntelligenceRequest(BaseModel):
+    user_id: int
+    receipt_id: Optional[int] = None
+    items: Optional[List[Dict[str, Any]]] = None
+
+@router.post("/health-intelligence")
+def analyze_health_intelligence(req: HealthIntelligenceRequest, db: Session = Depends(get_db)):
+    """
+    Personalized Health Intelligence Endpoint:
+    Analyzes glycemic impact, sodium & cardiovascular risk, allergen triggers,
+    nutritional balance, and tailored recommendations based on actual food purchases and user profile.
+    """
+    return health_intelligence_service.analyze_health_intelligence(
+        db=db,
+        user_id=req.user_id,
+        receipt_id=req.receipt_id,
+        custom_items=req.items
+    )
+
+@router.get("/health-intelligence/{user_id}")
+def get_user_health_intelligence(
+    user_id: int,
+    receipt_id: Optional[int] = None,
+    db: Session = Depends(get_db)
+):
+    """
+    Retrieve personalized Health Intelligence for a specific user and optional receipt.
+    """
+    return health_intelligence_service.analyze_health_intelligence(
+        db=db,
+        user_id=user_id,
+        receipt_id=receipt_id
+    )

@@ -4,6 +4,17 @@ import re
 from typing import List, Dict, Any, Optional
 import numpy as np
 
+# Import torch and transformers at the module level to ensure clean DLL initialization on Windows
+try:
+    import torch
+    from transformers import LayoutLMv3Processor, LayoutLMv3ForTokenClassification
+    TRANSFORMERS_AVAILABLE = True
+except Exception as e:
+    TRANSFORMERS_AVAILABLE = False
+    LayoutLMv3Processor = None
+    LayoutLMv3ForTokenClassification = None
+    torch = None
+
 from .regex_parser import RegexParser
 
 logger = logging.getLogger(__name__)
@@ -23,26 +34,32 @@ class LayoutLMService:
         self.regex_fallback = RegexParser()
         
         # Check potential local paths for fine-tuned weights
-        model_paths = [
+        backend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../.."))
+        candidate_paths = [
+            os.path.join(backend_dir, "layoutlmv3-finetuned"),
+            os.path.join(backend_dir, "layoutlmv3"),
             "./layoutlmv3-finetuned",
+            "./layoutlmv3",
+            os.path.join(backend_dir, "layoutlmv3-smoke-test"),
             "./layoutlmv3-smoke-test",
-            model_name
         ]
         
         self.model_name = model_name
         self.selected_path = None
-        for path in model_paths:
-            if path == model_name or os.path.exists(path):
-                self.selected_path = path
+        for path in candidate_paths:
+            if os.path.isdir(path) and os.path.isfile(os.path.join(path, "config.json")):
+                self.selected_path = os.path.abspath(path)
                 break
+        if not self.selected_path:
+            self.selected_path = model_name
 
     def _ensure_model_loaded(self):
         if self.enabled:
             return True
+        if not TRANSFORMERS_AVAILABLE:
+            logger.warning("Transformers/PyTorch not available for LayoutLMv3.")
+            return False
         try:
-            from transformers import LayoutLMv3Processor, LayoutLMv3ForTokenClassification
-            import torch
-            
             logger.info(f"Loading LayoutLMv3 model from path: {self.selected_path}")
             self.processor = LayoutLMv3Processor.from_pretrained(self.selected_path, apply_ocr=False)
             self.model = LayoutLMv3ForTokenClassification.from_pretrained(self.selected_path)
@@ -91,7 +108,6 @@ class LayoutLMService:
             predictions = logits.argmax(-1)[0].tolist()
             
             # Map predictions back to words using word_ids
-            # word_ids maps each token index in the input sequence to its corresponding original word index.
             word_ids = encoding.word_ids(batch_index=0)
             
             # Initialize all word labels as "O" (Outside)
@@ -143,10 +159,10 @@ class LayoutLMService:
             logger.error(f"LayoutLM inference failed: {e}")
             return []
 
-    def parse_receipt_entities(self, entities: List[Dict[str, Any]], words: List[str] = None, boxes: List[List[int]] = None) -> Dict[str, Any]:
+    def parse_receipt_entities(self, entities: List[Dict[str, Any]], words: List[str] = None, boxes: List[List[int]] = None, raw_results: Any = None, **kwargs) -> Dict[str, Any]:
         """
         Heuristic-based aggregation of LayoutLM token results into a structured receipt object.
-        If AI is disabled or empty, falls back to Regex recognition.
+        Reconciles with RegexParser for complete multi-line item, header, and validation accuracy.
         """
         if not entities and words and boxes:
             logger.info("Semantic AI disabled/empty. Falling back to RegexParser.")
@@ -154,29 +170,49 @@ class LayoutLMService:
 
         parsed = {
             "merchant_name": "",
+            "store_address": "",
+            "bill_number": "",
             "date": "",
+            "time": "",
             "total_amount": 0.0,
+            "subtotal": 0.0,
             "items": [],
-            "discounts": []
+            "discounts": [],
+            "taxes": [],
+            "validation": {}
         }
 
-        # Y-axis spatial row clustering for line items
+        # Non-drifting horizontal line clustering for menu items
         menu_tokens = [ent for ent in entities if ent.get("entity", "").startswith("menu.")]
         if menu_tokens:
-            menu_tokens.sort(key=lambda e: ((e["bbox"][1] + e["bbox"][3]) / 2, e["bbox"][0]))
+            menu_tokens.sort(key=lambda e: (e["bbox"][1], e["bbox"][0]))
             rows = []
             for token in menu_tokens:
-                y_center = (token["bbox"][1] + token["bbox"][3]) / 2
+                y_center = (token["bbox"][1] + token["bbox"][3]) / 2.0
+                h = max(1, token["bbox"][3] - token["bbox"][1])
                 matched = False
                 for row in rows:
-                    if abs(y_center - row["avg_y"]) < 28: # Within same horizontal text line
+                    overlap = min(token["bbox"][3], row["y2"]) - max(token["bbox"][1], row["y1"])
+                    min_h = min(h, row["height"])
+                    if (min_h > 0 and overlap / min_h > 0.40) or abs(y_center - row["anchor_y"]) < 12:
                         row["tokens"].append(token)
-                        row["avg_y"] = sum((t["bbox"][1] + t["bbox"][3]) / 2 for t in row["tokens"]) / len(row["tokens"])
+                        row["y1"] = min(row["y1"], token["bbox"][1])
+                        row["y2"] = max(row["y2"], token["bbox"][3])
+                        row["height"] = row["y2"] - row["y1"]
                         matched = True
                         break
                 if not matched:
-                    rows.append({"avg_y": y_center, "tokens": [token]})
+                    rows.append({
+                        "anchor_y": y_center,
+                        "y1": token["bbox"][1],
+                        "y2": token["bbox"][3],
+                        "height": h,
+                        "tokens": [token]
+                    })
             
+            rows.sort(key=lambda r: r["y1"])
+            pending_names = []
+
             for row in rows:
                 row_tokens = sorted(row["tokens"], key=lambda t: t["bbox"][0])
                 names, price_val, unit_price, qty = [], 0.0, 0.0, 1
@@ -184,7 +220,7 @@ class LayoutLMService:
                 for t in row_tokens:
                     lbl, txt = t.get("entity"), t.get("text", "").strip()
                     if lbl in ("menu.nm", "menu.sub_nm"):
-                        if txt not in ("$", "-", "@"): names.append(txt)
+                        if txt not in ("$", "-", "@", "₹"): names.append(txt)
                     elif lbl in ("menu.price", "menu.discountprice"):
                         try:
                             val_str = "".join(filter(lambda x: x.isdigit() or x in ".,", txt))
@@ -195,22 +231,26 @@ class LayoutLMService:
                             val_str = "".join(filter(lambda x: x.isdigit() or x in ".,", txt))
                             if val_str: unit_price = float(val_str.replace(",", "."))
                             
-                            # Extract rateunit (e.g. from 12.00/kg or 12.00kg)
                             unit_match = re.search(r'[A-Za-z]+', txt)
                             if unit_match:
                                 rateunit = unit_match.group()
                         except ValueError: pass
                     elif lbl == "menu.cnt":
-                        qty = txt  # Preserve string with units (e.g., 500g, 1kg)
-                        
-                        # Fallback for rateunit from count if not found in unitprice
-                        if not rateunit:
-                            unit_match = re.search(r'[A-Za-z]+', txt)
-                            if unit_match:
-                                rateunit = unit_match.group()
+                        clean_cnt = "".join(filter(lambda x: x.isdigit() or x in ".,", txt))
+                        if clean_cnt:
+                            try:
+                                qty = float(clean_cnt) if "." in clean_cnt else int(clean_cnt)
+                            except ValueError:
+                                qty = txt
+                        unit_match = re.search(r'^[a-zA-Z]+$', txt)
+                        if unit_match:
+                            rateunit = unit_match.group()
                                 
-                if names or price_val > 0:
-                    item_name = " ".join(names).strip() or "Item"
+                if (price_val > 0 or unit_price > 0):
+                    combined_names = pending_names + names
+                    pending_names = []
+                    item_name = " ".join(combined_names).strip() or "Item"
+                    
                     # Filter out non-food tax & metadata lines
                     item_lower = item_name.lower()
                     non_food_kw = ["cgst", "sgst", "gst", "vat", "tax", "round", "subtotal", "sub total", "total", "fssai", "gstin", "dine in", "bill no", "token no"]
@@ -219,13 +259,23 @@ class LayoutLMService:
                     if not any(char.isalpha() for char in item_name) and price_val == 0.0:
                         continue
                     
+                    # Clean portion codes like HALF-85 and punctuation
+                    item_name = re.sub(r'(?i)HALF-\d+', '', item_name).strip("- ")
+                    item_name = re.sub(r'[-_]+', ' ', item_name).strip()
+                    item_name = " ".join([p.capitalize() for p in item_name.split()])
+                    
+                    calc_total = price_val if price_val > 0 else (unit_price * (qty if isinstance(qty, (int, float)) and qty > 0 else 1))
+
                     parsed["items"].append({
                         "name": item_name, 
                         "quantity": qty, 
-                        "unit_price": unit_price, 
-                        "total_price": price_val,
+                        "unit_price": unit_price if unit_price > 0 else (round(calc_total / qty, 2) if isinstance(qty, (int, float)) and qty > 1 else calc_total), 
+                        "total_price": calc_total,
                         "rateunit": rateunit
                     })
+                else:
+                    if names:
+                        pending_names.extend(names)
 
         # Extract discounts and loyalty programs
         disc_tokens = [ent for ent in entities if ent.get("entity", "") in ("loyalty_discount", "sub_total.discount_price", "discount")]
@@ -254,28 +304,56 @@ class LayoutLMService:
         if total_candidates:
             parsed["total_amount"] = max(total_candidates)
 
-        # Filter out line items before passing tokens to RegexParser for merchant name fallback
-        non_item_words, non_item_boxes = [], []
-        if len(entities) == len(words) == len(boxes):
-            for ent, w, b in zip(entities, words, boxes):
-                lbl = ent.get("entity", "O")
-                if not (lbl.startswith("menu.") or lbl.startswith("sub_total.") or lbl == "total.total_price"):
-                    non_item_words.append(w); non_item_boxes.append(b)
-        else:
-            non_item_words, non_item_boxes = words, boxes
-
-        regex_results = self.regex_fallback.parse(non_item_words if non_item_words else words, non_item_boxes if non_item_boxes else boxes)
-        parsed["merchant_name"] = regex_results.get("merchant_name", "")
-
+        # Extract metadata from RegexParser
         full_regex = self.regex_fallback.parse(words, boxes)
-        parsed["date"] = full_regex.get("date", "")
+        parsed["merchant_name"] = full_regex.get("merchant_name", "") or parsed.get("merchant_name", "")
+        parsed["store_address"] = full_regex.get("store_address", "") or parsed.get("store_address", "")
+        parsed["bill_number"] = full_regex.get("bill_number", "") or parsed.get("bill_number", "")
+        parsed["date"] = parsed["date"] or full_regex.get("date", "")
+        parsed["time"] = full_regex.get("time", "") or parsed.get("time", "")
+        parsed["subtotal"] = full_regex.get("subtotal", 0.0)
+        parsed["taxes"] = full_regex.get("taxes", [])
+        parsed["validation"] = full_regex.get("validation", {})
         if parsed["total_amount"] == 0.0:
             parsed["total_amount"] = full_regex.get("total_amount", 0.0)
 
-        # Fallback for items if Semantic AI yielded no line items
-        if not parsed["items"]:
-            logger.info("Semantic AI yielded no items. Falling back to RegexParser for items.")
-            parsed["items"] = full_regex.get("items", [])
+        # Reconcile items between Semantic AI and RegexParser
+        regex_items = full_regex.get("items", [])
+        regex_reconciled = full_regex.get("validation", {}).get("is_reconciled", False)
+        ai_items = parsed.get("items", [])
+        ai_sum = round(sum(it.get("total_price", 0.0) for it in ai_items), 2)
+        regex_sum = round(sum(it.get("total_price", 0.0) for it in regex_items), 2)
+        target_total = parsed.get("subtotal") or parsed.get("total_amount") or full_regex.get("subtotal") or full_regex.get("total_amount") or 0.0
+
+        should_use_regex = False
+        if not ai_items and regex_items:
+            should_use_regex = True
+        elif any(it.get("total_price", 0) >= 10000 or it.get("unit_price", 0) >= 10000 for it in ai_items):
+            # Discard spurious entities tagged as item prices (e.g. transaction IDs or barcodes)
+            should_use_regex = True
+        elif len(regex_items) > len(ai_items):
+            # RegexParser recovered more discrete items
+            should_use_regex = True
+        elif regex_reconciled:
+            # RegexParser mathematically verified all items and taxes
+            should_use_regex = True
+        elif target_total > 0 and abs(regex_sum - target_total) < abs(ai_sum - target_total) - 1.0:
+            should_use_regex = True
+
+        if should_use_regex:
+            logger.info(
+                f"RegexParser successfully extracted and verified {len(regex_items)} items "
+                f"(sum {regex_sum}) vs {len(ai_items)} items from Semantic AI. Using verified items."
+            )
+            parsed["items"] = regex_items
+
+        # Clean merchant name if trailing unbalanced parenthesis
+        if parsed.get("merchant_name"):
+            m = parsed["merchant_name"]
+            if m.count("(") < m.count(")"):
+                parsed["merchant_name"] = re.sub(r'\)+$', '', m).strip()
+            elif m.count("(") > m.count(")"):
+                parsed["merchant_name"] = re.sub(r'^\(+', '', m).strip()
 
         return parsed
 
@@ -287,7 +365,6 @@ class LayoutLMService:
         new_words = []
         new_boxes = []
         
-        # Regex pattern to match alphabetical prefix followed by numeric suffix (e.g., "Qty1.00")
         pattern = re.compile(r'^([a-zA-Z]+)([\d.,]+)$')
         
         for word, box in zip(words, boxes):

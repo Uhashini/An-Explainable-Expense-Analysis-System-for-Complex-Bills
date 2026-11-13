@@ -88,3 +88,11 @@ EVALUATION_REPORT.md
 TECHNICAL_REPORT_COMPREHENSIVE.md
 PROJECT_SUMMARY.md
 PIPELINE_EXECUTION_REPORT.md
+
+# LayoutLMv3 Fine-tuned Model Weights and Checkpoints (DO NOT COMMIT)
+backend/layoutlmv3-finetuned/
+backend/layoutlmv3/
+**/layoutlmv3-finetuned/
+**/layoutlmv3/
+*.safetensors
+*.bin

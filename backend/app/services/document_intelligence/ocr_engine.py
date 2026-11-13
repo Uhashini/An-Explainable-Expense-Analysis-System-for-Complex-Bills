@@ -1,4 +1,5 @@
 import os
+os.environ["PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION"] = "python"
 import numpy as np
 import logging
 from typing import List, Dict, Any, Union
@@ -43,9 +44,9 @@ class OCREngine:
                 lang=self.lang,
                 enable_mkldnn=False,
                 det_limit_side_len=960,
-                det_db_thresh=0.3,
-                det_db_box_thresh=0.6,
-                det_db_unclip_ratio=1.5,
+                det_db_thresh=0.15,
+                det_db_box_thresh=0.3,
+                det_db_unclip_ratio=1.8,
                 use_dilation=False,
                 drop_score=0.5,
             )

@@ -169,6 +169,9 @@ export default function ReceiptDetailsScreen({ route, navigation }) {
   const [dateStr, setDateStr] = useState(
     isMock ? "20 July 2025" : initialInfo.date || "Unknown Date",
   );
+  const [subtotal, setSubtotal] = useState(initialInfo.subtotal || null);
+  const [taxes, setTaxes] = useState(initialInfo.taxes || []);
+  const [validation, setValidation] = useState(initialInfo.validation || null);
 
   const [extractedItems, setExtractedItems] = useState(initialItems);
   const [foodDetailsLoaded, setFoodDetailsLoaded] = useState(isMock || !!receiptId);
@@ -205,6 +208,9 @@ export default function ReceiptDetailsScreen({ route, navigation }) {
             setTotalAmount(info.total_amount || 0.0);
             setDateStr(info.date || "Unknown Date");
             setExtractedItems(info.items ? [...info.items] : []);
+            setSubtotal(info.subtotal || null);
+            setTaxes(info.taxes || []);
+            setValidation(info.validation || null);
             setFoodDetailsLoaded(true);
           } else {
             showNotification("Error", "Failed to load receipt details.");
@@ -223,6 +229,9 @@ export default function ReceiptDetailsScreen({ route, navigation }) {
       setTotalAmount(info.total_amount || 0.0);
       setDateStr(info.date || "Unknown Date");
       setExtractedItems(info.items ? [...info.items] : []);
+      setSubtotal(info.subtotal || null);
+      setTaxes(info.taxes || []);
+      setValidation(info.validation || null);
       const hasMatchedItems = (info.items || []).some(it => it.food_id || it.nutrition);
       setFoodDetailsLoaded(hasMatchedItems);
     }
@@ -560,6 +569,13 @@ export default function ReceiptDetailsScreen({ route, navigation }) {
 
               const handleItemPress = () => {
                 if (isEditing) return;
+                if (!item.food_id && !item.matched_product_id) {
+                  showNotification(
+                    item.name || "Item",
+                    "Nutrition information is currently unavailable in the database for this item."
+                  );
+                  return;
+                }
                 navigation.navigate("FoodItemDetails", {
                   product_id: item.food_id || item.matched_product_id,
                   item_name: item.matched_name || item.name,
@@ -588,7 +604,7 @@ export default function ReceiptDetailsScreen({ route, navigation }) {
                         onChangeText={(val) => updateItem("name", val)}
                       />
                     ) : (
-                      <Text style={styles.cellText} numberOfLines={1}>
+                      <Text style={styles.cellText} numberOfLines={2}>
                         {item.name || "Item"}
                       </Text>
                     )}
@@ -599,6 +615,11 @@ export default function ReceiptDetailsScreen({ route, navigation }) {
                           {item.matched_name}
                         </Text>
                       )}
+                    {!isEditing && foodDetailsLoaded && !item.food_id && !item.matched_product_id && (
+                      <Text style={styles.unmatchedText} numberOfLines={1}>
+                        Nutrition information unavailable
+                      </Text>
+                    )}
                   </View>
                   {isEditing ? (
                     <TextInput
@@ -665,8 +686,23 @@ export default function ReceiptDetailsScreen({ route, navigation }) {
               label="Total Items"
               value={extractedItems.length.toString()}
             />
+            {subtotal != null && subtotal > 0 && (
+              <InfoRow label="Subtotal" value={`₹${Number(subtotal).toFixed(2)}`} />
+            )}
+            {taxes && taxes.length > 0 && taxes.map((t, tidx) => (
+              <InfoRow key={tidx} label={t.name || "Tax"} value={`₹${Number(t.amount || 0).toFixed(2)}`} />
+            ))}
             <InfoRow label="Total Calories" value="-" />
             <InfoRow label="Total Protein" value="-" />
+            {validation && validation.is_reconciled !== undefined && (
+              <View style={[styles.validationBanner, validation.is_reconciled ? styles.valSuccess : styles.valWarning]}>
+                <Text style={[styles.validationText, validation.is_reconciled ? styles.valTextSuccess : styles.valTextWarning]}>
+                  {validation.is_reconciled
+                    ? "✓ Bill Math Reconciled (Items + Taxes = Total)"
+                    : `⚠️ Math Discrepancy: Sum ₹${validation.calculated_total ?? validation.calculated_items_subtotal ?? totalAmount} vs Printed ₹${validation.receipt_total ?? validation.printed_grand_total ?? totalAmount}`}
+                </Text>
+              </View>
+            )}
             <View style={styles.summaryDivider} />
             <View style={[styles.infoRow, styles.totalRow]}>
               <Text style={styles.totalLabel}>Total Cost</Text>
@@ -924,6 +960,41 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: "rgba(153,8,8,0.5)",
     marginTop: 2,
+  },
+  unmatchedText: {
+    fontFamily: FONTS.regular,
+    fontSize: 9,
+    color: "#7f8c8d",
+    fontStyle: "italic",
+    marginTop: 2,
+  },
+  validationBanner: {
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginTop: 6,
+    marginBottom: 4,
+  },
+  valSuccess: {
+    backgroundColor: "#e8f8f0",
+    borderWidth: 1,
+    borderColor: "#a3e4d7",
+  },
+  valWarning: {
+    backgroundColor: "#fef9e7",
+    borderWidth: 1,
+    borderColor: "#f9e79f",
+  },
+  validationText: {
+    fontFamily: FONTS.semiBold,
+    fontSize: 11,
+    textAlign: "center",
+  },
+  valTextSuccess: {
+    color: "#1e8449",
+  },
+  valTextWarning: {
+    color: "#b7950b",
   },
   colItem: { flex: 2 },
   colQty: { flex: 0.8, textAlign: "center" },
@@ -1243,4 +1314,3 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
 });
-

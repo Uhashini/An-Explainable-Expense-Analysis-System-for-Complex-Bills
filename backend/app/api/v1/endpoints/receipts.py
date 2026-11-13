@@ -1,7 +1,7 @@
 import logging
 from fastapi import APIRouter, UploadFile, File, HTTPException, Body
 from pydantic import BaseModel
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from app.services.ocr_service import ocr_service
 from app.services.product_matcher import product_matcher
 
@@ -94,7 +94,6 @@ async def match_products(request: MatchProductsRequest):
 from sqlalchemy.orm import Session
 from fastapi import Depends
 from app.database.postgres_client import get_db, UserProfile, Receipt, ReceiptItem, AnalysisResult
-from typing import Optional
 
 class ReceiptItemCreate(BaseModel):
     name: str
@@ -438,4 +437,3 @@ async def analyze_save_money(request: SaveMoneyAnalysisRequest, db: Session = De
             status_code=500,
             detail=f"Error analyzing save money mode: {str(e)}",
         )
-
