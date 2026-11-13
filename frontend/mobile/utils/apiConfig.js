@@ -1,6 +1,5 @@
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
-import * as Linking from 'expo-linking';
 import { getToken, getRefreshToken, saveAuthData, clearUser } from './authStorage';
 
 // ─── Backend API Configuration ──────────────────────────────────────────────
@@ -12,7 +11,6 @@ import { getToken, getRefreshToken, saveAuthData, clearUser } from './authStorag
 //
 
 function resolveHostIp() {
-  // 1. Direct host URI from Expo config
   try {
     const rawUri =
       Constants?.expoConfig?.hostUri ||
@@ -28,19 +26,6 @@ function resolveHostIp() {
     }
   } catch (e) {}
 
-  // 2. Derive from Linking URL in Expo Go (e.g. exp://192.168.0.177:8081/--)
-  try {
-    const linkingUrl = Linking.createURL('/');
-    if (linkingUrl && linkingUrl.includes('://')) {
-      const hostPart = linkingUrl.split('://')[1];
-      const ip = hostPart.split(':')[0].split('/')[0];
-      if (ip && ip !== 'localhost' && ip !== '127.0.0.1') {
-        return ip;
-      }
-    }
-  } catch (e) {}
-
-  // 3. Fallback to machine's active local Wi-Fi IP
   return '192.168.0.177';
 }
 

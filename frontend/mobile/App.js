@@ -37,6 +37,7 @@ import FoodItemDetailsScreen from './screens/FoodItemDetailsScreen';
 import EditGoalsScreen from './screens/EditGoalsScreen';
 import GainMuscleScreen from './screens/GainMuscleScreen';
 import GemmaChatScreen from './screens/GemmaChatScreen';
+import ErrorBoundary from './components/ErrorBoundary';
 
 import { COLORS, FONTS } from './theme';
 
@@ -190,7 +191,13 @@ function MainTabs() {
       tabBar={(props) => <CustomTabBar {...props} />}
       screenOptions={{ headerShown: false }}
     >
-      <Tab.Screen name="Home" component={DashboardScreen} />
+      <Tab.Screen name="Home">
+        {(props) => (
+          <ErrorBoundary fallbackMessage="We encountered an issue loading your Dashboard. Tap below to reload.">
+            <DashboardScreen {...props} />
+          </ErrorBoundary>
+        )}
+      </Tab.Screen>
       <Tab.Screen name="Receipts" component={ReceiptStackNavigator} />
       <Tab.Screen name="Scan" component={UploadReceiptScreen} />
       <Tab.Screen name="Chatbot" component={GemmaChatScreen} />
@@ -219,8 +226,9 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <NavigationContainer>
-        <Stack.Navigator
+      <ErrorBoundary fallbackMessage="An error occurred while loading Pantrix. Tap below to reload.">
+        <NavigationContainer>
+          <Stack.Navigator
           initialRouteName="Landing"
           screenOptions={{
             headerShown: false,
@@ -284,7 +292,8 @@ export default function App() {
           />
         </Stack.Navigator>
       </NavigationContainer>
-    </SafeAreaProvider>
-  );
+    </ErrorBoundary>
+  </SafeAreaProvider>
+);
 }
 

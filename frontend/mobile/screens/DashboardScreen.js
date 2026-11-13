@@ -28,7 +28,8 @@ function StatCard({ tag, label, value, sub, subAlert, accent }) {
 }
 
 function GoalCard({ tag, label, progress, detail, color, onPress }) {
-  const pct = Math.round(progress * 100);
+  const rawPct = Math.round((Number(progress) || 0) * 100);
+  const safePct = Number.isFinite(rawPct) ? Math.min(Math.max(rawPct, 0), 100) : 0;
   const Container = onPress ? TouchableOpacity : View;
   return (
     <Container style={styles.goalCard} onPress={onPress} activeOpacity={0.85}>
@@ -39,11 +40,11 @@ function GoalCard({ tag, label, progress, detail, color, onPress }) {
           </Text>
         </View>
         <Text style={styles.goalLabel}>{label}</Text>
-        <Text style={styles.goalPct}>{pct}%</Text>
+        <Text style={styles.goalPct}>{safePct}%</Text>
         {onPress && <Text style={{ fontFamily: FONTS.bold, fontSize: 13, color: color, marginLeft: 4 }}>→</Text>}
       </View>
       <View style={styles.goalTrack}>
-        <View style={[styles.goalFill, { width: `${pct}%`, backgroundColor: color }]} />
+        <View style={[styles.goalFill, { width: `${safePct}%`, backgroundColor: color }]} />
       </View>
       <Text style={styles.goalDetail}>{detail}</Text>
     </Container>
@@ -69,7 +70,7 @@ function SpendingForecastCard({ data, loading, error }) {
         <View style={{ flex: 1 }}>
           <Text style={styles.forecastTitle}>Spending Forecast</Text>
           <Text style={styles.forecastSubtitle}>
-            {data ? `${data.goal} · ${data.month} ${data.year}` : 'SAVE MONEY · THIS MONTH'}
+            {data?.goal ? `${data.goal} · ${data.month || ''} ${data.year || ''}` : 'SAVE MONEY · THIS MONTH'}
           </Text>
         </View>
         {data && (
@@ -123,10 +124,18 @@ function SpendingForecastCard({ data, loading, error }) {
   }
 
   // ── Live data ────────────────────────────────────────────────────────────
-  const overBudget  = data.projectedSpend > data.budget;
-  const diff        = Math.abs(data.projectedSpend - data.budget);
-  const budgetPct   = Math.min((data.budgetUsedPct || 0) * 100, 100);
-  const fmt         = (n) => Number(n).toLocaleString('en-IN', { maximumFractionDigits: 0 });
+  const overBudget  = (data.projectedSpend || 0) > (data.budget || 0);
+  const diff        = Math.abs((data.projectedSpend || 0) - (data.budget || 0));
+  const rawBudgetPct = (data.budgetUsedPct || 0) * 100;
+  const budgetPct   = Number.isFinite(rawBudgetPct) ? Math.min(Math.max(rawBudgetPct, 0), 100) : 0;
+  const fmt         = (n) => {
+    try {
+      const num = Number(n);
+      return Number.isFinite(num) ? num.toLocaleString('en-IN', { maximumFractionDigits: 0 }) : '0';
+    } catch (e) {
+      return String(n || 0);
+    }
+  };
 
   const overBudgetCats = (data.categories || []).filter(c => c.projected > c.budget);
 
@@ -187,9 +196,10 @@ function SpendingForecastCard({ data, loading, error }) {
         <View style={styles.forecastCategories}>
           <Text style={styles.forecastCatTitle}>SPENDING BY CATEGORY</Text>
           {data.categories.map((cat) => {
-            const catPct = cat.budget > 0
-              ? Math.min((cat.projected / cat.budget) * 100, 100)
+            const rawCatPct = cat.budget > 0
+              ? (cat.projected / cat.budget) * 100
               : 100;
+            const catPct = Number.isFinite(rawCatPct) ? Math.min(Math.max(rawCatPct, 0), 100) : 0;
             const catOver = cat.projected > cat.budget && cat.budget > 0;
             return (
               <View key={cat.name} style={styles.forecastCatRow}>
@@ -353,7 +363,7 @@ function NutritionForecastCard({ data, loading, error }) {
         <View style={{ flex: 1 }}>
           <Text style={styles.nutritionTitle}>Nutrition Forecast</Text>
           <Text style={styles.nutritionSubtitle}>
-            {data ? `EAT HEALTHY · ${data.month} ${data.year}` : 'EAT HEALTHY · THIS MONTH'}
+            {data?.month ? `EAT HEALTHY · ${data.month} ${data.year || ''}` : 'EAT HEALTHY · THIS MONTH'}
           </Text>
         </View>
         {data && data.hasSufficientData && (
@@ -401,9 +411,17 @@ function NutritionForecastCard({ data, loading, error }) {
     );
   }
 
-  const score      = data.healthyBasketScore || 0;
+  const rawScore   = Number(data.healthyBasketScore || 0);
+  const score      = Number.isFinite(rawScore) ? Math.min(Math.max(Math.round(rawScore), 0), 100) : 0;
   const scoreColor = score >= 75 ? '#4CAF50' : score >= 50 ? '#E6A817' : COLORS.primary;
-  const fmt        = (n) => Number(n).toLocaleString('en-IN', { maximumFractionDigits: 1 });
+  const fmt        = (n) => {
+    try {
+      const num = Number(n);
+      return Number.isFinite(num) ? num.toLocaleString('en-IN', { maximumFractionDigits: 1 }) : '0';
+    } catch (e) {
+      return String(n || 0);
+    }
+  };
   const COLLAPSED_NUTRIENTS = ['calories_kcal', 'protein_g', 'fiber_g'];
   const overBudgetCats = (data.categories || []).filter(c => !c.healthy);
 
@@ -431,10 +449,11 @@ function NutritionForecastCard({ data, loading, error }) {
       {/* Key nutrients — collapsed view */}
       <View style={styles.nutritionNutrientList}>
         {COLLAPSED_NUTRIENTS.map((key) => {
-          const n = data.nutrients[key];
+          const n = data.nutrients?.[key];
           if (!n) return null;
-          const pct   = Math.min(n.pct || 0, 100);
-          const isLow = n.pct < 60;
+          const rawPct = Number(n.pct || 0);
+          const pct   = Number.isFinite(rawPct) ? Math.min(Math.max(rawPct, 0), 100) : 0;
+          const isLow = rawPct < 60;
           return (
             <View key={key} style={styles.nutritionNutrientRow}>
               <View style={styles.nutritionNutrientInfo}>
@@ -447,7 +466,7 @@ function NutritionForecastCard({ data, loading, error }) {
               <View style={styles.nutritionNutrientTrack}>
                 <View style={[styles.nutritionNutrientFill, { width: `${pct}%`, backgroundColor: n.color }]} />
               </View>
-              <Text style={styles.nutritionNutrientRda}>{Math.round(n.pct)}% of RDA</Text>
+              <Text style={styles.nutritionNutrientRda}>{Math.round(pct)}% of RDA</Text>
             </View>
           );
         })}
@@ -466,10 +485,11 @@ function NutritionForecastCard({ data, loading, error }) {
       {expanded && (
         <View style={styles.nutritionExpanded}>
           <Text style={styles.nutritionExpandedTitle}>ALL NUTRIENTS (PER DAY AVG)</Text>
-          {Object.entries(data.nutrients).map(([key, n]) => {
-            const pct   = Math.min(n.pct || 0, 100);
-            const isLow = n.pct < 60;
-            const isHigh = n.pct > 130;
+          {Object.entries(data.nutrients || {}).map(([key, n]) => {
+            const rawPct = Number(n.pct || 0);
+            const pct   = Number.isFinite(rawPct) ? Math.min(Math.max(rawPct, 0), 100) : 0;
+            const isLow = rawPct < 60;
+            const isHigh = rawPct > 130;
             return (
               <View key={key} style={styles.nutritionNutrientRow}>
                 <View style={styles.nutritionNutrientInfo}>
@@ -579,7 +599,14 @@ export default function DashboardScreen({ navigation }) {
 
   // ─── Real Quick Stats Calculation for All Users ────────────────────────────
   const quickStats = useMemo(() => {
-    const fmt = (n) => Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 });
+    const fmt = (n) => {
+      try {
+        const num = Number(n || 0);
+        return Number.isFinite(num) ? num.toLocaleString('en-IN', { maximumFractionDigits: 0 }) : '0';
+      } catch (e) {
+        return String(n || 0);
+      }
+    };
     const isInitialLoading = (forecastLoading || nutritionLoading || spendingLoading) && !forecastData && !nutritionData && !spendingData;
 
     // 1. Total Spend (Real spend calculation from actual receipts)
@@ -750,9 +777,10 @@ export default function DashboardScreen({ navigation }) {
 
   const gainMuscleGoal = useMemo(() => {
     if (nutritionData && nutritionData.hasSufficientData) {
-      const prot = Math.round(nutritionData.nutrients?.protein_g?.perDay || 0);
+      const prot = Math.round(Number(nutritionData.nutrients?.protein_g?.perDay) || 0);
       const targetProt = 120;
-      const prog = Math.min(Math.max(prot / targetProt, 0), 1);
+      const rawProg = prot / targetProt;
+      const prog = Number.isFinite(rawProg) ? Math.min(Math.max(rawProg, 0), 1) : 0;
       return {
         tag: 'FIT',
         label: 'Gain Muscle',
