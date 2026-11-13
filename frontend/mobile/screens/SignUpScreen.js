@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, TextInput, StyleSheet, TouchableOpacity,
-  KeyboardAvoidingView, Platform, Alert,
+  KeyboardAvoidingView, Platform, Alert, ActivityIndicator,
 } from 'react-native';
 import BackgroundLayout from '../components/BackgroundLayout';
 import OrDivider from '../components/OrDivider';
@@ -44,6 +44,7 @@ export default function SignUpScreen({ navigation }) {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const handleGoogleSignIn = async () => {
     if (googleLoading) return;
@@ -78,21 +79,24 @@ export default function SignUpScreen({ navigation }) {
   const allReqsMet = req.length && req.uppercase && req.number;
 
   const handleCreateAccount = async () => {
+    if (loading) return;
+
     if (!name.trim() || !email.trim() || !password || !confirmPassword) {
-      Alert.alert('Missing details', 'Please fill out all registration fields.');
+      showNotification('Missing details', 'Please fill out all registration fields.');
       return;
     }
 
     if (password !== confirmPassword) {
-      Alert.alert('Passwords do not match', 'Please confirm that both passwords are identical.');
+      showNotification('Passwords do not match', 'Please confirm that both passwords are identical.');
       return;
     }
 
     if (!allReqsMet) {
-      Alert.alert('Weak password', 'Your password must be at least 8 characters long and include an uppercase letter and a number.');
+      showNotification('Weak password', 'Your password must be at least 8 characters long and include an uppercase letter and a number.');
       return;
     }
 
+    setLoading(true);
     try {
       const response = await fetch(`${API_BASE_URL}/auth/register`, {
         method: 'POST',
@@ -113,12 +117,16 @@ export default function SignUpScreen({ navigation }) {
         });
         if (navigation.replace) {
           navigation.replace('PersonalInfo', { name: name.trim(), userId: data.user_id });
+        } else if (navigation.navigate) {
+          navigation.navigate('PersonalInfo', { name: name.trim(), userId: data.user_id });
         }
       } else {
-        Alert.alert('Registration Failed', data.detail || 'Please try again.');
+        showNotification('Registration Failed', data.detail || 'Please try again.');
       }
     } catch (error) {
-      Alert.alert('Network Error', 'Could not connect to the server.');
+      showNotification('Network Error', 'Could not connect to the server.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -209,11 +217,16 @@ export default function SignUpScreen({ navigation }) {
 
           {/* Button */}
           <TouchableOpacity
-            style={[styles.primaryButton, (!allReqsMet || !name || !email) && styles.disabledButton]}
+            style={[styles.primaryButton, (!allReqsMet || !name || !email || loading) && styles.disabledButton]}
             onPress={handleCreateAccount}
+            disabled={loading}
             activeOpacity={0.85}
           >
-            <Text style={styles.primaryButtonText}>CREATE ACCOUNT</Text>
+            {loading ? (
+              <ActivityIndicator color="#FFFFFF" size="small" />
+            ) : (
+              <Text style={styles.primaryButtonText}>CREATE ACCOUNT</Text>
+            )}
           </TouchableOpacity>
 
           {/* OR Divider */}

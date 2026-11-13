@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, Alert, ActivityIndicator } from 'react-native';
 import BackgroundLayout from '../components/BackgroundLayout';
 import ProgressBar from '../components/ProgressBar';
 import PreferenceChip from '../components/PreferenceChip';
 import GoalCard from '../components/GoalCard';
 import ReviewCard from '../components/ReviewCard';
 import { API_BASE_URL } from '../utils/apiConfig';
+import { getUser } from '../utils/authStorage';
+import { showNotification } from '../utils/alertHelper';
 import ProfileIcon from '../assets/icons/profile.svg';
 import HomeIcon from '../assets/icons/home.svg';
 import CameraIcon from '../assets/icons/camera.svg';
@@ -37,16 +39,27 @@ export default function OnboardingFlowScreen({ navigation, route }) {
   const [data, setData] = useState({ fullName: route.params?.name || '', age: '', gender: '', height: '', weight: '', activity: '', food: '', allergies: [], conditions: [], goals: [], budget: '', stores: [], household: '', frequency: '', city: '' });
   const update = (key, value) => setData((d) => ({ ...d, [key]: value }));
   const required = step === 1 ? data.fullName && /^\d+$/.test(data.age) && data.gender && /^\d+(\.\d+)?$/.test(data.height) && /^\d+(\.\d+)?$/.test(data.weight) : step === 2 ? data.activity && data.food : step === 3 ? data.goals.length : step === 4 ? data.budget && data.household && data.frequency : true;
+  const [loading, setLoading] = useState(false);
   const go = async () => {
     if (step < 5) {
       setStep(step + 1);
     } else {
+      setLoading(true);
       try {
+        const currentUser = await getUser();
+        const userId = route.params?.userId || currentUser?.id || currentUser?.user_id;
+
+        if (!userId) {
+          showNotification('Session Notice', 'Could not locate user identity. Please log in again.');
+          setLoading(false);
+          return;
+        }
+
         const response = await fetch(`${API_BASE_URL}/auth/onboarding`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            user_id: route.params?.userId,
+            user_id: userId,
             full_name: data.fullName,
             age: data.age ? parseInt(data.age, 10) : null,
             gender: data.gender,
@@ -67,13 +80,19 @@ export default function OnboardingFlowScreen({ navigation, route }) {
         if (response.ok) {
           if (navigation.reset) {
             navigation.reset({ index: 0, routes: [{ name: 'Main' }] });
+          } else if (navigation.replace) {
+            navigation.replace('Main');
+          } else if (navigation.navigate) {
+            navigation.navigate('Main');
           }
         } else {
           const result = await response.json();
-          Alert.alert('Error', result.detail || 'Failed to save onboarding data.');
+          showNotification('Onboarding Notice', result.detail || 'Failed to save onboarding data.');
         }
       } catch (error) {
-        Alert.alert('Error', 'Could not connect to the server.');
+        showNotification('Connection Error', 'Could not connect to the server.');
+      } finally {
+        setLoading(false);
       }
     }
   };
@@ -85,7 +104,7 @@ export default function OnboardingFlowScreen({ navigation, route }) {
   {step === 3 && <View>{goals.map((goal) => <GoalCard key={goal.title} goal={goal} selected={data.goals.includes(goal.title)} onPress={() => update('goals', data.goals.includes(goal.title) ? data.goals.filter((g) => g !== goal.title) : [...data.goals, goal.title])} />)}</View>}
   {step === 4 && <View><Label>MONTHLY GROCERY BUDGET (₹)</Label><Input value={data.budget} onChangeText={(v) => update('budget', v)} placeholder="e.g. 8000" keyboardType="numeric" /><Label>PREFERRED STORES (OPTIONAL)</Label><Chips items={['DMart', 'Reliance Fresh', 'Big Bazaar', 'More', "Spencer's", 'Local Market']} value={data.stores} setValue={(v) => update('stores', v)} /><Label>HOUSEHOLD SIZE</Label><Chips items={['1', '2', '3', '4', '5+']} value={data.household ? [data.household] : []} setValue={(v) => update('household', v[0] || '')} /><Label>SHOPPING FREQUENCY</Label><Chips items={['Weekly', 'Bi-weekly', 'Monthly']} value={data.frequency ? [data.frequency] : []} setValue={(v) => update('frequency', v[0] || '')} /><Label>CITY (OPTIONAL)</Label><Input value={data.city} onChangeText={(v) => update('city', v)} placeholder="Your city" /></View>}
   {step === 5 && <View><ReviewCard title="Personal Information" onEdit={() => edit(1)} rows={[["Name", data.fullName], ['Age', data.age], ['Gender', data.gender], ['Height', data.height && `${data.height} cm`], ['Weight', data.weight && `${data.weight} kg`]]} /><ReviewCard title="Lifestyle" onEdit={() => edit(2)} rows={[["Activity", data.activity], ['Food preference', data.food], ['Allergies', data.allergies.join(', ')], ['Conditions', data.conditions.join(', ')]]} /><ReviewCard title="Goals" onEdit={() => edit(3)} rows={[["Selected goals", data.goals.join(', ')]]} /><ReviewCard title="Shopping Preferences" onEdit={() => edit(4)} rows={[["Budget", data.budget && `₹${data.budget}`], ['Stores', data.stores.join(', ')], ['Household', data.household], ['Frequency', data.frequency], ['City', data.city]]} /></View>}
-  {!required && <Text style={styles.error}>{step === 3 ? 'Choose at least one goal to continue.' : 'Complete the required fields to continue.'}</Text>}<View style={styles.buttons}>{step > 1 && <TouchableOpacity style={styles.back} onPress={() => setStep(step - 1)}><Text style={styles.backText}>BACK</Text></TouchableOpacity>}<TouchableOpacity disabled={!required} onPress={go} style={[styles.next, !required && styles.disabled]}><Text style={styles.nextText}>{step === 5 ? 'FINISH SETUP' : 'NEXT'}</Text></TouchableOpacity></View></ScrollView></KeyboardAvoidingView></BackgroundLayout>;
+  {!required && <Text style={styles.error}>{step === 3 ? 'Choose at least one goal to continue.' : 'Complete the required fields to continue.'}</Text>}<View style={styles.buttons}>{step > 1 && <TouchableOpacity style={styles.back} onPress={() => setStep(step - 1)} disabled={loading}><Text style={styles.backText}>BACK</Text></TouchableOpacity>}<TouchableOpacity disabled={!required || loading} onPress={go} style={[styles.next, (!required || loading) && styles.disabled]}>{loading ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.nextText}>{step === 5 ? 'FINISH SETUP' : 'NEXT'}</Text>}</TouchableOpacity></View></ScrollView></KeyboardAvoidingView></BackgroundLayout>;
 }
 const styles = StyleSheet.create({ content: { flexGrow: 1, paddingBottom: 26 }, hero: { alignItems: 'center', marginBottom: 21 }, icon: { width: 56, height: 56, borderRadius: 28, backgroundColor: '#dcfce7', alignItems: 'center', justifyContent: 'center', marginBottom: 10 }, heroIcon: { width: 36, height: 36 }, title: { color: '#174d2a', fontFamily: 'serif', fontSize: 23, fontWeight: '700', marginBottom: 6 }, subtitle: { color: '#64756a', fontFamily: 'serif', fontSize: 13, textAlign: 'center', lineHeight: 18 }, label: { color: '#174d2a', fontFamily: 'serif', fontSize: 10, fontWeight: '700', letterSpacing: 1.1, marginBottom: 7, marginTop: 6 }, input: { backgroundColor: '#f6fdf8', borderWidth: 1, borderColor: '#b8d5c1', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontFamily: 'serif', fontSize: 15, color: '#173d28', marginBottom: 10 }, chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14 }, buttons: { flexDirection: 'row', gap: 10, marginTop: 12 }, back: { flex: 1, borderWidth: 1, borderColor: green, borderRadius: 28, alignItems: 'center', justifyContent: 'center', paddingVertical: 14 }, backText: { color: green, fontFamily: 'serif', fontWeight: '700', fontSize: 13, letterSpacing: 1 }, next: { flex: 1, backgroundColor: green, borderRadius: 28, alignItems: 'center', paddingVertical: 15, elevation: 3 }, nextText: { color: '#fff', fontFamily: 'serif', fontWeight: '700', fontSize: 13, letterSpacing: 1 }, disabled: { opacity: .42 }, error: { color: '#b45309', fontFamily: 'serif', fontSize: 12, marginTop: 2 } });
 

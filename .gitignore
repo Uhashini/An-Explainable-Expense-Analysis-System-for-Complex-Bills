@@ -77,6 +77,10 @@ backend/test_image/ocr_output.json
 *.jpg
 *.png
 ocr_summary.md.resolved
+fix.js
+fix_trendline.js
+script.py
+user_spending.py
 
 # Node.js
 node_modules/

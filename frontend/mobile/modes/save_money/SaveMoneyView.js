@@ -1,6 +1,7 @@
-import React from 'react';
-import { View, Text, ActivityIndicator } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+
 import CategorySpendingSection from './CategorySpendingSection';
 import ItemBreakdownSection from './ItemBreakdownSection';
 import BudgetUtilizationSection from './BudgetUtilizationSection';
@@ -8,6 +9,8 @@ import SpendingTrendSection from './SpendingTrendSection';
 import PriceDeviationSection from './PriceDeviationSection';
 import CategoryOverspendingSection from './CategoryOverspendingSection';
 import PurchaseFrequencySection from './PurchaseFrequencySection';
+
+import AnalyticsStoryDeck from '../../components/AnalyticsStoryDeck';
 import { COLORS, FONTS } from '../../theme';
 import styles from './saveMoneyStyles';
 
@@ -21,6 +24,8 @@ export default function SaveMoneyView({
   setPreviousSpend,
   onRecalculateBudget,
 }) {
+  const [viewMode, setViewMode] = useState('deck'); // 'deck' | 'list'
+
   const categorySpending = saveMoneyData?.category_spending;
   const itemBreakdown = saveMoneyData?.item_breakdown;
   const budgetUtilization = saveMoneyData?.budget_utilization;
@@ -29,171 +34,166 @@ export default function SaveMoneyView({
   const categoryAnomalies = saveMoneyData?.category_anomalies;
   const purchaseFrequency = saveMoneyData?.purchase_frequency;
 
-  const totalSpend =
-    categorySpending?.total_spending ??
-    categorySpending?.total_spend ??
-    budgetUtilization?.current_receipt_total ??
-    0;
+  // ─── The EXACT 7 Analytics Sections Placed Directly Into The Story Deck ───
+  const storyCards = [
+    // Slide 1: SM-01 Category-wise Spending Distribution
+    <CategorySpendingSection
+      key="sm-01"
+      categorySpendingData={categorySpending}
+      isLoading={isLoadingSaveMoney}
+    />,
 
-  const highestCat =
-    categorySpending?.highest_category?.category ||
-    categorySpending?.highest_category?.category_name ||
-    'N/A';
+    // Slide 2: SM-02 Item-wise Spending Breakdown
+    <ItemBreakdownSection
+      key="sm-02"
+      itemBreakdownData={itemBreakdown}
+      isLoading={isLoadingSaveMoney}
+    />,
 
-  const budgetStatus = budgetUtilization?.status || 'SAFE';
+    // Slide 3: SM-03 Budget Utilization & Goal Setting
+    <BudgetUtilizationSection
+      key="sm-03"
+      budgetUtilizationData={budgetUtilization}
+      isLoading={isLoadingSaveMoney}
+      monthlyBudget={monthlyBudget}
+      setMonthlyBudget={setMonthlyBudget}
+      previousSpend={previousSpend}
+      setPreviousSpend={setPreviousSpend}
+      onRecalculate={onRecalculateBudget}
+    />,
+
+    // Slide 4: SM-04 Weekly / Monthly Spending Trend
+    <SpendingTrendSection
+      key="sm-04"
+      spendingTrendData={spendingTrend}
+      isLoading={isLoadingSaveMoney}
+    />,
+
+    // Slide 5: SM-05 Price Deviation Analysis
+    <PriceDeviationSection
+      key="sm-05"
+      priceDeviationData={priceDeviation}
+      isLoading={isLoadingSaveMoney}
+    />,
+
+    // Slide 6: SM-06 Category Overspending (ML Isolation Forest + SHAP)
+    <CategoryOverspendingSection
+      key="sm-06"
+      categoryAnomaliesData={categoryAnomalies}
+      isLoading={isLoadingSaveMoney}
+    />,
+
+    // Slide 7: SM-07 Purchase Frequency & Staples
+    <PurchaseFrequencySection
+      key="sm-07"
+      purchaseFrequencyData={purchaseFrequency}
+      isLoading={isLoadingSaveMoney}
+    />,
+  ];
 
   return (
     <View style={styles.maxWidthWrapper}>
-      {/* Overview Ribbon Card */}
-      <View style={styles.purposeCard}>
-        <View style={styles.badgeRow}>
-          <Text style={styles.purposeBadge}>SAVE MONEY INTELLIGENCE</Text>
-          <View style={[styles.subBadge, { backgroundColor: '#E8F5E9' }]}>
-            <Text style={[styles.subBadgeText, { color: '#2E7D32' }]}>
-              {receiptId ? `Receipt #${receiptId}` : 'Current Grocery Haul'}
-            </Text>
-          </View>
-        </View>
+      {/* ── View Mode Switcher ── */}
+      <View style={viewStyles.toggleRow}>
+        <TouchableOpacity
+          onPress={() => setViewMode('deck')}
+          style={[viewStyles.toggleBtn, viewMode === 'deck' && viewStyles.toggleBtnActive]}
+          activeOpacity={0.8}
+        >
+          <Feather name="layers" size={13} color={viewMode === 'deck' ? '#FFFFFF' : '#7A7265'} />
+          <Text style={[viewStyles.toggleText, viewMode === 'deck' && viewStyles.toggleTextActive]}>
+            Story Deck
+          </Text>
+        </TouchableOpacity>
 
-        <Text style={styles.purposeTitle}>
-          Expense Intelligence & Budget Optimization
-        </Text>
-        <Text style={styles.purposeDesc}>
-          Comprehensive 7-point financial audit including category distribution, cost ranking, goal tracking, ML overspend detection, and price inflation benchmarks.
-        </Text>
-
-        {/* Quick KPI Stat Ribbon */}
-        <View style={styles.metricsGrid}>
-          <View style={styles.metricCard}>
-            <View style={styles.metricCardTop}>
-              <View style={[styles.metricIconBg, { backgroundColor: '#E3F2FD' }]}>
-                <Feather name="shopping-bag" size={16} color="#1976D2" />
-              </View>
-              <Text style={styles.rdiBadge}>SM-01</Text>
-            </View>
-            <Text style={styles.metricValue} numberOfLines={1}>₹{totalSpend.toLocaleString()}</Text>
-            <Text style={styles.metricLabel} numberOfLines={1}>Total Spend</Text>
-          </View>
-
-          <View style={styles.metricCard}>
-            <View style={styles.metricCardTop}>
-              <View style={[styles.metricIconBg, { backgroundColor: '#FFF3E0' }]}>
-                <Feather name="pie-chart" size={16} color="#F57C00" />
-              </View>
-              <Text style={[styles.rdiBadge, { backgroundColor: '#FFF3E0', color: '#F57C00' }]}>Top Cat</Text>
-            </View>
-            <Text style={[styles.metricValue, { fontSize: 14 }]} numberOfLines={1}>
-              {highestCat}
-            </Text>
-            <Text style={styles.metricLabel} numberOfLines={1}>Highest Spend</Text>
-          </View>
-
-          <View style={styles.metricCard}>
-            <View style={styles.metricCardTop}>
-              <View
-                style={[
-                  styles.metricIconBg,
-                  {
-                    backgroundColor:
-                      budgetStatus === 'SAFE'
-                        ? '#E8F5E9'
-                        : budgetStatus === 'WARNING'
-                        ? '#FFF8E1'
-                        : '#FFEBEE',
-                  },
-                ]}
-              >
-                <Feather
-                  name="shield"
-                  size={16}
-                  color={
-                    budgetStatus === 'SAFE'
-                      ? '#2E7D32'
-                      : budgetStatus === 'WARNING'
-                      ? '#F57C00'
-                      : '#D32F2F'
-                  }
-                />
-              </View>
-              <Text
-                style={[
-                  styles.rdiBadge,
-                  {
-                    backgroundColor:
-                      budgetStatus === 'SAFE'
-                        ? '#E8F5E9'
-                        : budgetStatus === 'WARNING'
-                        ? '#FFF8E1'
-                        : '#FFEBEE',
-                    color:
-                      budgetStatus === 'SAFE'
-                        ? '#2E7D32'
-                        : budgetStatus === 'WARNING'
-                        ? '#F57C00'
-                        : '#D32F2F',
-                  },
-                ]}
-              >
-                {budgetStatus}
-              </Text>
-            </View>
-            <Text style={styles.metricValue} numberOfLines={1}>
-              {budgetUtilization?.utilization_percentage ?? budgetUtilization?.utilization ?? 0}%
-            </Text>
-            <Text style={styles.metricLabel} numberOfLines={1}>Budget Used</Text>
-          </View>
-        </View>
+        <TouchableOpacity
+          onPress={() => setViewMode('list')}
+          style={[viewStyles.toggleBtn, viewMode === 'list' && viewStyles.toggleBtnActive]}
+          activeOpacity={0.8}
+        >
+          <Feather name="list" size={13} color={viewMode === 'list' ? '#FFFFFF' : '#7A7265'} />
+          <Text style={[viewStyles.toggleText, viewMode === 'list' && viewStyles.toggleTextActive]}>
+            Full Audit Feed
+          </Text>
+        </TouchableOpacity>
       </View>
 
-      {/* Structured Sections Flow */}
-      <View style={[styles.contentContainer, { marginTop: 16 }]}>
-        {/* SM-01: Category-wise Spending Distribution */}
-        <CategorySpendingSection
-          categorySpendingData={categorySpending}
-          isLoading={isLoadingSaveMoney}
+      {/* ── Content View ── */}
+      {viewMode === 'deck' ? (
+        <AnalyticsStoryDeck
+          cards={storyCards}
+          initialIndex={0}
         />
-
-        {/* SM-02: Item-wise Spending Breakdown */}
-        <ItemBreakdownSection
-          itemBreakdownData={itemBreakdown}
-          isLoading={isLoadingSaveMoney}
-        />
-
-        {/* SM-03: Budget Utilization & Goal Setting */}
-        <BudgetUtilizationSection
-          budgetUtilizationData={budgetUtilization}
-          isLoading={isLoadingSaveMoney}
-          monthlyBudget={monthlyBudget}
-          setMonthlyBudget={setMonthlyBudget}
-          previousSpend={previousSpend}
-          setPreviousSpend={setPreviousSpend}
-          onRecalculate={onRecalculateBudget}
-        />
-
-        {/* SM-04: Weekly / Monthly Spending Trend */}
-        <SpendingTrendSection
-          spendingTrendData={spendingTrend}
-          isLoading={isLoadingSaveMoney}
-        />
-
-        {/* SM-05: Price Deviation Analysis */}
-        <PriceDeviationSection
-          priceDeviationData={priceDeviation}
-          isLoading={isLoadingSaveMoney}
-        />
-
-        {/* SM-06: Category Overspending (Isolation Forest + SHAP) */}
-        <CategoryOverspendingSection
-          categoryAnomaliesData={categoryAnomalies}
-          isLoading={isLoadingSaveMoney}
-        />
-
-        {/* SM-07: Purchase Frequency & Staples */}
-        <PurchaseFrequencySection
-          purchaseFrequencyData={purchaseFrequency}
-          isLoading={isLoadingSaveMoney}
-        />
-      </View>
+      ) : (
+        /* ── Full Audit Feed Mode ── */
+        <View style={[styles.contentContainer, { marginTop: 12 }]}>
+          <CategorySpendingSection
+            categorySpendingData={categorySpending}
+            isLoading={isLoadingSaveMoney}
+          />
+          <ItemBreakdownSection
+            itemBreakdownData={itemBreakdown}
+            isLoading={isLoadingSaveMoney}
+          />
+          <BudgetUtilizationSection
+            budgetUtilizationData={budgetUtilization}
+            isLoading={isLoadingSaveMoney}
+            monthlyBudget={monthlyBudget}
+            setMonthlyBudget={setMonthlyBudget}
+            previousSpend={previousSpend}
+            setPreviousSpend={setPreviousSpend}
+            onRecalculate={onRecalculateBudget}
+          />
+          <SpendingTrendSection
+            spendingTrendData={spendingTrend}
+            isLoading={isLoadingSaveMoney}
+          />
+          <PriceDeviationSection
+            priceDeviationData={priceDeviation}
+            isLoading={isLoadingSaveMoney}
+          />
+          <CategoryOverspendingSection
+            categoryAnomaliesData={categoryAnomalies}
+            isLoading={isLoadingSaveMoney}
+          />
+          <PurchaseFrequencySection
+            purchaseFrequencyData={purchaseFrequency}
+            isLoading={isLoadingSaveMoney}
+          />
+        </View>
+      )}
     </View>
   );
 }
+
+const viewStyles = StyleSheet.create({
+  toggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EAE6DC',
+    borderRadius: 20,
+    padding: 3,
+    marginTop: 4,
+    marginBottom: 8,
+    alignSelf: 'center',
+  },
+  toggleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    borderRadius: 16,
+    gap: 6,
+  },
+  toggleBtnActive: {
+    backgroundColor: '#8B0000',
+  },
+  toggleText: {
+    fontFamily: FONTS.bold,
+    fontSize: 11,
+    color: '#7A7265',
+  },
+  toggleTextActive: {
+    color: '#FFFFFF',
+  },
+});
