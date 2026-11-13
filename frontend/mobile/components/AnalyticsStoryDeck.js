@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react';
 import {
   View,
   Text,
@@ -24,15 +24,18 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
  * - Active card rendered directly from existing analytics components
  * - Smooth vertical scrolling inside card for tall content (nestedScrollEnabled)
  * - Touch swipe gestures (PanResponder) & Web ArrowLeft/ArrowRight keyboard support
- * - Fixed bottom navigation controls (< Previous, Next Insight (X/Y))
+ * - Fixed top navigation controls (< Previous, Next Insight (X/Y))
  */
-export default function AnalyticsStoryDeck({
-  cards = [],
-  initialIndex = 0,
-  onCardChange,
-  onComplete,
-  containerStyle,
-}) {
+const AnalyticsStoryDeck = forwardRef(function AnalyticsStoryDeck(
+  {
+    cards = [],
+    initialIndex = 0,
+    onCardChange,
+    onComplete,
+    containerStyle,
+  },
+  ref
+) {
   const [activeIndex, setActiveIndex] = useState(initialIndex);
   const totalCards = cards.length;
 
@@ -81,6 +84,11 @@ export default function AnalyticsStoryDeck({
       ]).start();
     });
   }, [activeIndex, totalCards, onCardChange, slideAnim, fadeAnim]);
+
+  useImperativeHandle(ref, () => ({
+    goToCard,
+    activeIndex,
+  }), [goToCard, activeIndex]);
 
   const handleNext = useCallback(() => {
     if (activeIndex < totalCards - 1) {
@@ -260,7 +268,9 @@ export default function AnalyticsStoryDeck({
       </View>
     </View>
   );
-}
+});
+
+export default AnalyticsStoryDeck;
 
 const styles = StyleSheet.create({
   deckContainer: {

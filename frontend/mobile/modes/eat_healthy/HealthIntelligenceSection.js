@@ -29,7 +29,9 @@ export default function HealthIntelligenceSection({
   data,
   receiptId,
   receiptData,
-  savedReceiptsList = []
+  savedReceiptsList = [],
+  sectionFilter = 'all',
+  hideHeader = false,
 }) {
   const [activeTab, setActiveTab] = useState('all');
   const [intelligence, setIntelligence] = useState(null);
@@ -138,74 +140,78 @@ export default function HealthIntelligenceSection({
   return (
     <View style={localStyles.container}>
       {/* ── 1. Purpose Banner & Personalized Health Profile ── */}
-      <View style={[styles.purposeCard, { borderLeftColor: COLORS.primary }]}>
-        <View style={styles.badgeRow}>
-          <Text style={[styles.purposeBadge, { color: COLORS.primary }]}>
-            HEALTH INTELLIGENCE
-          </Text>
-          <View style={localStyles.personalizedPill}>
-            <Feather name="user-check" size={11} color={COLORS.primary} style={{ marginRight: 4 }} />
-            <Text style={localStyles.personalizedPillText}>
-              Personalized for {userCtx.name || 'You'}
+      {!hideHeader && (
+        <View style={[styles.purposeCard, { borderLeftColor: COLORS.primary }]}>
+          <View style={styles.badgeRow}>
+            <Text style={[styles.purposeBadge, { color: COLORS.primary }]}>
+              HEALTH INTELLIGENCE
             </Text>
-          </View>
-        </View>
-
-        <Text style={styles.purposeTitle}>Personalized Nutrition & Risk Screen</Text>
-        <Text style={styles.purposeSub}>
-          Cross-referencing purchased foods against your personal health goals, declared allergies, glycemic load, and cardiovascular sodium targets.
-        </Text>
-
-        {/* User Context Chips */}
-        <View style={localStyles.contextChipsRow}>
-          <View style={localStyles.contextChip}>
-            <Text style={localStyles.contextChipLabel}>🎯 Goal:</Text>
-            <Text style={localStyles.contextChipValue}>{userCtx.goals || 'Eat Healthy'}</Text>
-          </View>
-          <View style={localStyles.contextChip}>
-            <Text style={localStyles.contextChipLabel}>🥗 Diet:</Text>
-            <Text style={localStyles.contextChipValue}>{userCtx.food_preference || 'Standard'}</Text>
-          </View>
-          <View style={localStyles.contextChip}>
-            <Text style={localStyles.contextChipLabel}>🛡️ Allergies:</Text>
-            <Text style={localStyles.contextChipValue}>{userCtx.allergies || 'None'}</Text>
-          </View>
-          {userCtx.medical_conditions && userCtx.medical_conditions !== 'None declared' && (
-            <View style={[localStyles.contextChip, { borderColor: '#FFCDD2', backgroundColor: '#FFEBEE' }]}>
-              <Text style={[localStyles.contextChipLabel, { color: '#C62828' }]}>❤️ Condition:</Text>
-              <Text style={[localStyles.contextChipValue, { color: '#C62828' }]}>{userCtx.medical_conditions}</Text>
+            <View style={localStyles.personalizedPill}>
+              <Feather name="user-check" size={11} color={COLORS.primary} style={{ marginRight: 4 }} />
+              <Text style={localStyles.personalizedPillText}>
+                Personalized for {userCtx.name || 'You'}
+              </Text>
             </View>
-          )}
+          </View>
+
+          <Text style={styles.purposeTitle}>Personalized Nutrition & Risk Screen</Text>
+          <Text style={styles.purposeSub}>
+            Cross-referencing purchased foods against your personal health goals, declared allergies, glycemic load, and cardiovascular sodium targets.
+          </Text>
+
+          {/* User Context Chips */}
+          <View style={localStyles.contextChipsRow}>
+            <View style={localStyles.contextChip}>
+              <Text style={localStyles.contextChipLabel}>🎯 Goal:</Text>
+              <Text style={localStyles.contextChipValue}>{userCtx.goals || 'Eat Healthy'}</Text>
+            </View>
+            <View style={localStyles.contextChip}>
+              <Text style={localStyles.contextChipLabel}>🥗 Diet:</Text>
+              <Text style={localStyles.contextChipValue}>{userCtx.food_preference || 'Standard'}</Text>
+            </View>
+            <View style={localStyles.contextChip}>
+              <Text style={localStyles.contextChipLabel}>🛡️ Allergies:</Text>
+              <Text style={localStyles.contextChipValue}>{userCtx.allergies || 'None'}</Text>
+            </View>
+            {userCtx.medical_conditions && userCtx.medical_conditions !== 'None declared' && (
+              <View style={[localStyles.contextChip, { borderColor: '#FFCDD2', backgroundColor: '#FFEBEE' }]}>
+                <Text style={[localStyles.contextChipLabel, { color: '#C62828' }]}>❤️ Condition:</Text>
+                <Text style={[localStyles.contextChipValue, { color: '#C62828' }]}>{userCtx.medical_conditions}</Text>
+              </View>
+            )}
+          </View>
         </View>
-      </View>
+      )}
 
       {/* ── 2. Interactive Navigation Filter Tabs ── */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={localStyles.tabsScroll}
-      >
-        {SECTION_TABS.map((tab) => {
-          const isActive = activeTab === tab.id;
-          return (
-            <TouchableOpacity
-              key={tab.id}
-              onPress={() => setActiveTab(tab.id)}
-              style={[localStyles.filterTab, isActive && localStyles.filterTabActive]}
-            >
-              <Feather
-                name={tab.icon}
-                size={13}
-                color={isActive ? '#FFFFFF' : COLORS.primary}
-                style={{ marginRight: 6 }}
-              />
-              <Text style={[localStyles.filterTabText, isActive && localStyles.filterTabTextActive]}>
-                {tab.label}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
+      {!hideHeader && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={localStyles.tabsScroll}
+        >
+          {SECTION_TABS.map((tab) => {
+            const isActive = activeTab === tab.id;
+            return (
+              <TouchableOpacity
+                key={tab.id}
+                onPress={() => setActiveTab(tab.id)}
+                style={[localStyles.filterTab, isActive && localStyles.filterTabActive]}
+              >
+                <Feather
+                  name={tab.icon}
+                  size={13}
+                  color={isActive ? '#FFFFFF' : COLORS.primary}
+                  style={{ marginRight: 6 }}
+                />
+                <Text style={[localStyles.filterTabText, isActive && localStyles.filterTabTextActive]}>
+                  {tab.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      )}
 
       {isLoading && !intelligence && (
         <View style={localStyles.loadingContainer}>
@@ -215,7 +221,7 @@ export default function HealthIntelligenceSection({
       )}
 
       {/* ── 3. Section A: Glycemic Impact Analysis ── */}
-      {(activeTab === 'all' || activeTab === 'glycemic') && (
+      {((sectionFilter === 'all' && (activeTab === 'all' || activeTab === 'glycemic')) || sectionFilter === 'glycemic') && (
         <View style={styles.card}>
           <TouchableOpacity
             activeOpacity={0.8}
@@ -316,7 +322,7 @@ export default function HealthIntelligenceSection({
       )}
 
       {/* ── 4. Section B: Sodium & Cardiovascular Health ── */}
-      {(activeTab === 'all' || activeTab === 'sodium') && (
+      {((sectionFilter === 'all' && (activeTab === 'all' || activeTab === 'sodium')) || sectionFilter === 'sodium') && (
         <View style={styles.card}>
           <TouchableOpacity
             activeOpacity={0.8}
@@ -413,7 +419,7 @@ export default function HealthIntelligenceSection({
       )}
 
       {/* ── 5. Section C: Allergen & Dietary Restriction Screening ── */}
-      {(activeTab === 'all' || activeTab === 'allergen') && (
+      {((sectionFilter === 'all' && (activeTab === 'all' || activeTab === 'allergen')) || sectionFilter === 'allergen') && (
         <View style={styles.card}>
           <TouchableOpacity
             activeOpacity={0.8}
@@ -528,7 +534,7 @@ export default function HealthIntelligenceSection({
       )}
 
       {/* ── 6. Section D: Nutritional Balance Analysis ── */}
-      {(activeTab === 'all' || activeTab === 'balance') && (
+      {((sectionFilter === 'all' && (activeTab === 'all' || activeTab === 'balance')) || sectionFilter === 'balance') && (
         <View style={styles.card}>
           <TouchableOpacity
             activeOpacity={0.8}
@@ -648,7 +654,7 @@ export default function HealthIntelligenceSection({
       )}
 
       {/* ── 7. Section E: Personalized Health Recommendations ── */}
-      {(activeTab === 'all' || activeTab === 'recs') && (
+      {((sectionFilter === 'all' && (activeTab === 'all' || activeTab === 'recs')) || sectionFilter === 'recs') && (
         <View style={styles.card}>
           <TouchableOpacity
             activeOpacity={0.8}
