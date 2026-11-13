@@ -19,7 +19,7 @@ import SignUpScreen from './screens/SignUpScreen';
 
 // ─── Onboarding Screens ──────────────────────────────────────────────────────
 import PersonalInfoScreen from './screens/OnboardingFlowScreen';
-import GoalsScreen from './screens/GoalsScreen';
+// GoalsScreen removed — was a dead prototype; OnboardingFlowScreen handles the full flow
 
 // ─── Main App Screens ────────────────────────────────────────────────────────
 import DashboardScreen from './screens/DashboardScreen';
@@ -235,7 +235,8 @@ export default function App() {
 
           {/* â”€â”€ Onboarding â”€â”€ */}
           <Stack.Screen name="PersonalInfo" component={PersonalInfoScreen} />
-          <Stack.Screen name="Goals" component={GoalsScreen} />
+          {/* Goals route redirects to OnboardingFlowScreen — the dead GoalsScreen prototype is no longer used */}
+          <Stack.Screen name="Goals" component={PersonalInfoScreen} />
           <Stack.Screen name="EditGoals" component={EditGoalsScreen} />
           <Stack.Screen name="PersonalInformation" component={PersonalInformationScreen} />
           <Stack.Screen name="HealthProfile" component={HealthProfileScreen} />

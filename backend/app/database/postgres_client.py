@@ -55,6 +55,8 @@ class UserOnboarding(Base):
     household_size = Column(String(50))
     shopping_frequency = Column(String(50))
     city = Column(String(100))
+    monthly_budget = Column(Numeric(12, 2), nullable=True)
+    preferred_stores = Column(String(255), nullable=True)
 
 # ---------- Food / Nutrition tables (match existing PostgreSQL schema) ----------
 

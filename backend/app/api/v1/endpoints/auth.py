@@ -118,6 +118,11 @@ class RefreshTokenRequest(BaseModel):
 
 class OnboardingData(BaseModel):
     user_id: int
+    # Personal info (also updates UserProfile)
+    full_name: Optional[str] = None
+    age: Optional[int] = None
+    gender: Optional[str] = None
+    # Onboarding fields
     height: Optional[str] = None
     weight: Optional[str] = None
     activity_level: Optional[str] = None
@@ -125,6 +130,8 @@ class OnboardingData(BaseModel):
     allergies: Optional[str] = None
     medical_conditions: Optional[str] = None
     goals: Optional[str] = None
+    monthly_budget: Optional[float] = None
+    preferred_stores: Optional[str] = None
     household_size: Optional[str] = None
     shopping_frequency: Optional[str] = None
     city: Optional[str] = None
@@ -475,6 +482,8 @@ def get_current_user_profile(
             "allergies": onboarding.allergies if onboarding else None,
             "medical_conditions": onboarding.medical_conditions if onboarding else None,
             "goals": onboarding.goals if onboarding else None,
+            "monthly_budget": float(onboarding.monthly_budget) if onboarding and onboarding.monthly_budget else None,
+            "preferred_stores": onboarding.preferred_stores if onboarding else None,
             "household_size": onboarding.household_size if onboarding else None,
             "shopping_frequency": onboarding.shopping_frequency if onboarding else None,
             "city": onboarding.city if onboarding else None,
@@ -486,15 +495,41 @@ def onboarding(data: OnboardingData, db: Session = Depends(get_db)):
     db_user = db.query(UserProfile).filter(UserProfile.user_id == data.user_id).first()
     if not db_user:
         raise HTTPException(status_code=404, detail="User not found")
-        
+
+    # Update UserProfile with personal info if provided
+    if data.full_name:
+        db_user.name = data.full_name.strip()
+    if data.age is not None:
+        db_user.age = data.age
+    if data.gender:
+        db_user.gender = data.gender
+    db.commit()
+
+    # Fields that belong in UserOnboarding (exclude personal info + user_id)
+    onboarding_fields = {
+        "height": data.height,
+        "weight": data.weight,
+        "activity_level": data.activity_level,
+        "food_preference": data.food_preference,
+        "allergies": data.allergies,
+        "medical_conditions": data.medical_conditions,
+        "goals": data.goals,
+        "monthly_budget": data.monthly_budget,
+        "preferred_stores": data.preferred_stores,
+        "household_size": data.household_size,
+        "shopping_frequency": data.shopping_frequency,
+        "city": data.city,
+    }
+
     existing_onboarding = db.query(UserOnboarding).filter(UserOnboarding.user_id == data.user_id).first()
     if existing_onboarding:
-        for key, value in data.dict(exclude={"user_id"}).items():
-            setattr(existing_onboarding, key, value)
+        for key, value in onboarding_fields.items():
+            if value is not None:
+                setattr(existing_onboarding, key, value)
         db.commit()
         return {"message": "Onboarding data updated successfully"}
     else:
-        new_onboarding = UserOnboarding(**data.dict())
+        new_onboarding = UserOnboarding(user_id=data.user_id, **{k: v for k, v in onboarding_fields.items() if v is not None})
         db.add(new_onboarding)
         db.commit()
         return {"message": "Onboarding data saved successfully"}
@@ -521,6 +556,8 @@ def get_user_profile(user_id: int, db: Session = Depends(get_db)):
             "allergies": onboarding.allergies if onboarding else None,
             "medical_conditions": onboarding.medical_conditions if onboarding else None,
             "goals": onboarding.goals if onboarding else None,
+            "monthly_budget": float(onboarding.monthly_budget) if onboarding and onboarding.monthly_budget else None,
+            "preferred_stores": onboarding.preferred_stores if onboarding else None,
             "household_size": onboarding.household_size if onboarding else None,
             "shopping_frequency": onboarding.shopping_frequency if onboarding else None,
             "city": onboarding.city if onboarding else None,

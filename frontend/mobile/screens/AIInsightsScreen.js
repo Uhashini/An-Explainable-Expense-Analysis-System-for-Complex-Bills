@@ -206,6 +206,8 @@ export default function AIInsightsScreen({ route, navigation }) {
           comparisonViewMode={comparisonViewMode}
           setComparisonViewMode={setComparisonViewMode}
           savedReceiptsList={savedReceiptsList}
+          receiptId={receiptId}
+          receiptData={receiptData}
         />
       );
     }

@@ -22,7 +22,7 @@ from collections import defaultdict
 from typing import List, Optional
 
 from app.database.postgres_client import (
-    get_db, Receipt, ReceiptItem, FoodItem, UserProfile
+    get_db, Receipt, ReceiptItem, FoodItem, UserProfile, UserOnboarding
 )
 
 router = APIRouter()
@@ -160,6 +160,13 @@ def get_spending_forecast(user_id: int, db: Session = Depends(get_db)):
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
+    # Fetch onboarding for user-declared budget and goals
+    onboarding = db.query(UserOnboarding).filter(UserOnboarding.user_id == user_id).first()
+    declared_budget = float(onboarding.monthly_budget) if onboarding and onboarding.monthly_budget else None
+    user_goals_raw = onboarding.goals if onboarding and onboarding.goals else ""
+    # Pick the primary goal (first one listed) for display, normalise to uppercase
+    primary_goal = user_goals_raw.split(",")[0].strip().upper() if user_goals_raw.strip() else "SAVE MONEY"
+
     # ── 1. Fetch all receipts ────────────────────────────────────────────────
     all_receipts = (
         db.query(Receipt)
@@ -217,19 +224,21 @@ def get_spending_forecast(user_id: int, db: Session = Depends(get_db)):
     else:
         projected_spend = 0.0
 
-    # ── 4. Calculate budget = rolling 3-month average (or global avg fallback) ──
-    sorted_months = sorted(historical_by_month.keys(), reverse=True)
-    recent_months = sorted_months[:3]
-
-    if recent_months:
-        budget = round(sum(historical_by_month[m] for m in recent_months) / len(recent_months), 2)
-    elif using_historical_fallback and all_receipts:
-        # Budget = 90% of projected (assume they're slightly over on average)
-        budget = round(projected_spend * 0.90, 2)
-    elif current_month_total > 0:
-        budget = round(projected_spend * 0.90, 2)
+    # ── 4. Determine budget ───────────────────────────────────────────────────
+    # Priority: (1) user's declared monthly budget from onboarding,
+    #           (2) rolling 3-month average of historical spend (fallback),
+    #           (3) 90% of projected if no history at all.
+    if declared_budget and declared_budget > 0:
+        budget = declared_budget
     else:
-        budget = 0.0
+        sorted_months = sorted(historical_by_month.keys(), reverse=True)
+        recent_months = sorted_months[:3]
+        if recent_months:
+            budget = round(sum(historical_by_month[m] for m in recent_months) / len(recent_months), 2)
+        elif projected_spend > 0:
+            budget = round(projected_spend * 0.90, 2)
+        else:
+            budget = 0.0
 
     budget_used_pct = round(projected_spend / budget, 4) if budget > 0 else 0.0
 
@@ -304,10 +313,12 @@ def get_spending_forecast(user_id: int, db: Session = Depends(get_db)):
     return {
         "month":                    month_name,
         "year":                     curr_year,
-        "goal":                     "SAVE MONEY",
+        "goal":                     primary_goal,
+        "goals":                    user_goals_raw,
         "currentSpend":             round(current_month_total, 2),
         "projectedSpend":           projected_spend,
         "budget":                   budget,
+        "declaredBudget":           declared_budget,
         "budgetUsedPct":            budget_used_pct,
         "daysElapsed":              days_elapsed,
         "daysInMonth":              days_in_month,

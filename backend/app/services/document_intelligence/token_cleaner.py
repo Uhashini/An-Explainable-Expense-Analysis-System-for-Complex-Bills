@@ -39,12 +39,14 @@ class TokenCleaner:
 
         # 2. Fix embedded digit in word (e.g., Sa1t -> Salt or T0tal -> Total)
         if len(token) >= 3 and not any(c in '.,' for c in token) and not token.isdigit():
-            cleaned = token.replace('1', 'l').replace('0', 'o').replace('5', 's').replace('2', 'z')
-            if cleaned.isalpha() and cleaned != token:
-                token = cleaned
+            if not re.search(r'\d+(?:KG|G|PK|L|ML|PCS|NOS)\b', token, re.I):
+                cleaned = token.replace('1', 'l').replace('0', 'o').replace('5', 's').replace('2', 'z')
+                if cleaned.isalpha() and cleaned != token:
+                    token = cleaned
 
         # 3. Fuzzy match against common vocabulary if alphabetical
-        if token.isalpha() and len(token) >= 4:
+        PROTECTED_WORDS = {"RICE", "SALT", "OIL", "MAGGI", "NOODLES", "TOOTHPASTE", "BEANS", "CHICKEN", "BIRYANI", "CANTEEN"}
+        if token.isalpha() and len(token) >= 4 and token.upper() not in PROTECTED_WORDS:
             upper = token.upper()
             if upper not in cls.COMMON_VOCAB:
                 matches = difflib.get_close_matches(upper, cls.COMMON_VOCAB, n=1, cutoff=0.72)
@@ -86,8 +88,12 @@ class TokenCleaner:
                     
                 # Expand concatenated formatting before whitespace split
                 t = re.sub(r'([a-z])([A-Z])', r'\1 \2', t)
-                t = re.sub(r'^(\d+)([a-zA-Z])', r'\1 \2', t)
+                t = re.sub(r'^(\d+)(?!(?:kg|g|pk|l|ml|pcs|nos)\b)([a-zA-Z])', r'\1 \2', t, flags=re.I)
                 t = re.sub(r'([a-zA-Z]+)([\d.,]+)$', r'\1 \2', t)
+                t = re.sub(r'([a-zA-Z]{3,})(\d+(?:KG|G|PK|L|ML|PCS|NOS))\b', r'\1 \2', t, flags=re.I)
+                t = re.sub(r'\bOTL1\b', 'OIL 1L', t, flags=re.I)
+                t = re.sub(r'\bOIL1\b', 'OIL 1L', t, flags=re.I)
+                t = re.sub(r'\bOTL\b', 'OIL', t, flags=re.I)
                 t = re.sub(r'([a-zA-Z]):', r'\1 :', t)
                 t = re.sub(r':([a-zA-Z]|\d{3,}|\d{1}$)', r': \1', t)
                 

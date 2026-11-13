@@ -6,7 +6,13 @@ import { COLORS, FONTS } from '../../theme';
 import { getDefaultNutritionData } from './nutritionUtils';
 import styles from './eatHealthyStyles';
 
-export default function BasicNutritionSection({ data: propData, comparisonViewMode, setComparisonViewMode, savedReceiptsList = [] }) {
+export default function BasicNutritionSection({
+  data: propData,
+  comparisonViewMode,
+  setComparisonViewMode,
+  savedReceiptsList = [],
+  sectionFilter = 'all',
+}) {
     const data = propData || getDefaultNutritionData();
     const safeData = data;
 
@@ -92,193 +98,203 @@ export default function BasicNutritionSection({ data: propData, comparisonViewMo
 
     return (
       <View style={styles.contentContainer}>
-        {/* ── Purpose Banner ── */}
-        <View style={styles.purposeCard}>
-          <View style={styles.badgeRow}>
-            <Text style={styles.purposeBadge}>BASIC NUTRITION ANALYSIS</Text>
-            <View style={[styles.gradePill, { backgroundColor: data.basketScore >= 80 ? '#E8F5E9' : '#FFF3E0' }]}>
-              <Text style={[styles.gradePillText, { color: data.basketScore >= 80 ? '#2E7D32' : '#E65100' }]}>
-                {data.basketScore >= 85 ? 'GRADE A' : data.basketScore >= 70 ? 'GRADE B' : 'GRADE C'}
-              </Text>
-            </View>
-          </View>
-          
-          <Text style={styles.purposeTitle}>Food Quality & Basket Balance</Text>
-          <Text style={styles.purposeSub}>
-            Extracted dynamic nutrition metrics for {data.totalItems || 1} line item(s) from your uploaded receipt.
-          </Text>
-
-          {/* Healthy Basket Score Card */}
-          <View style={styles.scoreRow}>
-            <View style={styles.scoreBadge}>
-              <Text style={styles.scoreValue}>{data.basketScore}</Text>
-              <Text style={styles.scoreMax}>/100</Text>
-            </View>
-            <View style={styles.scoreTextContainer}>
-              <Text style={styles.scoreTitle}>Healthy Basket Score</Text>
-              <Text style={styles.scoreDesc}>
-                {data.healthyPct}% Whole Foods • {data.protein}g Total Protein Yield
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        {/* ── Key AI Nutrition Insights Highlights ── */}
-        <View style={styles.card}>
-          <Text style={styles.cardHeaderTitle}>💡 Key AI Nutrition Insights</Text>
-
-          <View style={[styles.insightHighlightBox, { backgroundColor: '#FFF3E0', borderColor: '#FFE0B2' }]}>
-            <View style={[styles.insightIconCircle, { backgroundColor: '#FFE0B2' }]}>
-              <Text style={styles.insightHighlightIcon}>📈</Text>
-            </View>
-            <View style={styles.insightHighlightText}>
-              <Text style={[styles.insightHighlightTitle, { color: '#E65100' }]}>
-                Protein Yield: {data.protein}g ({data.proteinRdiPct}% Daily RDI)
-              </Text>
-              <Text style={styles.insightHighlightSub}>
-                Protein contributes {data.proteinRatio || 30}% of the total macro calories in this receipt.
-              </Text>
-            </View>
-          </View>
-
-          <View style={[styles.insightHighlightBox, { backgroundColor: '#E8F5E9', borderColor: '#C8E6C9' }]}>
-            <View style={[styles.insightIconCircle, { backgroundColor: '#C8E6C9' }]}>
-              <Text style={styles.insightHighlightIcon}>📉</Text>
-            </View>
-            <View style={styles.insightHighlightText}>
-              <Text style={[styles.insightHighlightTitle, { color: '#2E7D32' }]}>
-                Food Quality Ratio: {data.healthyPct}% Whole Foods
-              </Text>
-              <Text style={styles.insightHighlightSub}>
-                {data.healthyPct}% of your items are unprocessed whole foods, maintaining high nutrient density.
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        {/* ── Key Metrics Grid (3 Column Grid on Web, 2 Column on Mobile) ── */}
-        <Text style={styles.sectionHeaderTitle}>NUTRITION METRICS & DAILY RDI %</Text>
-        <View style={styles.metricsGrid}>
-          {/* Calories Card */}
-          <View style={[styles.metricCard, { borderTopColor: '#F57C00' }]}>
-            <View style={styles.metricCardTop}>
-              <View style={[styles.metricIconBg, { backgroundColor: '#FFF3E0' }]}>
-                <Text style={styles.metricIcon}>⚡</Text>
+        {/* ── Block 1: Purpose Banner & Key AI Insights (Card 1: Score & Quality) ── */}
+        {(sectionFilter === 'all' || sectionFilter === 'score') && (
+          <>
+            {/* ── Purpose Banner ── */}
+            <View style={styles.purposeCard}>
+              <View style={styles.badgeRow}>
+                <Text style={styles.purposeBadge}>BASIC NUTRITION ANALYSIS</Text>
+                <View style={[styles.gradePill, { backgroundColor: data.basketScore >= 80 ? '#E8F5E9' : '#FFF3E0' }]}>
+                  <Text style={[styles.gradePillText, { color: data.basketScore >= 80 ? '#2E7D32' : '#E65100' }]}>
+                    {data.basketScore >= 85 ? 'GRADE A' : data.basketScore >= 70 ? 'GRADE B' : 'GRADE C'}
+                  </Text>
+                </View>
               </View>
-              <Text style={styles.rdiBadge}>{Math.round((data.calories / 2000) * 100)}% RDI</Text>
-            </View>
-            <Text style={styles.metricValue}>{data.calories} <Text style={styles.metricUnit}>kcal</Text></Text>
-            <Text style={styles.metricLabel}>Total Calories</Text>
-            <View style={styles.miniProgressBg}>
-              <View style={[styles.miniProgressFill, { width: `${Math.min(100, (data.calories / 2000) * 100)}%`, backgroundColor: '#F57C00' }]} />
-            </View>
-          </View>
+              
+              <Text style={styles.purposeTitle}>Food Quality & Basket Balance</Text>
+              <Text style={styles.purposeSub}>
+                Extracted dynamic nutrition metrics for {data.totalItems || 1} line item(s) from your uploaded receipt.
+              </Text>
 
-          {/* Protein Card */}
-          <View style={[styles.metricCard, { borderTopColor: '#D32F2F' }]}>
-            <View style={styles.metricCardTop}>
-              <View style={[styles.metricIconBg, { backgroundColor: '#FFEBEE' }]}>
-                <Text style={styles.metricIcon}>🥩</Text>
+              {/* Healthy Basket Score Card */}
+              <View style={styles.scoreRow}>
+                <View style={styles.scoreBadge}>
+                  <Text style={styles.scoreValue}>{data.basketScore}</Text>
+                  <Text style={styles.scoreMax}>/100</Text>
+                </View>
+                <View style={styles.scoreTextContainer}>
+                  <Text style={styles.scoreTitle}>Healthy Basket Score</Text>
+                  <Text style={styles.scoreDesc}>
+                    {data.healthyPct}% Whole Foods • {data.protein}g Total Protein Yield
+                  </Text>
+                </View>
               </View>
-              <Text style={[styles.rdiBadge, { color: '#D32F2F', backgroundColor: '#FFEBEE' }]}>{data.proteinRdiPct}% RDI</Text>
             </View>
-            <Text style={styles.metricValue}>{data.protein} <Text style={styles.metricUnit}>g</Text></Text>
-            <Text style={styles.metricLabel}>Protein</Text>
-            <View style={styles.miniProgressBg}>
-              <View style={[styles.miniProgressFill, { width: `${data.proteinRdiPct}%`, backgroundColor: '#D32F2F' }]} />
-            </View>
-          </View>
 
-          {/* Carbohydrates Card */}
-          <View style={[styles.metricCard, { borderTopColor: '#1976D2' }]}>
-            <View style={styles.metricCardTop}>
-              <View style={[styles.metricIconBg, { backgroundColor: '#E3F2FD' }]}>
-                <Text style={styles.metricIcon}>🍞</Text>
+            {/* ── Key AI Nutrition Insights Highlights ── */}
+            <View style={styles.card}>
+              <Text style={styles.cardHeaderTitle}>💡 Key AI Nutrition Insights</Text>
+
+              <View style={[styles.insightHighlightBox, { backgroundColor: '#FFF3E0', borderColor: '#FFE0B2' }]}>
+                <View style={[styles.insightIconCircle, { backgroundColor: '#FFE0B2' }]}>
+                  <Text style={styles.insightHighlightIcon}>📈</Text>
+                </View>
+                <View style={styles.insightHighlightText}>
+                  <Text style={[styles.insightHighlightTitle, { color: '#E65100' }]}>
+                    Protein Yield: {data.protein}g ({data.proteinRdiPct}% Daily RDI)
+                  </Text>
+                  <Text style={styles.insightHighlightSub}>
+                    Protein contributes {data.proteinRatio || 30}% of the total macro calories in this receipt.
+                  </Text>
+                </View>
               </View>
-              <Text style={[styles.rdiBadge, { color: '#1976D2', backgroundColor: '#E3F2FD' }]}>{data.carbsRdiPct}% RDI</Text>
-            </View>
-            <Text style={styles.metricValue}>{data.carbs} <Text style={styles.metricUnit}>g</Text></Text>
-            <Text style={styles.metricLabel}>Carbohydrates</Text>
-            <View style={styles.miniProgressBg}>
-              <View style={[styles.miniProgressFill, { width: `${data.carbsRdiPct}%`, backgroundColor: '#1976D2' }]} />
-            </View>
-          </View>
 
-          {/* Fat Card */}
-          <View style={[styles.metricCard, { borderTopColor: '#388E3C' }]}>
-            <View style={styles.metricCardTop}>
-              <View style={[styles.metricIconBg, { backgroundColor: '#E8F5E9' }]}>
-                <Text style={styles.metricIcon}>🥑</Text>
+              <View style={[styles.insightHighlightBox, { backgroundColor: '#E8F5E9', borderColor: '#C8E6C9' }]}>
+                <View style={[styles.insightIconCircle, { backgroundColor: '#C8E6C9' }]}>
+                  <Text style={styles.insightHighlightIcon}>📉</Text>
+                </View>
+                <View style={styles.insightHighlightText}>
+                  <Text style={[styles.insightHighlightTitle, { color: '#2E7D32' }]}>
+                    Food Quality Ratio: {data.healthyPct}% Whole Foods
+                  </Text>
+                  <Text style={styles.insightHighlightSub}>
+                    {data.healthyPct}% of your items are unprocessed whole foods, maintaining high nutrient density.
+                  </Text>
+                </View>
               </View>
-              <Text style={[styles.rdiBadge, { color: '#388E3C', backgroundColor: '#E8F5E9' }]}>{data.fatRdiPct}% RDI</Text>
             </View>
-            <Text style={styles.metricValue}>{data.fat} <Text style={styles.metricUnit}>g</Text></Text>
-            <Text style={styles.metricLabel}>Fat</Text>
-            <View style={styles.miniProgressBg}>
-              <View style={[styles.miniProgressFill, { width: `${data.fatRdiPct}%`, backgroundColor: '#388E3C' }]} />
-            </View>
-          </View>
+          </>
+        )}
 
-          {/* Fiber Card */}
-          <View style={[styles.metricCard, { borderTopColor: '#00796B' }]}>
-            <View style={styles.metricCardTop}>
-              <View style={[styles.metricIconBg, { backgroundColor: '#E0F2F1' }]}>
-                <Text style={styles.metricIcon}>🌿</Text>
+        {/* ── Block 2: Key Metrics Grid & Macro Energy (Card 2: Macro Fuel & Energy) ── */}
+        {(sectionFilter === 'all' || sectionFilter === 'macros') && (
+          <>
+            {/* ── Key Metrics Grid (3 Column Grid on Web, 2 Column on Mobile) ── */}
+            <Text style={styles.sectionHeaderTitle}>NUTRITION METRICS & DAILY RDI %</Text>
+            <View style={styles.metricsGrid}>
+              {/* Calories Card */}
+              <View style={[styles.metricCard, { borderTopColor: '#F57C00' }]}>
+                <View style={styles.metricCardTop}>
+                  <View style={[styles.metricIconBg, { backgroundColor: '#FFF3E0' }]}>
+                    <Text style={styles.metricIcon}>⚡</Text>
+                  </View>
+                  <Text style={styles.rdiBadge}>{Math.round((data.calories / 2000) * 100)}% RDI</Text>
+                </View>
+                <Text style={styles.metricValue}>{data.calories} <Text style={styles.metricUnit}>kcal</Text></Text>
+                <Text style={styles.metricLabel}>Total Calories</Text>
+                <View style={styles.miniProgressBg}>
+                  <View style={[styles.miniProgressFill, { width: `${Math.min(100, (data.calories / 2000) * 100)}%`, backgroundColor: '#F57C00' }]} />
+                </View>
               </View>
-              <Text style={[styles.rdiBadge, { color: '#00796B', backgroundColor: '#E0F2F1' }]}>{data.fiberRdiPct}% RDI</Text>
-            </View>
-            <Text style={styles.metricValue}>{data.fiber} <Text style={styles.metricUnit}>g</Text></Text>
-            <Text style={styles.metricLabel}>Dietary Fiber</Text>
-            <View style={styles.miniProgressBg}>
-              <View style={[styles.miniProgressFill, { width: `${data.fiberRdiPct}%`, backgroundColor: '#00796B' }]} />
-            </View>
-          </View>
 
-          {/* Sugar Card */}
-          <View style={[styles.metricCard, { borderTopColor: '#C2185B' }]}>
-            <View style={styles.metricCardTop}>
-              <View style={[styles.metricIconBg, { backgroundColor: '#FCE4EC' }]}>
-                <Text style={styles.metricIcon}>🍬</Text>
+              {/* Protein Card */}
+              <View style={[styles.metricCard, { borderTopColor: '#D32F2F' }]}>
+                <View style={styles.metricCardTop}>
+                  <View style={[styles.metricIconBg, { backgroundColor: '#FFEBEE' }]}>
+                    <Text style={styles.metricIcon}>🥩</Text>
+                  </View>
+                  <Text style={[styles.rdiBadge, { color: '#D32F2F', backgroundColor: '#FFEBEE' }]}>{data.proteinRdiPct}% RDI</Text>
+                </View>
+                <Text style={styles.metricValue}>{data.protein} <Text style={styles.metricUnit}>g</Text></Text>
+                <Text style={styles.metricLabel}>Protein</Text>
+                <View style={styles.miniProgressBg}>
+                  <View style={[styles.miniProgressFill, { width: `${data.proteinRdiPct}%`, backgroundColor: '#D32F2F' }]} />
+                </View>
               </View>
-              <Text style={[styles.rdiBadge, { color: '#C2185B', backgroundColor: '#FCE4EC' }]}>{data.sugarRdiPct}% Cap</Text>
-            </View>
-            <Text style={styles.metricValue}>{data.sugar} <Text style={styles.metricUnit}>g</Text></Text>
-            <Text style={styles.metricLabel}>Sugar</Text>
-            <View style={styles.miniProgressBg}>
-              <View style={[styles.miniProgressFill, { width: `${data.sugarRdiPct}%`, backgroundColor: '#C2185B' }]} />
-            </View>
-          </View>
-        </View>
 
-        {/* ── Caloric Energy Source Breakdown ── */}
-        <Text style={styles.sectionHeaderTitle}>MACRO ENERGY BREAKDOWN (kcal)</Text>
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Energy Source Distribution</Text>
-          <Text style={styles.cardSub}>Caloric yield per macronutrient from this receipt</Text>
+              {/* Carbohydrates Card */}
+              <View style={[styles.metricCard, { borderTopColor: '#1976D2' }]}>
+                <View style={styles.metricCardTop}>
+                  <View style={[styles.metricIconBg, { backgroundColor: '#E3F2FD' }]}>
+                    <Text style={styles.metricIcon}>🍞</Text>
+                  </View>
+                  <Text style={[styles.rdiBadge, { color: '#1976D2', backgroundColor: '#E3F2FD' }]}>{data.carbsRdiPct}% RDI</Text>
+                </View>
+                <Text style={styles.metricValue}>{data.carbs} <Text style={styles.metricUnit}>g</Text></Text>
+                <Text style={styles.metricLabel}>Carbohydrates</Text>
+                <View style={styles.miniProgressBg}>
+                  <View style={[styles.miniProgressFill, { width: `${data.carbsRdiPct}%`, backgroundColor: '#1976D2' }]} />
+                </View>
+              </View>
 
-          <View style={styles.energyRow}>
-            <View style={[styles.energyCard, { backgroundColor: '#FFEBEE', borderColor: '#FFCDD2' }]}>
-              <Text style={[styles.energyVal, { color: '#D32F2F' }]}>{data.protCal || 154} kcal</Text>
-              <Text style={styles.energyLabel}>Protein Energy</Text>
-              <Text style={styles.energySub}>4 kcal/g</Text>
+              {/* Fat Card */}
+              <View style={[styles.metricCard, { borderTopColor: '#388E3C' }]}>
+                <View style={styles.metricCardTop}>
+                  <View style={[styles.metricIconBg, { backgroundColor: '#E8F5E9' }]}>
+                    <Text style={styles.metricIcon}>🥑</Text>
+                  </View>
+                  <Text style={[styles.rdiBadge, { color: '#388E3C', backgroundColor: '#E8F5E9' }]}>{data.fatRdiPct}% RDI</Text>
+                </View>
+                <Text style={styles.metricValue}>{data.fat} <Text style={styles.metricUnit}>g</Text></Text>
+                <Text style={styles.metricLabel}>Fat</Text>
+                <View style={styles.miniProgressBg}>
+                  <View style={[styles.miniProgressFill, { width: `${data.fatRdiPct}%`, backgroundColor: '#388E3C' }]} />
+                </View>
+              </View>
+
+              {/* Fiber Card */}
+              <View style={[styles.metricCard, { borderTopColor: '#00796B' }]}>
+                <View style={styles.metricCardTop}>
+                  <View style={[styles.metricIconBg, { backgroundColor: '#E0F2F1' }]}>
+                    <Text style={styles.metricIcon}>🌿</Text>
+                  </View>
+                  <Text style={[styles.rdiBadge, { color: '#00796B', backgroundColor: '#E0F2F1' }]}>{data.fiberRdiPct}% RDI</Text>
+                </View>
+                <Text style={styles.metricValue}>{data.fiber} <Text style={styles.metricUnit}>g</Text></Text>
+                <Text style={styles.metricLabel}>Dietary Fiber</Text>
+                <View style={styles.miniProgressBg}>
+                  <View style={[styles.miniProgressFill, { width: `${data.fiberRdiPct}%`, backgroundColor: '#00796B' }]} />
+                </View>
+              </View>
+
+              {/* Sugar Card */}
+              <View style={[styles.metricCard, { borderTopColor: '#C2185B' }]}>
+                <View style={styles.metricCardTop}>
+                  <View style={[styles.metricIconBg, { backgroundColor: '#FCE4EC' }]}>
+                    <Text style={styles.metricIcon}>🍬</Text>
+                  </View>
+                  <Text style={[styles.rdiBadge, { color: '#C2185B', backgroundColor: '#FCE4EC' }]}>{data.sugarRdiPct}% Cap</Text>
+                </View>
+                <Text style={styles.metricValue}>{data.sugar} <Text style={styles.metricUnit}>g</Text></Text>
+                <Text style={styles.metricLabel}>Sugar</Text>
+                <View style={styles.miniProgressBg}>
+                  <View style={[styles.miniProgressFill, { width: `${data.sugarRdiPct}%`, backgroundColor: '#C2185B' }]} />
+                </View>
+              </View>
             </View>
 
-            <View style={[styles.energyCard, { backgroundColor: '#E3F2FD', borderColor: '#BBDEFB' }]}>
-              <Text style={[styles.energyVal, { color: '#1976D2' }]}>{data.carbCal || 314} kcal</Text>
-              <Text style={styles.energyLabel}>Carb Energy</Text>
-              <Text style={styles.energySub}>4 kcal/g</Text>
-            </View>
+            {/* ── Caloric Energy Source Breakdown ── */}
+            <Text style={styles.sectionHeaderTitle}>MACRO ENERGY BREAKDOWN (kcal)</Text>
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Energy Source Distribution</Text>
+              <Text style={styles.cardSub}>Caloric yield per macronutrient from this receipt</Text>
 
-            <View style={[styles.energyCard, { backgroundColor: '#E8F5E9', borderColor: '#C8E6C9' }]}>
-              <Text style={[styles.energyVal, { color: '#388E3C' }]}>{data.fatCal || 164} kcal</Text>
-              <Text style={styles.energyLabel}>Fat Energy</Text>
-              <Text style={styles.energySub}>9 kcal/g</Text>
-            </View>
-          </View>
-        </View>
+              <View style={styles.energyRow}>
+                <View style={[styles.energyCard, { backgroundColor: '#FFEBEE', borderColor: '#FFCDD2' }]}>
+                  <Text style={[styles.energyVal, { color: '#D32F2F' }]}>{data.protCal || 154} kcal</Text>
+                  <Text style={styles.energyLabel}>Protein Energy</Text>
+                  <Text style={styles.energySub}>4 kcal/g</Text>
+                </View>
 
-        {/* ── Scanned Food Item Nutrition Table ── */}
-        {data.parsedItems && data.parsedItems.length > 0 && (
+                <View style={[styles.energyCard, { backgroundColor: '#E3F2FD', borderColor: '#BBDEFB' }]}>
+                  <Text style={[styles.energyVal, { color: '#1976D2' }]}>{data.carbCal || 314} kcal</Text>
+                  <Text style={styles.energyLabel}>Carb Energy</Text>
+                  <Text style={styles.energySub}>4 kcal/g</Text>
+                </View>
+
+                <View style={[styles.energyCard, { backgroundColor: '#E8F5E9', borderColor: '#C8E6C9' }]}>
+                  <Text style={[styles.energyVal, { color: '#388E3C' }]}>{data.fatCal || 164} kcal</Text>
+                  <Text style={styles.energyLabel}>Fat Energy</Text>
+                  <Text style={styles.energySub}>9 kcal/g</Text>
+                </View>
+              </View>
+            </View>
+          </>
+        )}
+
+        {/* ── Scanned Food Item Nutrition Table (Card 3: Items & History Trend) ── */}
+        {(sectionFilter === 'all' || sectionFilter === 'items_trend') && data.parsedItems && data.parsedItems.length > 0 && (
           <>
             <Text style={styles.sectionHeaderTitle}>ITEM-BY-ITEM NUTRITION BREAKDOWN</Text>
             <View style={styles.card}>
@@ -313,72 +329,81 @@ export default function BasicNutritionSection({ data: propData, comparisonViewMo
         )}
 
         {/* ── Creative Charts Section ── */}
-        <Text style={styles.sectionHeaderTitle}>CHARTS & VISUAL BREAKDOWN</Text>
+        {sectionFilter === 'all' && (
+          <Text style={styles.sectionHeaderTitle}>CHARTS & VISUAL BREAKDOWN</Text>
+        )}
 
-        {/* Chart 1: Food Quality Distribution Gauge */}
-        <View style={styles.card}>
-          <View style={styles.cardHeaderRow}>
-            <Text style={styles.cardTitle}>Food Quality Distribution</Text>
-            <Text style={styles.badgePillText}>{data.healthyPct}% Whole Foods</Text>
-          </View>
-          <Text style={styles.cardSub}>Healthy Whole Foods % vs Ultra-Processed %</Text>
-
-          <View style={styles.progressContainer}>
-            <View style={[styles.progressBar, { width: `${data.healthyPct}%`, backgroundColor: '#2E7D32' }]}>
-              <Text style={styles.progressPctInside}>{data.healthyPct}%</Text>
+        {/* Chart 1: Food Quality Distribution Gauge (Card 1: Score & Quality) ── */}
+        {(sectionFilter === 'all' || sectionFilter === 'score') && (
+          <View style={styles.card}>
+            <View style={styles.cardHeaderRow}>
+              <Text style={styles.cardTitle}>Food Quality Distribution</Text>
+              <Text style={styles.badgePillText}>{data.healthyPct}% Whole Foods</Text>
             </View>
-            {data.processedPct > 0 && (
-              <View style={[styles.progressBar, { width: `${data.processedPct}%`, backgroundColor: '#D32F2F' }]}>
-                {data.processedPct > 10 && <Text style={styles.progressPctInside}>{data.processedPct}%</Text>}
+            <Text style={styles.cardSub}>Healthy Whole Foods % vs Ultra-Processed %</Text>
+
+            <View style={styles.progressContainer}>
+              <View style={[styles.progressBar, { width: `${data.healthyPct}%`, backgroundColor: '#2E7D32' }]}>
+                <Text style={styles.progressPctInside}>{data.healthyPct}%</Text>
               </View>
-            )}
-          </View>
+              {data.processedPct > 0 && (
+                <View style={[styles.progressBar, { width: `${data.processedPct}%`, backgroundColor: '#D32F2F' }]}>
+                  {data.processedPct > 10 && <Text style={styles.progressPctInside}>{data.processedPct}%</Text>}
+                </View>
+              )}
+            </View>
 
-          <View style={styles.legendRow}>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: '#2E7D32' }]} />
-              <Text style={styles.legendText}>Healthy Whole Foods ({data.healthyPct}%)</Text>
-            </View>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: '#D32F2F' }]} />
-              <Text style={styles.legendText}>Processed Foods ({data.processedPct}%)</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Chart 2: Macronutrient Ratio Bar */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Nutrition Distribution</Text>
-          <Text style={styles.cardSub}>Macro balance of Carbs, Protein, Fats & Dietary Fiber</Text>
-
-          <View style={styles.macroBarContainer}>
-            <View style={[styles.macroSegment, { flex: Math.max(1, data.carbsRatio || 45), backgroundColor: '#1976D2' }]} />
-            <View style={[styles.macroSegment, { flex: Math.max(1, data.proteinRatio || 30), backgroundColor: '#D81B60' }]} />
-            <View style={[styles.macroSegment, { flex: Math.max(1, data.fatRatio || 15), backgroundColor: '#F57C00' }]} />
-            <View style={[styles.macroSegment, { flex: Math.max(1, data.fiberRatio || 10), backgroundColor: '#388E3C' }]} />
-          </View>
-
-          <View style={styles.macroGrid}>
-            <View style={styles.macroItem}>
-              <View style={[styles.macroDotCircle, { backgroundColor: '#1976D2' }]} />
-              <Text style={styles.macroText}>Carbs {data.carbsRatio || 45}%</Text>
-            </View>
-            <View style={styles.macroItem}>
-              <View style={[styles.macroDotCircle, { backgroundColor: '#D81B60' }]} />
-              <Text style={styles.macroText}>Protein {data.proteinRatio || 30}%</Text>
-            </View>
-            <View style={styles.macroItem}>
-              <View style={[styles.macroDotCircle, { backgroundColor: '#F57C00' }]} />
-              <Text style={styles.macroText}>Fat {data.fatRatio || 15}%</Text>
-            </View>
-            <View style={styles.macroItem}>
-              <View style={[styles.macroDotCircle, { backgroundColor: '#388E3C' }]} />
-              <Text style={styles.macroText}>Fiber {data.fiberRatio || 10}%</Text>
+            <View style={styles.legendRow}>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: '#2E7D32' }]} />
+                <Text style={styles.legendText}>Healthy Whole Foods ({data.healthyPct}%)</Text>
+              </View>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: '#D32F2F' }]} />
+                <Text style={styles.legendText}>Processed Foods ({data.processedPct}%)</Text>
+              </View>
             </View>
           </View>
-        </View>
+        )}
 
-        {/* ── DYNAMIC RECEIPT COMPARISON DASHBOARD ── */}
+        {/* Chart 2: Macronutrient Ratio Bar (Card 2: Macro Fuel & Energy) ── */}
+        {(sectionFilter === 'all' || sectionFilter === 'macros') && (
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Nutrition Distribution</Text>
+            <Text style={styles.cardSub}>Macro balance of Carbs, Protein, Fats & Dietary Fiber</Text>
+
+            <View style={styles.macroBarContainer}>
+              <View style={[styles.macroSegment, { flex: Math.max(1, data.carbsRatio || 45), backgroundColor: '#1976D2' }]} />
+              <View style={[styles.macroSegment, { flex: Math.max(1, data.proteinRatio || 30), backgroundColor: '#D81B60' }]} />
+              <View style={[styles.macroSegment, { flex: Math.max(1, data.fatRatio || 15), backgroundColor: '#F57C00' }]} />
+              <View style={[styles.macroSegment, { flex: Math.max(1, data.fiberRatio || 10), backgroundColor: '#388E3C' }]} />
+            </View>
+
+            <View style={styles.macroGrid}>
+              <View style={styles.macroItem}>
+                <View style={[styles.macroDotCircle, { backgroundColor: '#1976D2' }]} />
+                <Text style={styles.macroText}>Carbs {data.carbsRatio || 45}%</Text>
+              </View>
+              <View style={styles.macroItem}>
+                <View style={[styles.macroDotCircle, { backgroundColor: '#D81B60' }]} />
+                <Text style={styles.macroText}>Protein {data.proteinRatio || 30}%</Text>
+              </View>
+              <View style={styles.macroItem}>
+                <View style={[styles.macroDotCircle, { backgroundColor: '#F57C00' }]} />
+                <Text style={styles.macroText}>Fat {data.fatRatio || 15}%</Text>
+              </View>
+              <View style={styles.macroItem}>
+                <View style={[styles.macroDotCircle, { backgroundColor: '#388E3C' }]} />
+                <Text style={styles.macroText}>Fiber {data.fiberRatio || 10}%</Text>
+              </View>
+            </View>
+          </View>
+        )}
+
+        {/* ── Block 4: Receipt Comparison Dashboard & Recommendations (Card 3: Items & History Trend) ── */}
+        {(sectionFilter === 'all' || sectionFilter === 'items_trend') && (
+          <>
+            {/* ── DYNAMIC RECEIPT COMPARISON DASHBOARD ── */}
         <View style={styles.card}>
           <View style={styles.trendHeader}>
             <View style={{ flex: 1 }}>
@@ -619,6 +644,8 @@ export default function BasicNutritionSection({ data: propData, comparisonViewMo
             </View>
           </View>
         </View>
-      </View>
-    );
-  };
+        </>
+      )}
+    </View>
+  );
+}
