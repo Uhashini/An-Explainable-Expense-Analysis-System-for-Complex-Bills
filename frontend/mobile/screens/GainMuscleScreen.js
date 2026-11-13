@@ -82,7 +82,7 @@ function SectionHeader({ tag, title, color }) {
 }
 
 // ─── GM-01: Protein Availability ──────────────────────────────────────────────
-function ProteinAvailabilitySection({ data }) {
+export function ProteinAvailabilitySection({ data }) {
   if (!data) return <LoadingCard />;
 
   const hasItems = data.items && data.items.length > 0;
@@ -160,7 +160,7 @@ function ProteinItemRow({ item, maxProtein }) {
 }
 
 // ─── GM-02: Protein Quality ────────────────────────────────────────────────────
-function ProteinQualitySection({ data }) {
+export function ProteinQualitySection({ data }) {
   if (!data) return <LoadingCard />;
 
   const basketScore = data.basket_quality_score;
@@ -236,7 +236,7 @@ function QualityItemRow({ item }) {
 }
 
 // ─── GM-03: Protein Cost Efficiency ───────────────────────────────────────────
-function ProteinCostSection({ data }) {
+export function ProteinCostSection({ data }) {
   if (!data) return <LoadingCard />;
 
   const hasItems = data.ranked_items && data.ranked_items.length > 0;
@@ -315,7 +315,7 @@ function CostEfficiencyRow({ item, rank, maxPPR }) {
 }
 
 // ─── GM-04: Recommendations ────────────────────────────────────────────────────
-function RecommendationsSection({ data, loading }) {
+export function RecommendationsSection({ data, loading }) {
   if (loading) return <LoadingCard message="Searching food database for recommendations..." />;
   if (!data) return null;
 
@@ -384,7 +384,7 @@ function RecommendationCard({ rec, rank }) {
 }
 
 // ─── GM-05: Protein Trend ──────────────────────────────────────────────────────
-function ProteinTrendSection({ data }) {
+export function ProteinTrendSection({ data }) {
   if (!data) return <LoadingCard />;
 
   if (data.insufficient_data) {
@@ -494,7 +494,7 @@ function ProteinBarChart({ timeSeries }) {
 }
 
 // ─── Protein Overview Card ─────────────────────────────────────────────────────
-function ProteinOverviewCard({ gm01, gm02, gm03, gm05 }) {
+export function ProteinOverviewCard({ gm01, gm02, gm03, gm05 }) {
   const totalProtein = gm01?.total_protein_g;
   const qualityLabel = gm02?.basket_quality_label;
   const efficiency = gm03?.overall_efficiency;
