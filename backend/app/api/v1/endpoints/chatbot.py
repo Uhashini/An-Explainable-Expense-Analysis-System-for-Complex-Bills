@@ -5,6 +5,8 @@ from typing import List, Optional, Dict, Any
 
 from app.database.postgres_client import get_db, UserProfile
 from app.services.gemma_chatbot_service import gemma_chatbot_service
+from app.services.llm_monitor import llm_monitor
+from app.evaluation.evaluator import LLMEvaluator
 
 router = APIRouter()
 
@@ -130,4 +132,54 @@ def update_config(config: ChatConfigRequest):
         "has_gemini_key": bool(gemma_chatbot_service.api_key),
         "has_groq_key": bool(gemma_chatbot_service.groq_key),
         "has_openrouter_key": bool(gemma_chatbot_service.openrouter_key),
+    }
+
+class ChatEvalRequest(BaseModel):
+    query: str
+    response: str
+    user_context: Optional[Dict[str, Any]] = None
+    is_long_requested: Optional[bool] = False
+
+@router.get("/monitoring/metrics")
+def get_llm_metrics():
+    """
+    Returns live rolling observability metrics for the Gemma Chatbot LLM.
+    Includes request counts, p50/p90 latency, error rates, model distribution,
+    and DeepEval/Ragas quality scores.
+    """
+    return llm_monitor.get_metrics()
+
+@router.get("/monitoring/traces")
+def get_llm_traces(
+    limit: int = Query(50, ge=1, le=500),
+    flagged_only: bool = Query(False),
+    min_latency_ms: Optional[float] = Query(None)
+):
+    """
+    Returns recent LLM interaction traces with full query, response, latency, and quality evaluations.
+    """
+    return {
+        "status": "success",
+        "traces": llm_monitor.get_traces(
+            limit=limit,
+            flagged_only=flagged_only,
+            min_latency_ms=min_latency_ms
+        )
+    }
+
+@router.post("/monitoring/evaluate")
+def evaluate_interaction(request: ChatEvalRequest):
+    """
+    On-demand evaluation of an interaction against DeepEval and Ragas criteria.
+    """
+    evaluator = LLMEvaluator()
+    result = evaluator.evaluate_all(
+        query=request.query,
+        response=request.response,
+        user_context=request.user_context or {},
+        is_long_requested=request.is_long_requested or False
+    )
+    return {
+        "status": "success",
+        "evaluation": result
     }

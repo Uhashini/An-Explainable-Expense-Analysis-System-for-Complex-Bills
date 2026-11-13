@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator
 } from 'react-native';
+import { Feather } from '@expo/vector-icons';
 import ScreenLayout from '../components/ScreenLayout';
 import { COLORS, FONTS } from '../theme';
 import { API_BASE_URL } from '../utils/apiConfig';
@@ -31,7 +32,7 @@ function ReceiptCard({ receipt, onPress, onDelete }) {
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             accessibilityLabel={`Delete receipt from ${receipt.store}`}
           >
-            <Text style={styles.deleteIconText}>🗑</Text>
+            <Feather name="trash-2" size={15} color="#D46A6A" />
           </TouchableOpacity>
           <Text style={styles.cardArrow}>›</Text>
         </View>
@@ -286,17 +287,14 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   deleteIconButton: {
-    paddingHorizontal: 7,
-    paddingVertical: 4,
+    width: 28,
+    height: 28,
     borderRadius: 8,
     backgroundColor: '#fff5f5',
     borderWidth: 1,
     borderColor: '#f5c6cb',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  deleteIconText: {
-    fontSize: 13,
   },
   cardArrow: {
     fontSize: 22,

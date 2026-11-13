@@ -258,10 +258,14 @@ export default function GemmaChatScreen({ navigation }) {
       <View style={[styles.phoneFrame, isDesktop && styles.desktopPhoneFrame]}>
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Text style={styles.backIcon}>←</Text>
-        </TouchableOpacity>
-        <View style={styles.headerCenter}>
+          {navigation?.canGoBack && navigation.canGoBack() ? (
+            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+              <Text style={styles.backIcon}>←</Text>
+            </TouchableOpacity>
+          ) : (
+            <View style={{ width: 12 }} />
+          )}
+          <View style={styles.headerCenter}>
           <View style={styles.titleRow}>
             <Text style={styles.headerTitle}>Pantrix AI</Text>
             <View style={styles.modelTag}>
@@ -276,9 +280,6 @@ export default function GemmaChatScreen({ navigation }) {
           </View>
         </View>
         <View style={styles.headerRightActions}>
-          <TouchableOpacity onPress={() => setSettingsVisible(true)} style={styles.iconBtn}>
-            <Text style={styles.iconBtnText}>⚙️</Text>
-          </TouchableOpacity>
           <TouchableOpacity onPress={clearChat} style={styles.clearBtn}>
             <Text style={styles.clearBtnText}>Reset</Text>
           </TouchableOpacity>

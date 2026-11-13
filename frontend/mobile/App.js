@@ -8,7 +8,7 @@ import { ActivityIndicator } from 'react-native';
 import HomeIcon from './assets/icons/home.svg';
 import ReceiptIcon from './assets/icons/receipt.svg';
 import CameraIcon from './assets/icons/camera.svg';
-import InsightsIcon from './assets/icons/insights.svg';
+import ChatbotIcon from './assets/icons/chatbot.svg';
 import ProfileIcon from './assets/icons/profile.svg';
 import { useFonts, PlusJakartaSans_400Regular, PlusJakartaSans_600SemiBold, PlusJakartaSans_700Bold } from '@expo-google-fonts/plus-jakarta-sans';
 
@@ -48,7 +48,7 @@ const TAB_ICONS = {
   Home: HomeIcon,
   Receipts: ReceiptIcon,
   Scan: CameraIcon,
-  Insights: InsightsIcon,
+  Chatbot: ChatbotIcon,
   Profile: ProfileIcon,
 };
 
@@ -182,7 +182,7 @@ function ReceiptStackNavigator() {
   );
 }
 
-// â”€â”€â”€ Main Tab Navigator â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Main Tab Navigator ──────────────────────────────────────────────────────
 function MainTabs() {
   return (
     <Tab.Navigator
@@ -193,7 +193,7 @@ function MainTabs() {
       <Tab.Screen name="Home" component={DashboardScreen} />
       <Tab.Screen name="Receipts" component={ReceiptStackNavigator} />
       <Tab.Screen name="Scan" component={UploadReceiptScreen} />
-      <Tab.Screen name="Insights" component={SpendingAnalyticsScreen} />
+      <Tab.Screen name="Chatbot" component={GemmaChatScreen} />
       <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
   );
@@ -265,6 +265,16 @@ export default function App() {
           <Stack.Screen
             name="GainMuscle"
             component={GainMuscleScreen}
+            options={{ animation: 'slide_from_right' }}
+          />
+          <Stack.Screen
+            name="Insights"
+            component={SpendingAnalyticsScreen}
+            options={{ animation: 'slide_from_right' }}
+          />
+          <Stack.Screen
+            name="SpendingAnalytics"
+            component={SpendingAnalyticsScreen}
             options={{ animation: 'slide_from_right' }}
           />
           <Stack.Screen
