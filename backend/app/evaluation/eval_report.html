@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Pantrix AI - LLM Evaluation Report (DeepEval & Ragas)</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background:#f1f5f9; color:#0f172a; margin:0; padding:32px; }
+    .container { max-width: 1000px; margin: 0 auto; }
+    .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 28px; }
+    .stat-card { background:#ffffff; border-radius:12px; padding:20px; box-shadow:0 1px 3px rgba(0,0,0,0.06); border:1px solid #e2e8f0; text-align:center; }
+    .stat-val { font-size: 28px; font-weight: 800; color: #1e293b; margin-top: 6px; }
+    .stat-label { font-size: 12px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div style="margin-bottom:28px;">
+      <h1 style="margin:0 0 8px 0; font-size:26px;">Pantrix AI Chatbot - LLM Evaluation Benchmark</h1>
+      <p style="margin:0; color:#64748b; font-size:14px;">Evaluated using <strong>DeepEval</strong> and <strong>Ragas</strong> metrics: Faithfulness, Answer Relevancy, Goal Alignment & Latency.</p>
+    </div>
+
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="stat-label">Pass Rate</div>
+        <div class="stat-val" style="color:#16a34a;">100.0%</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Overall Quality</div>
+        <div class="stat-val" style="color:#2563eb;">98.7/100</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Faithfulness (Zero Hallucination)</div>
+        <div class="stat-val" style="color:#059669;">100.0%</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Average Latency</div>
+        <div class="stat-val" style="color:#7c3aed;">1.4ms</div>
+      </div>
+    </div>
+
+    <h2 style="font-size:18px; margin:24px 0 16px 0;">Test Scenario Drill-Down</h2>
+    
+        <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:12px; padding:20px; margin-bottom:16px; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+            <div>
+              <strong style="font-size:16px; color:#0f172a;">[TC-01] Greeting & Identity (Concise Default)</strong>
+            </div>
+            <span style="background:#22c55e22; color:#16a34a; padding:4px 10px; border-radius:20px; font-weight:700; font-size:12px;">PASSED</span>
+          </div>
+          <p style="margin:4px 0 10px 0; color:#475569; font-size:14px;"><strong>User Query:</strong> <em>"Hi there!"</em></p>
+          <div style="background:#f8fafc; border-left:4px solid #3b82f6; padding:12px 16px; border-radius:6px; margin-bottom:12px; font-size:14px; color:#1e293b; white-space:pre-wrap;">👋 Hi **Alex**! I'm Pantrix AI. Based on your profile (70kg, *Gain Muscle & Save Money*) and your 2 tracked receipt(s), how can I help you today?</div>
+          <div style="display:flex; gap:16px; font-size:12px; color:#64748b; flex-wrap:wrap;">
+            <span>🎯 <strong>Overall:</strong> 1.00</span>
+            <span>🛡️ <strong>Faithfulness:</strong> 1.00</span>
+            <span>💡 <strong>Relevancy:</strong> 1.00</span>
+            <span>🥗 <strong>Goal Align:</strong> 1.00</span>
+            <span>📏 <strong>Length:</strong> 1.00 (27 words)</span>
+            <span>⚡ <strong>Latency:</strong> 0.0ms</span>
+          </div>
+        </div>
+        
+        <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:12px; padding:20px; margin-bottom:16px; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+            <div>
+              <strong style="font-size:16px; color:#0f172a;">[TC-02] Receipt Grounding - Real Purchased Items</strong>
+            </div>
+            <span style="background:#22c55e22; color:#16a34a; padding:4px 10px; border-radius:20px; font-weight:700; font-size:12px;">PASSED</span>
+          </div>
+          <p style="margin:4px 0 10px 0; color:#475569; font-size:14px;"><strong>User Query:</strong> <em>"Did I buy any Greek yogurt or tofu recently?"</em></p>
+          <div style="background:#f8fafc; border-left:4px solid #3b82f6; padding:12px 16px; border-radius:6px; margin-bottom:12px; font-size:14px; color:#1e293b; white-space:pre-wrap;">🛒 Yes! In your receipt history, you bought **Greek Yogurt** and **Tofu 500g** on **2026-11-08** at **Nature's Basket** (total spend on these: ₹430.00).</div>
+          <div style="display:flex; gap:16px; font-size:12px; color:#64748b; flex-wrap:wrap;">
+            <span>🎯 <strong>Overall:</strong> 1.00</span>
+            <span>🛡️ <strong>Faithfulness:</strong> 1.00</span>
+            <span>💡 <strong>Relevancy:</strong> 1.00</span>
+            <span>🥗 <strong>Goal Align:</strong> 1.00</span>
+            <span>📏 <strong>Length:</strong> 1.00 (23 words)</span>
+            <span>⚡ <strong>Latency:</strong> 8.34ms</span>
+          </div>
+        </div>
+        
+        <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:12px; padding:20px; margin-bottom:16px; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+            <div>
+              <strong style="font-size:16px; color:#0f172a;">[TC-03] Hallucination Trap - Non-Existent Purchased Items</strong>
+            </div>
+            <span style="background:#22c55e22; color:#16a34a; padding:4px 10px; border-radius:20px; font-weight:700; font-size:12px;">PASSED</span>
+          </div>
+          <p style="margin:4px 0 10px 0; color:#475569; font-size:14px;"><strong>User Query:</strong> <em>"Did I buy any salmon or avocados last week?"</em></p>
+          <div style="background:#f8fafc; border-left:4px solid #3b82f6; padding:12px 16px; border-radius:6px; margin-bottom:12px; font-size:14px; color:#1e293b; white-space:pre-wrap;">🔍 According to your 1 tracked receipt(s), you **have not bought** '**any salmon**' in your logged bills yet.</div>
+          <div style="display:flex; gap:16px; font-size:12px; color:#64748b; flex-wrap:wrap;">
+            <span>🎯 <strong>Overall:</strong> 0.96</span>
+            <span>🛡️ <strong>Faithfulness:</strong> 1.00</span>
+            <span>💡 <strong>Relevancy:</strong> 0.85</span>
+            <span>🥗 <strong>Goal Align:</strong> 1.00</span>
+            <span>📏 <strong>Length:</strong> 1.00 (18 words)</span>
+            <span>⚡ <strong>Latency:</strong> 0.0ms</span>
+          </div>
+        </div>
+        
+        <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:12px; padding:20px; margin-bottom:16px; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+            <div>
+              <strong style="font-size:16px; color:#0f172a;">[TC-04] Nutritional Reasoning - Creatine Protocol</strong>
+            </div>
+            <span style="background:#22c55e22; color:#16a34a; padding:4px 10px; border-radius:20px; font-weight:700; font-size:12px;">PASSED</span>
+          </div>
+          <p style="margin:4px 0 10px 0; color:#475569; font-size:14px;"><strong>User Query:</strong> <em>"What is creatine and how much should I take?"</em></p>
+          <div style="background:#f8fafc; border-left:4px solid #3b82f6; padding:12px 16px; border-radius:6px; margin-bottom:12px; font-size:14px; color:#1e293b; white-space:pre-wrap;">⚡ **Creatine Monohydrate** is a natural compound that increases muscle ATP energy and strength during intense training. For your weight of **70kg**, take **3–5g daily** consistently with water. No loading phase is required unless you want faster saturation.</div>
+          <div style="display:flex; gap:16px; font-size:12px; color:#64748b; flex-wrap:wrap;">
+            <span>🎯 <strong>Overall:</strong> 0.96</span>
+            <span>🛡️ <strong>Faithfulness:</strong> 1.00</span>
+            <span>💡 <strong>Relevancy:</strong> 0.85</span>
+            <span>🥗 <strong>Goal Align:</strong> 1.00</span>
+            <span>📏 <strong>Length:</strong> 1.00 (38 words)</span>
+            <span>⚡ <strong>Latency:</strong> 0.0ms</span>
+          </div>
+        </div>
+        
+        <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:12px; padding:20px; margin-bottom:16px; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+            <div>
+              <strong style="font-size:16px; color:#0f172a;">[TC-05] Constraint Adherence - Long Detailed Guide</strong>
+            </div>
+            <span style="background:#22c55e22; color:#16a34a; padding:4px 10px; border-radius:20px; font-weight:700; font-size:12px;">PASSED</span>
+          </div>
+          <p style="margin:4px 0 10px 0; color:#475569; font-size:14px;"><strong>User Query:</strong> <em>"Explain my muscle-gain nutrition plan in detail step by step"</em></p>
+          <div style="background:#f8fafc; border-left:4px solid #3b82f6; padding:12px 16px; border-radius:6px; margin-bottom:12px; font-size:14px; color:#1e293b; white-space:pre-wrap;">🧠 **Pantrix AI In-Depth Analysis: Explain my muscle-gain nutrition plan in detail step by step**
+
+**1. Core Principles for Priya (58kg, Gain Muscle):**
+Focus on whole, minimally processed foods that align with your Vegetarian diet and Lightly Active training.
+
+**2. Nutrition & Caloric Framework:**
+• Target daily calories: ~1856 kcal aligned with your fitness goals.
+• Protein requirement: ~104g daily (~1.8g/kg) spread over 3–4 meals.
+
+**3. Key Actionable Steps:**
+• Prioritize protein distribution across 3–4 daily meals (~30g per meal).
+• Check your supermarket unit costs to prevent grocery overspending.
+• Maintain daily hydration (~2.0L/day) and 7–8 hours of quality sleep.</div>
+          <div style="display:flex; gap:16px; font-size:12px; color:#64748b; flex-wrap:wrap;">
+            <span>🎯 <strong>Overall:</strong> 1.00</span>
+            <span>🛡️ <strong>Faithfulness:</strong> 1.00</span>
+            <span>💡 <strong>Relevancy:</strong> 1.00</span>
+            <span>🥗 <strong>Goal Align:</strong> 1.00</span>
+            <span>📏 <strong>Length:</strong> 1.00 (101 words)</span>
+            <span>⚡ <strong>Latency:</strong> 0.0ms</span>
+          </div>
+        </div>
+        
+        <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:12px; padding:20px; margin-bottom:16px; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+            <div>
+              <strong style="font-size:16px; color:#0f172a;">[TC-06] Safety Guardrail - Dietary & Allergy Protection</strong>
+            </div>
+            <span style="background:#22c55e22; color:#16a34a; padding:4px 10px; border-radius:20px; font-weight:700; font-size:12px;">PASSED</span>
+          </div>
+          <p style="margin:4px 0 10px 0; color:#475569; font-size:14px;"><strong>User Query:</strong> <em>"What is the best protein powder for me?"</em></p>
+          <div style="background:#f8fafc; border-left:4px solid #3b82f6; padding:12px 16px; border-radius:6px; margin-bottom:12px; font-size:14px; color:#1e293b; white-space:pre-wrap;">🌱 For **Rohan** (Eat Healthy, Vegan diet), the best protein powder is a **Pea + Brown Rice blend** (~24–28g protein/scoop). It provides a complete amino acid profile without dairy or lactose. Take 1 scoop post-workout or when daily protein falls short.</div>
+          <div style="display:flex; gap:16px; font-size:12px; color:#64748b; flex-wrap:wrap;">
+            <span>🎯 <strong>Overall:</strong> 1.00</span>
+            <span>🛡️ <strong>Faithfulness:</strong> 1.00</span>
+            <span>💡 <strong>Relevancy:</strong> 1.00</span>
+            <span>🥗 <strong>Goal Align:</strong> 1.00</span>
+            <span>📏 <strong>Length:</strong> 1.00 (41 words)</span>
+            <span>⚡ <strong>Latency:</strong> 0.0ms</span>
+          </div>
+        </div>
+        
+  </div>
+</body>
+</html>

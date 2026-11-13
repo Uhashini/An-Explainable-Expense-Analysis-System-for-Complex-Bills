@@ -18,6 +18,7 @@ from app.database.postgres_client import (
     HealthIndicators,
 )
 from app.core.config import settings
+from app.services.llm_monitor import llm_monitor
 
 logger = logging.getLogger(__name__)
 
@@ -761,6 +762,21 @@ class GemmaChatbotService:
 
         # ── 4. SUPPLEMENTS: PROTEIN POWDERS ──
         if any(w in msg_lower for w in ["whey", "protein powder", "casein", "plant protein", "isolate", "concentrate"]):
+            is_plant_or_dairy_free = any(p in food_pref.lower() for p in ["vegan", "plant"]) or "dairy" in allergies.lower()
+            if is_plant_or_dairy_free:
+                if not is_long_requested:
+                    return (
+                        f"🌱 For **{name}** ({primary_goal}, {food_pref} diet), the best protein powder is a **Pea + Brown Rice blend** (~24–28g protein/scoop). "
+                        f"It provides a complete amino acid profile without dairy or lactose. Take 1 scoop post-workout or when daily protein falls short."
+                    )
+                return (
+                    f"🌱 **Plant-Based Protein Powder Guide for {name}**\n\n"
+                    f"• **Pea + Brown Rice Blend:** Gold standard hypoallergenic complete protein matching whey leucine content.\n"
+                    f"• **Soy Protein Isolate:** High-quality complete protein with excellent bioavailability.\n"
+                    f"• **Dosage for {user_weight:.0f}kg:** 1 scoop (~25–30g protein) daily around workouts.\n\n"
+                    f"💡 100% free from dairy, whey, and lactose to support your {food_pref} diet."
+                )
+
             if not is_long_requested:
                 return (
                     f"🥛 For **{name}** ({primary_goal}, {food_pref} diet), **Whey Isolate** (~25–30g protein/scoop) is ideal for fast lean muscle recovery if you consume dairy. "
@@ -1041,8 +1057,15 @@ class GemmaChatbotService:
         ])
 
         if matched_items and is_item_query:
-            first_match = matched_items[0]
+            distinct_names = list(dict.fromkeys(it['name'] for it in matched_items))
             total_item_spend = sum(p.get("price", 0) for p in matched_items)
+            first_match = matched_items[0]
+            if len(distinct_names) > 1:
+                names_str = " and ".join(f"**{n}**" for n in distinct_names[:3])
+                return (
+                    f"🛒 Yes! In your receipt history, you bought {names_str} on **{first_match.get('date', 'Recent')}** "
+                    f"at **{first_match.get('merchant', 'Store')}** (total spend on these: ₹{total_item_spend:.2f})."
+                )
             return (
                 f"🛒 Yes! In your receipt history, you bought **{first_match['name']}** on **{first_match.get('date', 'Recent')}** "
                 f"at **{first_match.get('merchant', 'Store')}** for **₹{first_match.get('price', 0):.2f}** (qty: {first_match.get('quantity', 1)}). "
@@ -1065,10 +1088,13 @@ class GemmaChatbotService:
             f"🧠 **Pantrix AI In-Depth Analysis: {clean_q}**\n\n"
             f"**1. Core Principles for {name} ({user_weight:.0f}kg, {primary_goal}):**\n"
             f"Focus on whole, minimally processed foods that align with your {food_pref} diet and {activity_level} training.\n\n"
-            f"**2. Key Actionable Steps:**\n"
-            f"• Prioritize protein distribution across 3–4 daily meals (~{round(user_weight * 1.8, 0):.0f}g daily target).\n"
-            f"• Check your supermarket unit costs to prevent overspending.\n"
-            f"• Maintain daily hydration (~{(user_weight * 35) / 1000:.1f}L/day) and adequate sleep."
+            f"**2. Nutrition & Caloric Framework:**\n"
+            f"• Target daily calories: ~{round(user_weight * 32, 0):.0f} kcal aligned with your fitness goals.\n"
+            f"• Protein requirement: ~{round(user_weight * 1.8, 0):.0f}g daily (~1.8g/kg) spread over 3–4 meals.\n\n"
+            f"**3. Key Actionable Steps:**\n"
+            f"• Prioritize protein distribution across 3–4 daily meals (~30g per meal).\n"
+            f"• Check your supermarket unit costs to prevent grocery overspending.\n"
+            f"• Maintain daily hydration (~{(user_weight * 35) / 1000:.1f}L/day) and 7–8 hours of quality sleep."
         )
 
     # ─────────────────────────────────────────────────────────────────────────────
@@ -1087,6 +1113,7 @@ class GemmaChatbotService:
         Detects if user asked for a long answer (default is brief).
         Grounded in user profile and receipt history.
         """
+        t_start = time.time()
         self._refresh_keys()
         history = conversation_history or []
         is_long = is_long_answer_requested(message)
@@ -1134,12 +1161,27 @@ class GemmaChatbotService:
             reply = self._generate_contextual_response(message, user_context, history, is_long_requested=is_long)
             model_used = "Gemma 3 12B (Pantrix Engine)"
 
+        latency_ms = (time.time() - t_start) * 1000.0
+
+        trace = llm_monitor.record_interaction(
+            user_id=user_id,
+            query=message,
+            response=reply or "",
+            model_used=model_used,
+            latency_ms=latency_ms,
+            is_live_api=is_live,
+            is_long_requested=is_long,
+            user_context=user_context,
+        )
+
         return {
             "status": "success",
             "reply": reply,
             "model": model_used,
             "is_live_api": is_live,
             "is_long_requested": is_long,
+            "latency_ms": round(latency_ms, 2),
+            "trace_id": trace.get("trace_id"),
             "context_summary": {
                 "user_name": user_context.get("profile", {}).get("name", "User"),
                 "total_receipts": user_context.get("receipt_summary", {}).get("total_receipts", 0),

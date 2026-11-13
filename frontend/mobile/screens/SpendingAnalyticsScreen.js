@@ -55,31 +55,30 @@ function parseSafeDate(dateStr) {
 function SpendingAnalyticsContent({ navigation }) {
   const [timeFilter, setTimeFilter] = useState('All Receipts'); // 'All Receipts' | 'This Month'
   const [monthlyBudget, setMonthlyBudget] = useState(DEFAULT_BUDGET);
-  const [isEditingBudget, setIsEditingBudget] = useState(false);
-  const [budgetInput, setBudgetInput] = useState(String(DEFAULT_BUDGET));
   const [spendingData, setSpendingData] = useState(null);
   const [rawReceipts, setRawReceipts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedPoint, setSelectedPoint] = useState(null);
 
-  // Load saved budget goal from local storage
-  useEffect(() => {
-    (async () => {
-      try {
-        const saved = await AsyncStorage.getItem(STORAGE_BUDGET_KEY);
-        if (saved) {
-          const val = parseFloat(saved);
-          if (!isNaN(val) && val > 0) {
-            setMonthlyBudget(val);
-            setBudgetInput(String(val));
-          }
+  // Load saved budget goal from local storage (synced with Home Page)
+  const reloadBudget = useCallback(async () => {
+    try {
+      const saved = await AsyncStorage.getItem(STORAGE_BUDGET_KEY);
+      if (saved) {
+        const val = parseFloat(saved);
+        if (!isNaN(val) && val > 0) {
+          setMonthlyBudget(val);
         }
-      } catch (e) {
-        console.warn('Error reading budget from storage:', e);
       }
-    })();
+    } catch (e) {
+      console.warn('Error reading budget from storage:', e);
+    }
   }, []);
+
+  useEffect(() => {
+    reloadBudget();
+  }, [reloadBudget]);
 
   // Fetch receipts and real analytics from backend
   const fetchSpendingAnalytics = useCallback(async () => {
@@ -127,29 +126,15 @@ function SpendingAnalyticsContent({ navigation }) {
   // Re-fetch automatically whenever the screen comes into focus
   useFocusEffect(
     useCallback(() => {
+      reloadBudget();
       fetchSpendingAnalytics();
-    }, [fetchSpendingAnalytics])
+    }, [reloadBudget, fetchSpendingAnalytics])
   );
 
   const onRefresh = () => {
     setIsRefreshing(true);
+    reloadBudget();
     fetchSpendingAnalytics();
-  };
-
-  const handleSaveBudget = async () => {
-    const parsed = parseFloat(budgetInput.replace(/[^0-9.]/g, ''));
-    if (!isNaN(parsed) && parsed > 0) {
-      setMonthlyBudget(parsed);
-      setIsEditingBudget(false);
-      try {
-        await AsyncStorage.setItem(STORAGE_BUDGET_KEY, String(parsed));
-      } catch (e) {
-        console.warn('Failed saving budget:', e);
-      }
-    } else {
-      setBudgetInput(String(monthlyBudget));
-      setIsEditingBudget(false);
-    }
   };
 
   // Determine if user has actual receipt data
@@ -425,155 +410,23 @@ function SpendingAnalyticsContent({ navigation }) {
           <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} colors={[COLORS.primary]} />
         }
       >
-        {/* ─── 1. Monthly Budget Hub (Always available to set goals) ─── */}
-        <View style={styles.budgetCard}>
-          <View style={styles.budgetCardTop}>
-            <View style={styles.budgetTitleRow}>
-              <View style={[styles.iconPill, { backgroundColor: '#FBEBEB' }]}>
-                <Feather name="target" size={17} color={COLORS.primary} />
-              </View>
-              <View>
-                <Text style={styles.budgetHeaderTitle}>Monthly Budget Goal</Text>
-                <Text style={styles.budgetHeaderSubtitle}>Active Grocery Spending Target</Text>
-              </View>
-            </View>
-
-            <View style={styles.budgetHeaderRight}>
-              {hasData && (
-                <View style={[styles.statusBadge, { backgroundColor: analytics.statusBg }]}>
-                  <View style={[styles.statusDot, { backgroundColor: analytics.statusColor }]} />
-                  <Text style={[styles.statusBadgeText, { color: analytics.statusColor }]}>
-                    {analytics.statusText}
-                  </Text>
-                </View>
-              )}
-              <TouchableOpacity
-                style={styles.editBudgetPill}
-                onPress={() => {
-                  setBudgetInput(String(analytics.monthlyBudget));
-                  setIsEditingBudget(!isEditingBudget);
-                }}
-                activeOpacity={0.7}
-              >
-                <Feather name={isEditingBudget ? 'x' : 'edit-2'} size={13} color={COLORS.primary} />
-                <Text style={styles.editBudgetText}>{isEditingBudget ? 'Close' : 'Set Budget'}</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* Inline Budget Quick Editor */}
-          {isEditingBudget && (
-            <View style={styles.budgetEditorBox}>
-              <Text style={styles.editorBoxTitle}>Configure Monthly Grocery Target</Text>
-              <View style={styles.editorInputRow}>
-                <Text style={styles.currencyPrefix}>₹</Text>
-                <TextInput
-                  style={styles.budgetTextInput}
-                  value={budgetInput}
-                  onChangeText={setBudgetInput}
-                  keyboardType="numeric"
-                  placeholder="e.g. 6000"
-                  placeholderTextColor="#aaa"
-                />
-                <TouchableOpacity style={styles.saveBudgetBtn} onPress={handleSaveBudget} activeOpacity={0.8}>
-                  <Text style={styles.saveBudgetBtnText}>Save</Text>
-                </TouchableOpacity>
-              </View>
-              <View style={styles.presetRow}>
-                {BUDGET_PRESETS.map((preset) => (
-                  <TouchableOpacity
-                    key={preset}
-                    style={[
-                      styles.presetChip,
-                      parseFloat(budgetInput) === preset && styles.presetChipActive,
-                    ]}
-                    onPress={() => setBudgetInput(String(preset))}
-                  >
-                    <Text
-                      style={[
-                        styles.presetChipText,
-                        parseFloat(budgetInput) === preset && styles.presetChipTextActive,
-                      ]}
-                    >
-                      ₹{(preset / 1000).toFixed(0)}k
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-          )}
-
-          {/* If user has data, show live numbers */}
-          {hasData ? (
-            <>
-              {/* Large Budget Numbers */}
-              <View style={styles.numbersGrid}>
-                <View>
-                  <Text style={styles.numLabel}>Spent This Period</Text>
-                  <Text style={styles.numLarge}>₹{analytics.currentSpend.toLocaleString('en-IN')}</Text>
-                  <Text style={styles.numSub}>of ₹{analytics.monthlyBudget.toLocaleString('en-IN')} Target</Text>
-                </View>
-                <View style={styles.numRightBox}>
-                  <Text style={styles.numLabel}>Remaining Budget</Text>
-                  <Text style={[styles.numLarge, { color: analytics.remaining >= 0 ? '#2E7D32' : '#D32F2F' }]}>
-                    {analytics.remaining >= 0
-                      ? `₹${analytics.remaining.toLocaleString('en-IN')}`
-                      : `-₹${Math.abs(analytics.remaining).toLocaleString('en-IN')}`}
-                  </Text>
-                  <Text style={styles.numSub}>
-                    {analytics.remaining >= 0 ? 'Left to spend' : 'Over budget limit'}
-                  </Text>
-                </View>
-              </View>
-
-              {/* Progress Bar */}
-              <View style={styles.progressContainer}>
-                <View style={styles.progressTrack}>
-                  <View
-                    style={[
-                      styles.progressFill,
-                      { width: `${analytics.utilizationPct}%`, backgroundColor: analytics.statusColor },
-                    ]}
-                  />
-                </View>
-                <View style={styles.progressMetaRow}>
-                  <Text style={styles.metaPct}>{analytics.rawPct}% Utilized</Text>
-                  <Text style={styles.metaPace}>
-                    {analytics.projectedMonthEnd > analytics.monthlyBudget
-                      ? `Pacing ₹${analytics.projectedMonthEnd.toLocaleString('en-IN')} (Over)`
-                      : `Pacing ₹${analytics.projectedMonthEnd.toLocaleString('en-IN')} (Safe)`}
-                  </Text>
-                </View>
-              </View>
-
-              {/* Daily Burn Rate & Avg Basket Banner */}
-              <View style={styles.burnRateRow}>
-                <View style={styles.burnItem}>
-                  <Feather name="activity" size={14} color={COLORS.mutedText} style={{ marginRight: 6 }} />
-                  <Text style={styles.burnText}>Burn Rate: <Text style={styles.burnBold}>₹{analytics.burnRate}/day</Text></Text>
-                </View>
-                <View style={styles.burnDivider} />
-                <View style={styles.burnItem}>
-                  <Feather name="shopping-bag" size={14} color={COLORS.mutedText} style={{ marginRight: 6 }} />
-                  <Text style={styles.burnText}>Avg Run: <Text style={styles.burnBold}>₹{analytics.avgBasket}</Text></Text>
-                </View>
-              </View>
-            </>
-          ) : (
-            /* New user zero-state budget view */
-            <View style={styles.newUserBudgetNotice}>
-              <View style={styles.targetRow}>
-                <Text style={styles.targetLabel}>Target Limit:</Text>
-                <Text style={styles.targetValue}>₹{analytics.monthlyBudget.toLocaleString('en-IN')}</Text>
-              </View>
-              <Text style={styles.targetDesc}>
-                Set your monthly grocery spending limit above. As you upload receipts, your real-time spend pace and remaining balance will track here automatically.
+        {/* Time Period Filter Pill Bar */}
+        <View style={styles.filterBar}>
+          {TIME_FILTERS.map((f) => (
+            <TouchableOpacity
+              key={f}
+              style={[styles.filterPill, timeFilter === f && styles.filterPillActive]}
+              onPress={() => setTimeFilter(f)}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.filterText, timeFilter === f && styles.filterTextActive]}>
+                {f}
               </Text>
-            </View>
-          )}
+            </TouchableOpacity>
+          ))}
         </View>
 
-        {/* ─── 2. Conditional View: Empty State vs Full Analytics ─── */}
+        {/* ─── Conditional View: Empty State vs Full Analytics ─── */}
         {isLoading ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={COLORS.primary} />

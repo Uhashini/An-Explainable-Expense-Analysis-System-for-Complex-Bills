@@ -5,6 +5,7 @@ import {
   LayoutAnimation, Platform, UIManager, ActivityIndicator,
 } from 'react-native';
 import ScreenLayout from '../components/ScreenLayout';
+import MonthlyBudgetCard from '../components/MonthlyBudgetCard';
 import { getUser } from '../utils/authStorage';
 import { authFetch, API_BASE_URL } from '../utils/apiConfig';
 import { COLORS, FONTS } from '../theme';
@@ -635,47 +636,6 @@ export default function DashboardScreen({ navigation }) {
             </View>
           </View>
 
-          {/* Gemma 3 12B AI Assistant Card */}
-          <TouchableOpacity
-            style={styles.gemmaCard}
-            onPress={() => navigation.navigate('GemmaChat')}
-            activeOpacity={0.9}
-          >
-            <View style={styles.gemmaHeader}>
-              <View style={styles.gemmaBadgeRow}>
-                <View style={styles.gemmaIconCircle}>
-                  <Text style={styles.gemmaIcon}>✦</Text>
-                </View>
-                <View>
-                  <Text style={styles.gemmaTitle}>Pantrix AI Assistant</Text>
-                  <View style={styles.gemmaTagRow}>
-                    <View style={styles.gemmaModelTag}>
-                      <Text style={styles.gemmaModelText}>Gemma 3 12B</Text>
-                    </View>
-                    <Text style={styles.gemmaLiveText}>• Context-Aware</Text>
-                  </View>
-                </View>
-              </View>
-              <View style={styles.gemmaArrowBtn}>
-                <Text style={styles.gemmaArrow}>→</Text>
-              </View>
-            </View>
-            <Text style={styles.gemmaDescription}>
-              Ask anything about your bills, protein intake, macros, or smart ways to cut grocery costs.
-            </Text>
-            <View style={styles.gemmaPromptRow}>
-              <View style={styles.gemmaPromptPill}>
-                <Text style={styles.gemmaPromptText}>"Track my protein"</Text>
-              </View>
-              <View style={styles.gemmaPromptPill}>
-                <Text style={styles.gemmaPromptText}>"Save ₹500"</Text>
-              </View>
-              <View style={styles.gemmaPromptPill}>
-                <Text style={styles.gemmaPromptText}>"Analyze bill"</Text>
-              </View>
-            </View>
-          </TouchableOpacity>
-
           {/* Quick Stats 2×2 Grid */}
           <Text style={styles.sectionTitle}>QUICK STATS</Text>
           <View style={styles.statsGrid}>
@@ -684,15 +644,14 @@ export default function DashboardScreen({ navigation }) {
             ))}
           </View>
 
+          {/* Monthly Budget Goal (Moved from Financial Insights) */}
+          <Text style={styles.sectionTitle}>MONTHLY BUDGET GOAL</Text>
+          <MonthlyBudgetCard userId={userId} />
+
           {/* Goal Progress */}
           <Text style={styles.sectionTitle}>GOAL PROGRESS</Text>
           <View style={styles.goalsContainer}>
-            {/* Save Money goal */}
-            {GOALS_TOP.map((g) => (
-              <GoalCard key={g.label} {...g} />
-            ))}
-
-            {/* Spending Forecast — live data, placed after Save Money per spec */}
+            {/* Spending Forecast — live data */}
             <SpendingForecastCard
               data={forecastData}
               loading={forecastLoading}
