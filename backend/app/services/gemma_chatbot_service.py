@@ -3,6 +3,7 @@ import json
 import time
 import logging
 import re
+from datetime import datetime
 from difflib import SequenceMatcher
 from typing import Dict, Any, List, Optional, Tuple
 import requests
@@ -130,6 +131,22 @@ def _clean_model_output(text: str) -> str:
         text = "\n".join(cleaned_lines).strip()
 
     return _deduplicate_text(text.strip())
+
+
+def _format_date_clean(d_str: Any) -> str:
+    """Formats date strings into clean editorial format like 'Sep 3, 2026'."""
+    if not d_str or str(d_str).strip().lower() in ("recent", "n/a", "unknown", "none", ""):
+        return "Recent"
+    s = str(d_str).strip()
+    try:
+        clean = s.replace("Z", "").split("T")[0]
+        parts = clean.split("-")
+        if len(parts) == 3 and len(parts[0]) == 4:
+            dt = datetime(int(parts[0]), int(parts[1]), int(parts[2]))
+            return dt.strftime("%b %d, %Y")
+    except Exception:
+        pass
+    return s
 
 
 class GemmaChatbotService:
@@ -420,9 +437,18 @@ class GemmaChatbotService:
 ### CORE INSTRUCTIONS:
 1. RELEVANCE: Answer ONLY what the user asked directly. Do NOT digress into unasked topics or filler intros.
 2. {length_rule}
-3. GROUNDING IN USER INFO: Tailor any health, diet, calorie, macro, or budget advice specifically to {name} ({weight}kg, {height}cm, {primary_goals}, {diet} diet, {activity} activity).
-4. GROUNDING IN USER'S HISTORY: When asked about past purchases, groceries, spending, or where they shopped, strictly use the receipt history above. If {total_receipts} == 0 or the item wasn't purchased, state clearly that according to their purchase history, no records exist yet.
-5. NO INTERNAL PLANNING / SCRATCHPAD: Output ONLY your direct final answer. Never echo the question, user profile lines, or planning notes before the answer.
+3. FORMATTING & VISUAL STRUCTURE (STRICT):
+   - Never output raw walls of text or single dense paragraphs when presenting numbers, breakdowns, or recommendations.
+   - Start with a 1-sentence bold takeaway summarizing the direct answer.
+   - Follow immediately with 2 to 4 clean bullet points (`• ` or `- `) using bold key-value labels (e.g., `• **Daily Target:** 85g – 117g protein`, `• **Top Sources:** Eggs, paneer, Greek yogurt`).
+   - When breaking down a receipt or store spend, format it as:
+     **Store Name — ₹Total** *(Date)*
+     • **Items:** X items (~₹Y avg/item)
+     • **Highlight / Top Category:** [Category or top item]
+   - Keep emojis to a maximum of 1 subtle icon in the opening line, or omit them entirely for a cleaner editorial look.
+4. GROUNDING IN USER INFO: Tailor any health, diet, calorie, macro, or budget advice specifically to {name} ({weight}kg, {height}cm, {primary_goals}, {diet} diet, {activity} activity).
+5. GROUNDING IN USER'S HISTORY: When asked about past purchases, groceries, spending, or where they shopped, strictly use the receipt history above. If {total_receipts} == 0 or the item wasn't purchased, state clearly that according to their purchase history, no records exist yet.
+6. NO INTERNAL PLANNING / SCRATCHPAD: Output ONLY your direct final answer. Never echo the question, user profile lines, or planning notes before the answer.
 """
         return prompt
 
@@ -711,53 +737,46 @@ class GemmaChatbotService:
         if re.search(r"^(hi|hello|hey|hola|namaste|good morning|good afternoon|good evening|yo)\b", msg_lower):
             if not is_long_requested:
                 return (
-                    f"👋 Hi **{name}**! I'm Pantrix AI. Based on your profile ({user_weight:.0f}kg, *{primary_goal}*) "
-                    f"and your {total_receipts} tracked receipt(s), how can I help you today?"
+                    f"**Welcome back, {name}!** Here is your quick Pantrix snapshot:\n"
+                    f"• **Tracked Receipts:** {total_receipts} receipt(s) totaling ₹{total_spent:.2f}\n"
+                    f"• **Primary Goal:** {primary_goal} ({activity_level} activity)\n"
+                    f"• **Daily Focus:** Ask about your spending, macro intake, or meal ideas."
                 )
             receipt_msg = (
-                f"• 🧾 **{total_receipts} Receipt(s) Scanned** totaling **₹{total_spent:.2f}**\n"
-                f"• 🥗 **Logged Macros:** ~**{protein_g}g** protein & ~**{calories:.0f} kcal**"
+                f"• **Scanned Bills:** {total_receipts} receipt(s) totaling ₹{total_spent:.2f}\n"
+                f"• **Logged Nutrition:** ~{protein_g}g protein & ~{calories:.0f} kcal"
                 if total_receipts > 0
-                else "• 🧾 **0 Receipts scanned yet** (upload your first bill anytime to unlock personalized spend & nutrient tracking!)"
+                else "• **Scanned Bills:** 0 receipts scanned yet (upload anytime to unlock full tracking)"
             )
             return (
-                f"👋 Hello **{name}**! I'm **Pantrix AI**, your intelligent grocery, nutrition, and expense copilot.\n\n"
-                f"Here is your connected snapshot:\n"
+                f"**Welcome to Pantrix Assistant, {name}!**\n"
                 f"{receipt_msg}\n"
-                f"• 🎯 **Your Goal:** *{primary_goal}* ({activity_level} activity)\n\n"
-                f"**You can ask me anything, such as:**\n"
-                f"1. *\"What is creatine and should I take it?\"*\n"
-                f"2. *\"How much protein and calories do I need daily?\"*\n"
-                f"3. *\"Break down my grocery spending and find savings\"*\n"
-                f"4. *\"Suggest high-protein vegetarian meals\"*\n"
-                f"5. *\"Did I buy any eggs, bananas, or milk recently?\"*"
+                f"• **Profile Target:** {primary_goal} ({user_weight:.0f}kg, {activity_level} activity)\n"
+                f"• **Recommended Queries:** Ask for high-protein foods, weekly spend, or store comparisons."
             )
 
         # ── 2. THANK YOU & CLOSING ──
         if re.search(r"\b(thank you|thanks|thx|awesome|great job|kudos|bye|goodbye|cya)\b", msg_lower):
-            return f"You're very welcome, **{name}**! 😊 Let me know whenever you need anything else for your groceries, budget, or nutrition."
+            return (
+                f"**You're very welcome, {name}!**\n"
+                f"• **Next Steps:** Scan your next receipt or ask whenever you need nutrition or grocery advice."
+            )
 
         # ── 3. SUPPLEMENTS: CREATINE ──
         if "creatine" in msg_lower:
             if not is_long_requested:
                 return (
-                    f"⚡ **Creatine Monohydrate** is a natural compound that increases muscle ATP energy and strength during intense training. "
-                    f"For your weight of **{user_weight:.0f}kg**, take **3–5g daily** consistently with water. "
-                    f"No loading phase is required unless you want faster saturation."
+                    f"**Creatine Monohydrate boosts muscle strength, power output, and ATP recovery.**\n"
+                    f"• **Recommended Dose:** 3g – 5g daily taken consistently with water\n"
+                    f"• **Target for {user_weight:.0f}kg:** No loading phase required; full saturation occurs within 3–4 weeks\n"
+                    f"• **Best Timing:** Any time with a meal or post-workout protein shake"
                 )
             return (
-                f"⚡ **Everything You Need to Know About Creatine**\n\n"
-                f"**1. What It Is & How It Works:**\n"
-                f"Creatine binds with phosphate to form **phosphocreatine**, which rapidly regenerates **ATP**—your muscles' primary energy currency during short, intense bursts of effort.\n\n"
-                f"**2. Proven Benefits for {name} (~{user_weight:.0f}kg, {primary_goal}):**\n"
-                f"• **Strength & Power:** Increases maximal strength by 5–15% and allows 1–2 extra reps per set.\n"
-                f"• **Muscle Growth:** Expands cell volume through intracellular hydration, promoting muscle protein synthesis.\n"
-                f"• **Cognitive Support:** Aids memory and reduces mental fatigue.\n\n"
-                f"**3. Recommended Protocol:**\n"
-                f"• **Type:** Micronized **Creatine Monohydrate**.\n"
-                f"• **Dosage:** **3g to 5g daily**.\n"
-                f"• **Timing:** Any time with a meal or protein shake; consistency is what matters.\n\n"
-                f"**4. Safety:** 100% safe for healthy adults in clinical trials. Drink 3–4L water daily."
+                f"**Creatine Monohydrate is clinically proven to enhance strength, power, and muscle recovery.**\n"
+                f"• **Mechanism:** Replenishes phosphocreatine to rapidly regenerate cellular ATP during training\n"
+                f"• **Optimal Dosage:** 3g – 5g daily (for {user_weight:.0f}kg body weight)\n"
+                f"• **Key Benefits:** Increases lifting strength by 5–15% and accelerates lean tissue recovery\n"
+                f"• **Usage Tip:** Take consistently every day with 3–4L of daily water intake."
             )
 
         # ── 4. SUPPLEMENTS: PROTEIN POWDERS ──
@@ -766,45 +785,61 @@ class GemmaChatbotService:
             if is_plant_or_dairy_free:
                 if not is_long_requested:
                     return (
-                        f"🌱 For **{name}** ({primary_goal}, {food_pref} diet), the best protein powder is a **Pea + Brown Rice blend** (~24–28g protein/scoop). "
-                        f"It provides a complete amino acid profile without dairy or lactose. Take 1 scoop post-workout or when daily protein falls short."
+                        f"**A Pea and Brown Rice protein blend is optimal for your {food_pref} diet.**\n"
+                        f"• **Protein Yield:** ~24g – 28g complete protein per scoop\n"
+                        f"• **Recommended Intake:** 1 scoop daily around workout windows\n"
+                        f"• **Key Advantage:** 100% dairy- and lactose-free with a complete amino acid profile"
                     )
                 return (
-                    f"🌱 **Plant-Based Protein Powder Guide for {name}**\n\n"
-                    f"• **Pea + Brown Rice Blend:** Gold standard hypoallergenic complete protein matching whey leucine content.\n"
-                    f"• **Soy Protein Isolate:** High-quality complete protein with excellent bioavailability.\n"
-                    f"• **Dosage for {user_weight:.0f}kg:** 1 scoop (~25–30g protein) daily around workouts.\n\n"
-                    f"💡 100% free from dairy, whey, and lactose to support your {food_pref} diet."
+                    f"**Plant-Based Protein Powder Guide for {name}:**\n"
+                    f"• **Pea + Rice Blend:** Gold-standard complete amino acid profile matching whey\n"
+                    f"• **Soy Protein Isolate:** Cost-effective, high-bioavailability complete plant protein\n"
+                    f"• **Target for {user_weight:.0f}kg:** 1 scoop (~25g–30g) daily around workout windows"
                 )
 
             if not is_long_requested:
                 return (
-                    f"🥛 For **{name}** ({primary_goal}, {food_pref} diet), **Whey Isolate** (~25–30g protein/scoop) is ideal for fast lean muscle recovery if you consume dairy. "
-                    f"If plant-based, a **Pea + Brown Rice blend** provides a complete amino acid profile. Take 1 scoop post-workout or when whole food protein falls short."
+                    f"**Whey Isolate is the highest-quality fast-digesting option for {name}.**\n"
+                    f"• **Protein Yield:** ~25g – 28g pure protein per scoop with virtually zero lactose\n"
+                    f"• **Recommended Intake:** 1 scoop post-workout or when daily whole-food protein falls short\n"
+                    f"• **Daily Target:** Supports your daily goal of ~{round(user_weight * 1.8, 0):.0f}g protein"
                 )
             return (
-                f"🥛 **Protein Powder Guide for {name}**\n\n"
-                f"• **Whey Isolate:** 90%+ protein, virtually zero lactose/fat. Best for fast absorption and lean recovery.\n"
-                f"• **Whey Concentrate:** 75–80% protein, cost-effective staple if you tolerate lactose well.\n"
-                f"• **Micellar Casein:** Slow-digesting (6–8 hours). Ideal right before sleep to prevent nighttime muscle breakdown.\n"
-                f"• **Plant Protein (Pea + Rice):** Hypoallergenic, complete amino acid profile matching whey for vegan/vegetarian diets.\n\n"
-                f"💡 **Target for {user_weight:.0f}kg:** Aim for ~25–30g (1 scoop) around your workout window."
+                f"**Protein Powder Guide tailored for {name} ({primary_goal}):**\n"
+                f"• **Whey Isolate:** 90%+ protein, virtually zero lactose/fat; ideal for post-workout recovery\n"
+                f"• **Whey Concentrate:** 75–80% protein; economical staple if lactose is well-tolerated\n"
+                f"• **Micellar Casein:** Slow-digesting (6–8 hours); ideal before sleep to prevent catabolism\n"
+                f"• **Plant Blend (Pea + Rice):** Hypoallergenic complete protein matching whey leucine levels"
             )
 
         # ── 5. SUPPLEMENTS: PRE-WORKOUT, BCAAS, EAAS, VITAMINS ──
         if any(w in msg_lower for w in ["bcaa", "eaa", "pre-workout", "preworkout", "beta-alanine", "citrulline", "multivitamin", "fish oil", "omega 3", "omega-3", "vitamin d"]):
             if "bcaa" in msg_lower or "eaa" in msg_lower:
                 return (
-                    f"🧬 If you already hit your daily protein goal (~{round(user_weight * 1.8, 0):.0f}g for your {user_weight:.0f}kg weight), standalone BCAAs are unnecessary. "
-                    f"If training completely fasted, EAAs provide all 9 essential amino acids to prevent muscle breakdown."
+                    f"**Standalone BCAAs are unnecessary if you meet your daily protein target.**\n"
+                    f"• **Daily Protein Goal:** ~{round(user_weight * 1.8, 0):.0f}g for your {user_weight:.0f}kg weight\n"
+                    f"• **Fasted Training Alternative:** EAAs (all 9 essential amino acids) prevent muscle breakdown\n"
+                    f"• **Priority:** Whole food protein sources and whey already provide abundant leucine"
                 )
             if "fish oil" in msg_lower or "omega 3" in msg_lower or "omega-3" in msg_lower:
-                return f"🐟 Take **1,000–2,000mg combined EPA + DHA daily** with a meal to reduce joint inflammation, optimize brain health, and support cardiovascular recovery."
+                return (
+                    f"**Omega-3 fatty acids reduce joint inflammation and support cardiovascular health.**\n"
+                    f"• **Recommended Dose:** 1,000mg – 2,000mg combined EPA + DHA daily\n"
+                    f"• **Best Timing:** Take with a meal containing dietary fats for optimal absorption\n"
+                    f"• **Key Benefits:** Accelerates muscle recovery and supports cognitive health"
+                )
             if "vitamin d" in msg_lower:
-                return f"☀️ Take **2,000–4,000 IU of Vitamin D3 daily** with a dietary fat meal (ideally paired with Vitamin K2) to optimize bone strength, immunity, and natural hormone balance."
+                return (
+                    f"**Vitamin D3 supports bone density, immune defense, and hormone synthesis.**\n"
+                    f"• **Recommended Dose:** 2,000 – 4,000 IU daily (ideally paired with Vitamin K2)\n"
+                    f"• **Best Timing:** Take with your largest meal containing dietary fat\n"
+                    f"• **Key Benefits:** Crucial for energy levels, muscle function, and overall vitality"
+                )
             return (
-                f"⚡ For pre-workout performance, prioritize **6–8g L-Citrulline** for nitric oxide blood flow and **150–200mg Caffeine** 30–45 mins before training. "
-                f"Avoid proprietary blends with undisclosed fillers."
+                f"**Effective pre-workout supplementation centers on two research-backed ingredients:**\n"
+                f"• **L-Citrulline:** 6g – 8g for nitric oxide production and blood flow\n"
+                f"• **Caffeine:** 150mg – 200mg taken 30–45 minutes prior to training\n"
+                f"• **Safety Tip:** Avoid proprietary blends with unlisted dosages"
             )
 
         # ── 6. METABOLIC CALCULATION: BMR, TDEE, CALORIES & DEFICIT/SURPLUS ──
@@ -834,39 +869,37 @@ class GemmaChatbotService:
             if not is_long_requested:
                 target_cal = deficit_cal if ("loss" in primary_goal.lower() or "healthy" in primary_goal.lower()) else surplus_cal
                 return (
-                    f"🔥 Based on your profile (**{user_weight:.0f}kg**, **{user_height:.0f}cm**, **{user_age} yrs**, **{activity_level}** activity):\n"
-                    f"• **Maintenance (TDEE):** ~**{tdee:.0f} kcal / day** (BMR: ~{bmr:.0f})\n"
-                    f"• **Target for {primary_goal}:** ~**{target_cal:.0f} kcal / day**\n"
-                    f"• **Daily Protein Target:** ~**{round(user_weight * 1.8, 0):.0f}g** ({round(user_weight * 1.8 * 4, 0):.0f} kcal)."
+                    f"**Based on your profile, your daily maintenance expenditure is ~{tdee:.0f} kcal.**\n"
+                    f"• **Basal Metabolic Rate (BMR):** ~{bmr:.0f} kcal / day at rest\n"
+                    f"• **Target for {primary_goal}:** ~{target_cal:.0f} kcal / day\n"
+                    f"• **Daily Protein Target:** ~{round(user_weight * 1.8, 0):.0f}g ({round(user_weight * 1.8 * 4, 0):.0f} kcal)"
                 )
 
             return (
-                f"🔥 **Personalized Metabolic & Calorie Breakdown for {name}**\n\n"
-                f"Calculated for **{user_weight:.0f} kg**, **{user_height:.0f} cm**, **{user_age} yrs**, **{activity_level}** activity:\n\n"
-                f"• ⚡ **BMR (Basal Metabolic Rate):** **~{bmr:.0f} kcal / day**\n"
-                f"• 🏃 **TDEE (Maintenance Calories):** **~{tdee:.0f} kcal / day**\n\n"
-                f"🎯 **Target Recommendations:**\n"
-                f"• **For Steady Fat Loss (~0.5 kg/week):** Eat **~{deficit_cal:.0f} kcal / day**.\n"
-                f"• **For Lean Muscle Building:** Eat **~{surplus_cal:.0f} kcal / day**.\n"
-                f"• **Macro Split:** ~{round(user_weight * 1.8, 0):.0f}g protein, ~{round(user_weight * 0.9, 0):.0f}g healthy fats, remainder from complex carbs."
+                f"**Personalized Metabolic & Calorie Breakdown for {name}:**\n"
+                f"• **BMR (Basal Metabolic Rate):** ~{bmr:.0f} kcal / day\n"
+                f"• **TDEE (Maintenance):** ~{tdee:.0f} kcal / day ({activity_level} activity)\n"
+                f"• **Fat Loss Target (~0.5 kg/wk):** ~{deficit_cal:.0f} kcal / day\n"
+                f"• **Muscle Building Target:** ~{surplus_cal:.0f} kcal / day\n"
+                f"• **Macro Distribution:** ~{round(user_weight * 1.8, 0):.0f}g protein, ~{round(user_weight * 0.9, 0):.0f}g fats, remainder complex carbs"
             )
 
         # ── 7. WORKOUT PLANS & TRAINING SPLITS ──
         if any(w in msg_lower for w in ["workout plan", "routine", "split", "push pull legs", "ppl", "upper lower", "gym plan", "exercise", "lifting schedule"]):
             if not is_long_requested:
                 return (
-                    f"🏋️ For your goal of *{primary_goal}*, a **4-Day Upper/Lower split** (or 3-Day Full Body) is optimal. "
-                    f"Focus on progressive overload on compound lifts (squats, bench press, deadlifts, rows, overhead press) with 1–2 reps in reserve."
+                    f"**A 4-Day Upper/Lower split is optimal for {primary_goal}.**\n"
+                    f"• **Frequency:** 4 days per week (2 Upper days, 2 Lower days)\n"
+                    f"• **Core Focus:** Progressive overload on compound lifts (squats, bench, deadlifts, rows)\n"
+                    f"• **Intensity:** Train with 1–2 reps in reserve per working set"
                 )
             return (
-                f"🏋️ **Optimal Training Split for {name} ({primary_goal})**\n\n"
-                f"**Option A: 4-Day Upper / Lower Split (Gold Standard)**\n"
-                f"• **Day 1 (Upper A):** Bench Press, Barbell Row, Overhead Press, Bicep Curls (3-4 sets each)\n"
-                f"• **Day 2 (Lower A):** Barbell Squats, Romanian Deadlifts, Calf Raises, Hanging Leg Raises\n"
-                f"• **Day 3:** Rest or light walking\n"
-                f"• **Day 4 (Upper B):** Incline Dumbbell Press, Pull-ups / Lat Pulldown, Lateral Raises, Tricep Pushdowns\n"
-                f"• **Day 5 (Lower B):** Leg Press, Bulgarian Split Squats, Hamstring Curls, Core\n\n"
-                f"💡 **Key Rule:** Apply progressive overload by adding 1 rep or 1–2kg each week."
+                f"**Optimal Training Schedule for {name} ({primary_goal}):**\n"
+                f"• **Upper A:** Bench Press, Barbell Row, Overhead Press, Bicep Curls (3–4 sets each)\n"
+                f"• **Lower A:** Barbell Squats, Romanian Deadlifts, Calf Raises, Core work\n"
+                f"• **Upper B:** Incline Dumbbell Press, Lat Pulldowns, Lateral Raises, Tricep Pushdowns\n"
+                f"• **Lower B:** Leg Press, Bulgarian Split Squats, Hamstring Curls\n"
+                f"• **Progression Rule:** Increase load by 1–2kg or add 1 rep each week"
             )
 
         # ── 8. PROTEIN & MUSCLE BUILDING TARGETS ──
@@ -886,55 +919,70 @@ class GemmaChatbotService:
 
             if not is_long_requested:
                 return (
-                    f"💪 For your weight of **{user_weight:.0f}kg** and goal (*{primary_goal}*), aim for **{daily_prot_min:.0f}g – {daily_prot_max:.0f}g of protein daily** (~1.6–2.2g/kg). "
-                    f"Prioritize eggs, paneer, chicken, Greek yogurt, tofu, lentils, or whey distributed over 3–4 meals."
+                    f"**Aim for {daily_prot_min:.0f}g – {daily_prot_max:.0f}g of protein daily for optimal recovery.**\n"
+                    f"• **Daily Target:** ~1.6g – 2.2g per kg for your {user_weight:.0f}kg weight\n"
+                    f"• **Per-Meal Target:** 25g – 35g protein spread evenly across 3–4 meals\n"
+                    f"• **Top Whole Sources:** Eggs, paneer, chicken breast, Greek yogurt, lentils, tofu"
                 )
 
             return (
-                f"💪 **Customized Protein Plan for {name}**\n\n"
-                f"🎯 **Target:** **{daily_prot_min:.0f}g – {daily_prot_max:.0f}g protein / day** (for your ~{user_weight:.0f}kg body weight & {activity_level} training).\n"
-                f"📊 **From Scanned Receipts:** ~**{protein_g}g** recorded total across bills.\n\n"
-                f"**High-Protein Items Found in Your Bills:**\n{prot_list_str}\n\n"
-                f"💡 Aim for ~30–40g protein per meal to trigger muscle protein synthesis."
+                f"**Customized Protein Blueprint for {name}:**\n"
+                f"• **Daily Target:** {daily_prot_min:.0f}g – {daily_prot_max:.0f}g protein / day\n"
+                f"• **Logged in Receipts:** ~{protein_g}g total recorded across bills\n"
+                f"• **Optimal Distribution:** 3–4 meals containing 30g–40g protein each\n"
+                f"• **High-Protein Items in Your Receipts:**\n{prot_list_str}"
             )
 
-        # ── 8. HYDRATION & WATER INTAKE ──
+        # ── 9. HYDRATION & WATER INTAKE ──
         if any(w in msg_lower for w in ["water", "hydration", "how much water", "drink water"]):
             water_liters = round((user_weight * 35) / 1000, 1)
             workout_water = round(water_liters + 0.6, 1)
             if not is_long_requested:
                 return (
-                    f"💧 For your body weight (**{user_weight:.0f}kg**), drink **{water_liters} Liters daily** (~35ml/kg), "
-                    f"increasing to **{workout_water} Liters on workout days** to replenish sweat losses."
+                    f"**Your baseline daily fluid requirement is {water_liters} Liters.**\n"
+                    f"• **Baseline Target:** ~{water_liters}L daily (~35ml per kg of your {user_weight:.0f}kg weight)\n"
+                    f"• **Workout Target:** ~{workout_water}L on active training days to replenish sweat\n"
+                    f"• **Hydration Indicator:** Aim for clear to pale straw-yellow urine color"
                 )
             return (
-                f"💧 **Personalized Daily Hydration Blueprint for {name}**\n\n"
-                f"• **Baseline Requirement:** **{water_liters} Liters / day** (~35ml per kg of your {user_weight:.0f}kg weight).\n"
-                f"• **Workout Days:** **{workout_water} Liters / day** to sustain performance and muscle hydration.\n\n"
-                f"**Tips:** Drink 500ml upon waking, add a pinch of salt to your workout bottle, and ensure urine is pale straw yellow."
+                f"**Hydration Blueprint for {name} ({user_weight:.0f}kg):**\n"
+                f"• **Daily Baseline:** {water_liters} Liters / day\n"
+                f"• **Workout Addition:** +500ml – 750ml during and post-workout ({workout_water}L total)\n"
+                f"• **Morning Routine:** Drink 500ml water immediately upon waking\n"
+                f"• **Electrolyte Balance:** Add a pinch of sea salt on intense workout days"
             )
 
-        # ── 9. DIETARY PROTOCOLS: INTERMITTENT FASTING & KETO ──
+        # ── 10. DIETARY PROTOCOLS: INTERMITTENT FASTING & KETO ──
         if any(w in msg_lower for w in ["fasting", "intermittent", "keto", "ketogenic", "low carb", "omad"]):
             if "keto" in msg_lower:
                 if not is_long_requested:
-                    return f"🥑 **Keto** is a high-fat (70–75%), moderate-protein (20–25%), and very low-carb (<30–50g net carbs/day) protocol that puts the body into ketosis. Ensure adequate sodium and potassium to prevent keto flu."
+                    return (
+                        f"**Keto is a high-fat, moderate-protein, very low-carbohydrate protocol.**\n"
+                        f"• **Macro Ratio:** 70–75% Healthy Fats, 20–25% Protein, 5–10% Net Carbs (<30g/day)\n"
+                        f"• **Core Foods:** Eggs, paneer, avocados, olive oil, nuts, and leafy greens\n"
+                        f"• **Key Requirement:** Maintain electrolyte intake (3,000–5,000mg sodium daily)"
+                    )
                 return (
-                    f"🥑 **Keto Protocol for {name}**\n\n"
-                    f"• **Macro Ratio:** 70–75% Healthy Fats, 20–25% Protein, 5–10% Net Carbs.\n"
-                    f"• **Best Foods:** Eggs, paneer, avocados, olive oil, chicken, fish, nuts, and leafy greens.\n"
-                    f"• **Crucial:** Supplement 3,000–5,000mg sodium daily as kidneys excrete water rapidly in ketosis."
+                    f"**Keto Protocol for {name}:**\n"
+                    f"• **Macro Ratio:** 70–75% Healthy Fats, 20–25% Protein, 5–10% Net Carbs\n"
+                    f"• **Best Foods:** Eggs, paneer, avocados, olive oil, chicken, fish, nuts, and leafy greens\n"
+                    f"• **Crucial:** Supplement 3,000–5,000mg sodium daily as kidneys excrete water rapidly in ketosis"
                 )
             if not is_long_requested:
-                return f"⏱️ **16/8 Intermittent Fasting** involves fasting for 16 hours and eating all daily meals within an 8-hour window (e.g., 12 PM to 8 PM). Only zero-calorie beverages (water, black coffee, plain tea) are permitted during the fast."
+                return (
+                    f"**16/8 Intermittent Fasting restricts daily eating to an 8-hour window.**\n"
+                    f"• **Protocol:** Fast for 16 hours, consume all daily nutrition in 8 hours (e.g., 12 PM – 8 PM)\n"
+                    f"• **Fasting Window:** Only zero-calorie liquids permitted (water, black coffee, plain tea)\n"
+                    f"• **Core Advantage:** Simplifies calorie restriction and improves insulin sensitivity"
+                )
             return (
-                f"⏱️ **16/8 Intermittent Fasting Guide**\n\n"
-                f"• **Protocol:** Fast 16 hours, eat within an 8-hour window (e.g. 12 PM – 8 PM).\n"
-                f"• **Benefits:** Enhances insulin sensitivity, promotes cellular cleanup (autophagy), and simplifies maintaining a calorie deficit.\n"
-                f"• **Allowed:** Water, black coffee, and green tea with zero creamers or sugar."
+                f"**16/8 Intermittent Fasting Guide for {name}:**\n"
+                f"• **Protocol:** Fast 16 hours, eat within an 8-hour window (e.g. 12 PM – 8 PM)\n"
+                f"• **Benefits:** Enhances insulin sensitivity, promotes autophagy, and maintains calorie control\n"
+                f"• **Allowed:** Water, black coffee, and green tea with zero creamers or sugar"
             )
 
-        # ── 10. RECIPES & PANTRY MEALS (USING SCANNED ITEMS) ──
+        # ── 11. RECIPES & PANTRY MEALS (USING SCANNED ITEMS) ──
         if any(w in msg_lower for w in ["cook", "recipe", "meal", "dinner", "lunch", "breakfast", "pantry", "make with", "prepare", "dish", "snack"]):
             real_foods = []
             for it in all_items_flat:
@@ -949,65 +997,87 @@ class GemmaChatbotService:
 
             if not is_long_requested:
                 return (
-                    f"👨‍🍳 Quick meal using your groceries (**{ing1}**): Sauté 150g {ing1} in 1 tsp olive oil with minced garlic, black pepper, and herbs for 6–8 mins (~220 kcal, ~18g protein). Serve with rice or whole wheat toast!"
+                    f"**Quick High-Protein Sauté using your {ing1}:**\n"
+                    f"• **Preparation:** Sauté 150g {ing1} in 1 tsp olive oil with garlic and black pepper for 6–8 mins\n"
+                    f"• **Nutrition:** ~220 kcal | ~18g protein | ~8g healthy fats\n"
+                    f"• **Pairing:** Serve alongside brown rice or whole-wheat toast"
                 )
             return (
-                f"👨‍🍳 **Personalized Recipes from Your Scanned Items ({', '.join(food_sample)})**\n\n"
-                f"🥗 **Recipe 1: Sautéed Garlic Herb {ing1}** *(15 mins | ~220 kcal | ~18g Protein)*\n"
-                f"• Sauté chopped {ing1} with olive oil, garlic, black pepper, and salt on medium-high heat for 6–8 minutes. Finish with lemon juice.\n\n"
-                f"🍌 **Recipe 2: Recovery {ing2} Power Bowl** *(5 mins | ~280 kcal | ~14g Protein)*\n"
-                f"• Combine {ing2} with Greek yogurt, oats, and honey for instant post-workout glycogen and protein replenishment."
+                f"**Personalized Recipes from Your Scanned Items ({', '.join(food_sample)}):**\n"
+                f"• **Sautéed Garlic {ing1}:** 15 mins | ~220 kcal | ~18g Protein. Pan-sear with olive oil and spices\n"
+                f"• **Recovery {ing2} Bowl:** 5 mins | ~280 kcal | ~14g Protein. Combine with Greek yogurt and oats\n"
+                f"• **Nutrition Tip:** Prioritizes whole-food protein to support your {primary_goal} goal"
             )
 
-        # ── 11. BUDGETING & GROCERY SAVINGS ──
+        # ── 12. BUDGETING & GROCERY SAVINGS ──
         if any(w in msg_lower for w in ["save", "saving", "budget", "cut cost", "reduce spend", "expensive", "cheaper", "spend less"]):
             savings_target = 500 if "500" in msg_lower else 750
             if not is_long_requested:
                 if total_receipts > 0:
                     return (
-                        f"💰 You have spent **₹{total_spent:.2f}** across {total_receipts} tracked receipt(s). "
-                        f"To save **₹{savings_target}+**, switch staple grains and oils to store brands (saves ~25%) and buy high-frequency essentials in 2–5kg bulk packs."
+                        f"**You have spent ₹{total_spent:.2f} across {total_receipts} tracked receipt(s).**\n"
+                        f"• **Potential Savings:** ~₹{savings_target}+ per month\n"
+                        f"• **Store Brands:** Switch staple grains and oils to store brands (saves ~20–30%)\n"
+                        f"• **Bulk Purchasing:** Buy high-frequency essentials in 2kg–5kg packs to reduce unit costs"
                     )
-                return f"💰 To save **₹{savings_target}+** on groceries, switch staples to store brands, check unit prices per kg, avoid pre-chopped convenience veggies, and shop with a planned 7-day meal list."
+                return (
+                    f"**Here are actionable strategies to save ₹{savings_target}+ on groceries:**\n"
+                    f"• **Store Brands:** Switch staple grains, pulses, and oils to retailer store brands\n"
+                    f"• **Unit Pricing:** Compare price-per-kilogram rather than sticker package prices\n"
+                    f"• **Meal Planning:** Shop with a strict 7-day grocery list to eliminate impulse buying"
+                )
 
             return (
-                f"💰 **Actionable Supermarket Savings Blueprint for {name}**\n\n"
-                f"You have spent **₹{total_spent:.2f}** across {total_receipts} tracked receipt(s).\n\n"
-                f"• **Switch to Store Brands (Save ~₹250):** Grains, pulses, salt, and oils from retailer store brands match premium brand quality at 20–35% lower cost.\n"
-                f"• **Unit Price Optimization (Save ~₹200):** Buy pantry staples in 2kg–5kg packs rather than single-run portions.\n"
-                f"• **Skip Convenience Markups (Save ~₹150):** Avoid pre-cut produce or shredded cheese which carry a 40–80% price premium.\n"
-                f"• **Stick to a Meal Plan:** Eliminates duplicate impulse snacks and food waste."
+                f"**Supermarket Cost-Reduction Blueprint for {name}:**\n"
+                f"• **Logged Spend:** ₹{total_spent:.2f} across {total_receipts} tracked receipt(s)\n"
+                f"• **Store Brands (Save ~₹250):** Grains, pulses, and oils offer equal quality at 20–35% less cost\n"
+                f"• **Unit Price Optimization (Save ~₹200):** Buy pantry staples in bulk rather than individual packs\n"
+                f"• **Skip Convenience Markups (Save ~₹150):** Avoid pre-cut produce or single-serve packages"
             )
 
-        # ── 12. LATEST RECEIPT BREAKDOWN ──
+        # ── 13. LATEST RECEIPT BREAKDOWN ──
         if any(phrase in msg_lower for phrase in ["latest receipt", "last receipt", "latest bill", "last bill", "last visit", "latest visit", "break down my latest", "break down my spend"]):
             if not receipts:
-                return f"🧾 According to your history, **{name}**, you haven't uploaded any receipts yet. Scan a grocery receipt in the app to unlock itemized spend and protein breakdown!"
+                return (
+                    f"**No receipts found in your history.**\n"
+                    f"• **Status:** You haven't uploaded any receipts yet\n"
+                    f"• **Next Step:** Scan a grocery receipt to unlock itemized spend and macro tracking"
+                )
 
             latest = receipts[0]
             items = latest.get("items", [])
             avg_item = latest.get('total_amount', 0) / max(len(items), 1)
+            store_name = latest.get('merchant', 'Grocery Store')
+            clean_date = _format_date_clean(latest.get('date', 'Recent'))
+            highlight_item = items[0].get('name') if items else "Pantry staples"
 
             if not is_long_requested:
                 return (
-                    f"🧾 Your latest receipt is from **{latest.get('merchant', 'Grocery Store')}** on **{latest.get('date', 'Recent')}** "
-                    f"for **₹{latest.get('total_amount', 0):.2f}** ({len(items)} items, avg ~₹{avg_item:.2f}/item)."
+                    f"**{store_name} — ₹{latest.get('total_amount', 0):.2f}** *({clean_date})*\n"
+                    f"• **Items:** {len(items)} items (~₹{avg_item:.2f} avg/item)\n"
+                    f"• **Highlight / Top Category:** {highlight_item}\n"
+                    f"[ View Full Receipt ↗ ]"
                 )
 
             items_str = "\n".join([f"• **{it.get('name')}**: ₹{it.get('price', 0):.2f} (qty: {it.get('quantity', 1)})" for it in items[:10]])
             if len(items) > 10:
                 items_str += f"\n• *...and {len(items) - 10} more items.*"
             return (
-                f"🧾 **Breakdown of Your Latest Receipt**\n\n"
-                f"🏪 **Store:** {latest.get('merchant', 'Grocery Store')} | 📅 **Date:** {latest.get('date', 'Recent')}\n"
-                f"💳 **Total:** **₹{latest.get('total_amount', 0):.2f}** ({len(items)} items, avg ₹{avg_item:.2f}/item)\n\n"
-                f"**Items:**\n{items_str}"
+                f"**{store_name} — ₹{latest.get('total_amount', 0):.2f}** *({clean_date})*\n"
+                f"• **Items Count:** {len(items)} items (~₹{avg_item:.2f} avg/item)\n"
+                f"• **Item Breakdown:**\n"
+                f"{items_str}\n"
+                f"[ View Full Receipt ↗ ]"
             )
 
-        # ── 13. STORE COMPARISONS & MERCHANT ANALYSIS ──
+        # ── 14. STORE COMPARISONS & MERCHANT ANALYSIS ──
         if any(w in msg_lower for w in ["store", "merchant", "reliance", "dmart", "spar", "market", "shop", "supermarket", "compare store"]):
             if not receipts:
-                return f"🏪 You don't have any store receipts logged in Pantrix yet. Upload your receipts to see store-by-store spending and price comparisons!"
+                return (
+                    f"**No store receipts logged yet.**\n"
+                    f"• **Status:** Upload your grocery bills to see store-by-store spending and price comparisons\n"
+                    f"• **Benefit:** Identifies which retailer gives you the best value on frequent purchases"
+                )
 
             merchant_stats: Dict[str, Dict[str, Any]] = {}
             for r in receipts:
@@ -1019,16 +1089,22 @@ class GemmaChatbotService:
 
             if not is_long_requested:
                 top_store = max(merchant_stats.items(), key=lambda kv: kv[1]["total"])
-                return f"🏪 Across your {total_receipts} receipt(s), your highest spend was at **{top_store[0]}** (₹{top_store[1]['total']:.2f} across {top_store[1]['count']} trip(s)). Total logged: ₹{total_spent:.2f}."
+                return (
+                    f"**Your highest grocery spend was at {top_store[0]}.**\n"
+                    f"• **Top Store Spend:** ₹{top_store[1]['total']:.2f} across {top_store[1]['count']} trip(s)\n"
+                    f"• **Total Tracked:** ₹{total_spent:.2f} across {total_receipts} receipt(s)\n"
+                    f"• **Optimization:** Consolidating trips into one weekly run minimizes impulse buys"
+                )
 
             m_lines = [f"• **{m}**: ₹{st['total']:.2f} ({st['count']} trip(s))" for m, st in merchant_stats.items()]
             return (
-                f"🏪 **Store-by-Store Spending Breakdown for {name}**\n\n"
+                f"**Store-by-Store Spending Breakdown for {name}:**\n"
+                f"• **Total Spent:** ₹{total_spent:.2f} across {total_receipts} receipt(s)\n"
                 + "\n".join(m_lines) +
-                f"\n\n💡 Consolidating into one weekly grocery trip helps minimize impulse purchases and transport costs."
+                f"\n• **Recommendation:** Consolidating into one weekly grocery trip helps minimize impulse purchases."
             )
 
-        # ── 14. SPECIFIC ITEM SEARCH OR PRICING IN RECEIPTS ──
+        # ── 15. SPECIFIC ITEM SEARCH OR PRICING IN RECEIPTS ──
         raw_tokens = re.findall(r"\b[a-zA-Z]{3,}\b", msg_lower)
         stopwords = {
             "did", "how", "much", "buy", "bought", "cost", "price", "spend", "spent",
@@ -1057,44 +1133,40 @@ class GemmaChatbotService:
         ])
 
         if matched_items and is_item_query:
-            distinct_names = list(dict.fromkeys(it['name'] for it in matched_items))
             total_item_spend = sum(p.get("price", 0) for p in matched_items)
             first_match = matched_items[0]
-            if len(distinct_names) > 1:
-                names_str = " and ".join(f"**{n}**" for n in distinct_names[:3])
-                return (
-                    f"🛒 Yes! In your receipt history, you bought {names_str} on **{first_match.get('date', 'Recent')}** "
-                    f"at **{first_match.get('merchant', 'Store')}** (total spend on these: ₹{total_item_spend:.2f})."
-                )
+            clean_m_date = _format_date_clean(first_match.get('date', 'Recent'))
             return (
-                f"🛒 Yes! In your receipt history, you bought **{first_match['name']}** on **{first_match.get('date', 'Recent')}** "
-                f"at **{first_match.get('merchant', 'Store')}** for **₹{first_match.get('price', 0):.2f}** (qty: {first_match.get('quantity', 1)}). "
-                f"Total spent on this item: ₹{total_item_spend:.2f}."
+                f"**{first_match['name']} — ₹{first_match.get('price', 0):.2f}** *({clean_m_date})*\n"
+                f"• **Store:** {first_match.get('merchant', 'Store')}\n"
+                f"• **Quantity:** {first_match.get('quantity', 1)}\n"
+                f"• **Total Spent on Item:** ₹{total_item_spend:.2f}"
             )
 
         if candidate_words and any(k in msg_lower for k in ["did i buy", "have i bought", "price of", "how much was", "cost of", "did i get"]):
             searched = " ".join(candidate_words[:2])
-            return f"🔍 According to your {total_receipts} tracked receipt(s), you **have not bought** '**{searched}**' in your logged bills yet."
+            return (
+                f"**No matching purchases found in your records.**\n"
+                f"• **Searched Item:** '{searched}'\n"
+                f"• **Tracked Receipts:** {total_receipts} receipt(s) checked\n"
+                f"• **Tip:** Upload or scan a new bill anytime to log this item"
+            )
 
-        # ── 15. GENERAL / OTHER INQUIRIES ──
+        # ── 16. GENERAL / OTHER INQUIRIES ──
         clean_q = user_message.strip().rstrip("?")
         if not is_long_requested:
             return (
-                f"💡 For **{name}** ({user_weight:.0f}kg, goal: *{primary_goal}*): Regarding *{clean_q}*, prioritize nutrient-dense whole foods, "
-                f"aim for ~1.6–2.0g/kg protein, and check unit prices to maximize savings. Ask with 'detailed answer' if you'd like a full breakdown!"
+                f"**Nutrition and shopping guidance for {name}:**\n"
+                f"• **Core Focus:** Prioritize nutrient-dense whole foods matching your {food_pref} diet\n"
+                f"• **Daily Target:** Aim for ~1.6g–2.0g/kg protein ({round(user_weight * 1.8, 0):.0f}g) and balanced hydration\n"
+                f"• **Budget Tip:** Check supermarket unit prices per kilogram to maximize savings"
             )
 
         return (
-            f"🧠 **Pantrix AI In-Depth Analysis: {clean_q}**\n\n"
-            f"**1. Core Principles for {name} ({user_weight:.0f}kg, {primary_goal}):**\n"
-            f"Focus on whole, minimally processed foods that align with your {food_pref} diet and {activity_level} training.\n\n"
-            f"**2. Nutrition & Caloric Framework:**\n"
-            f"• Target daily calories: ~{round(user_weight * 32, 0):.0f} kcal aligned with your fitness goals.\n"
-            f"• Protein requirement: ~{round(user_weight * 1.8, 0):.0f}g daily (~1.8g/kg) spread over 3–4 meals.\n\n"
-            f"**3. Key Actionable Steps:**\n"
-            f"• Prioritize protein distribution across 3–4 daily meals (~30g per meal).\n"
-            f"• Check your supermarket unit costs to prevent grocery overspending.\n"
-            f"• Maintain daily hydration (~{(user_weight * 35) / 1000:.1f}L/day) and 7–8 hours of quality sleep."
+            f"**Pantrix Analysis for {name} ({user_weight:.0f}kg, {primary_goal}):**\n"
+            f"• **Dietary Framework:** Whole, minimally processed foods aligned with {food_pref} preferences\n"
+            f"• **Macro Targets:** ~{round(user_weight * 1.8, 0):.0f}g protein & ~{round(user_weight * 32, 0):.0f} kcal daily\n"
+            f"• **Action Steps:** Distribute protein across 3–4 meals and check unit prices to limit grocery expenses"
         )
 
     # ─────────────────────────────────────────────────────────────────────────────

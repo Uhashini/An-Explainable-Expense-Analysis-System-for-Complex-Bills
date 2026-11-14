@@ -16,6 +16,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Feather } from '@expo/vector-icons';
 import { COLORS, FONTS } from '../theme';
 import { API_BASE_URL } from '../utils/apiConfig';
 import { getUser } from '../utils/authStorage';
@@ -29,7 +30,7 @@ export default function GemmaChatScreen({ navigation }) {
       id: 'welcome',
       role: 'assistant',
       content:
-        "👋 Hi! I am **Pantrix AI**, powered by **Gemma 3 12B**.\n\nI have loaded your personal profile, health targets, and receipt history. Ask me anything about your groceries, nutrition, or recent purchases!\n\n💡 *Note: I provide direct, brief answers by default. If you ever need a thorough breakdown or step-by-step guide, just ask for a 'detailed answer'!*",
+        "👋 Hi, I'm **Pantrix Assistant**.\n\nI have your receipts, nutrition targets, and grocery history synced. Ask me anything about your spending, protein intake, or what to buy next!",
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     },
   ]);
@@ -197,28 +198,104 @@ export default function GemmaChatScreen({ navigation }) {
     ]);
   };
 
+  const parseInlineMarkdown = (text, isUser = false) => {
+    const tokens = [];
+    const regex = /(\*\*.*?\*\*|\*[^*]+?\*)/g;
+    let lastIndex = 0;
+    let match;
+
+    while ((match = regex.exec(text)) !== null) {
+      if (match.index > lastIndex) {
+        tokens.push({ type: 'text', content: text.slice(lastIndex, match.index) });
+      }
+      const raw = match[0];
+      if (raw.startsWith('**') && raw.endsWith('**')) {
+        tokens.push({ type: 'bold', content: raw.slice(2, -2) });
+      } else if (raw.startsWith('*') && raw.endsWith('*')) {
+        tokens.push({ type: 'italic', content: raw.slice(1, -1) });
+      }
+      lastIndex = regex.lastIndex;
+    }
+
+    if (lastIndex < text.length) {
+      tokens.push({ type: 'text', content: text.slice(lastIndex) });
+    }
+
+    return tokens.map((t, idx) => {
+      if (t.type === 'bold') {
+        return (
+          <Text key={idx} style={[styles.boldText, isUser && styles.userBoldText]}>
+            {t.content}
+          </Text>
+        );
+      }
+      if (t.type === 'italic') {
+        return (
+          <Text key={idx} style={[styles.italicText, isUser && styles.userItalicText]}>
+            {t.content}
+          </Text>
+        );
+      }
+      return <Text key={idx}>{t.content}</Text>;
+    });
+  };
+
   const renderFormattedText = (content, isUser = false) => {
     const lines = content.split('\n');
-    return lines.map((line, lineIdx) => {
-      const parts = line.split(/(\*\*.*?\*\*)/g);
+    return lines.map((rawLine, lineIdx) => {
+      const line = rawLine.trim();
+
+      if (!line) {
+        return <View key={`empty-${lineIdx}`} style={{ height: 6 }} />;
+      }
+
+      // Action pill like [ View Full Receipt ↗ ]
+      const pillMatch = line.match(/^\[(.*?)\]$/);
+      if (pillMatch) {
+        return (
+          <View key={`pill-${lineIdx}`} style={styles.actionPillRow}>
+            <TouchableOpacity
+              style={styles.actionPill}
+              activeOpacity={0.8}
+              onPress={() => navigation?.navigate && navigation.navigate('Receipts')}
+            >
+              <Text style={styles.actionPillText}>{pillMatch[1]}</Text>
+            </TouchableOpacity>
+          </View>
+        );
+      }
+
+      // Bullet points (starts with • or - or *)
+      const isBullet = line.startsWith('• ') || line.startsWith('- ') || (line.startsWith('* ') && !line.startsWith('** '));
+      if (isBullet) {
+        const bulletContent = line.replace(/^[•\-*]\s+/, '');
+        return (
+          <View key={`bullet-${lineIdx}`} style={styles.bulletRow}>
+            <Text style={[styles.bulletDot, isUser && styles.userBulletDot]}>•</Text>
+            <Text style={[styles.messageText, styles.bulletText, isUser && styles.userMessageText]}>
+              {parseInlineMarkdown(bulletContent, isUser)}
+            </Text>
+          </View>
+        );
+      }
+
+      // Numbered list e.g. "1. " or "2. "
+      const numberMatch = line.match(/^(\d+)\.\s+(.*)$/);
+      if (numberMatch) {
+        return (
+          <View key={`num-${lineIdx}`} style={styles.bulletRow}>
+            <Text style={[styles.numIndex, isUser && styles.userBulletDot]}>{numberMatch[1]}.</Text>
+            <Text style={[styles.messageText, styles.bulletText, isUser && styles.userMessageText]}>
+              {parseInlineMarkdown(numberMatch[2], isUser)}
+            </Text>
+          </View>
+        );
+      }
+
+      // Standard paragraph line
       return (
-        <Text
-          key={`line-${lineIdx}`}
-          style={[styles.messageText, isUser && styles.userMessageText]}
-        >
-          {parts.map((part, partIdx) => {
-            if (part.startsWith('**') && part.endsWith('**')) {
-              return (
-                <Text
-                  key={`part-${partIdx}`}
-                  style={[styles.boldText, isUser && styles.userBoldText]}
-                >
-                  {part.slice(2, -2)}
-                </Text>
-              );
-            }
-            return part;
-          })}
+        <Text key={`line-${lineIdx}`} style={[styles.messageText, isUser && styles.userMessageText]}>
+          {parseInlineMarkdown(line, isUser)}
         </Text>
       );
     });
@@ -230,18 +307,14 @@ export default function GemmaChatScreen({ navigation }) {
       <View style={[styles.messageRow, isUser ? styles.userRow : styles.assistantRow]}>
         {!isUser && (
           <View style={styles.avatar}>
-            <Text style={styles.avatarText}>✦</Text>
+            <Text style={styles.avatarText}>P</Text>
           </View>
         )}
         <View style={[styles.bubble, isUser ? styles.userBubble : styles.assistantBubble]}>
-          {!isUser && (
-            <View style={styles.botBadgeRow}>
-              <Text style={styles.botBadge} numberOfLines={1}>{item.model || 'GEMMA AI'}</Text>
-              <Text style={styles.timeText}>{item.timestamp}</Text>
-            </View>
-          )}
           {renderFormattedText(item.content, isUser)}
-          {isUser && <Text style={styles.userTimeText}>{item.timestamp}</Text>}
+          <Text style={[styles.timeText, isUser && styles.userTimeText]}>
+            {item.timestamp}
+          </Text>
         </View>
       </View>
     );
@@ -260,129 +333,134 @@ export default function GemmaChatScreen({ navigation }) {
         <View style={styles.header}>
           {navigation?.canGoBack && navigation.canGoBack() ? (
             <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-              <Text style={styles.backIcon}>←</Text>
+              <Feather name="chevron-left" size={22} color={COLORS.primary} />
             </TouchableOpacity>
           ) : (
             <View style={{ width: 12 }} />
           )}
           <View style={styles.headerCenter}>
-          <View style={styles.titleRow}>
-            <Text style={styles.headerTitle}>Pantrix AI</Text>
-            <View style={styles.modelTag}>
-              <Text style={styles.modelTagText}>Gemma AI</Text>
+            <Text style={styles.headerTitle}>Pantrix Assistant</Text>
+            <View style={styles.statusIndicatorRow}>
+              <View style={[styles.statusDot, { backgroundColor: '#22c55e' }]} />
+              <Text style={styles.headerSubtitle} numberOfLines={1}>
+                {userContext?.total_receipts != null
+                  ? `${userContext.total_receipts} receipts synced`
+                  : 'Receipts & profile synced'}
+              </Text>
             </View>
           </View>
-          <View style={styles.statusIndicatorRow}>
-            <View style={[styles.statusDot, { backgroundColor: statusInfo.has_api_key ? '#22c55e' : '#3b82f6' }]} />
-            <Text style={styles.headerSubtitle} numberOfLines={1}>
-              {statusInfo.provider || 'Local Data-Grounded Mode'}
-            </Text>
+          <View style={styles.headerRightActions}>
+            <TouchableOpacity onPress={clearChat} style={styles.clearBtn}>
+              <Feather name="rotate-ccw" size={11} color="#7A7265" style={{ marginRight: 4 }} />
+              <Text style={styles.clearBtnText}>Reset</Text>
+            </TouchableOpacity>
           </View>
         </View>
-        <View style={styles.headerRightActions}>
-          <TouchableOpacity onPress={clearChat} style={styles.clearBtn}>
-            <Text style={styles.clearBtnText}>Reset</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
 
-      {/* Context Snapshot Banner */}
-      {userContext && (
-        <View style={styles.contextBanner}>
-          <Text style={styles.contextLabel}>CONNECTED CONTEXT:</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.contextPillsScroll}
-          >
-            <View style={styles.contextPill}>
-              <Text style={styles.contextPillText}>🧾 {userContext.total_receipts || 0} Receipts</Text>
-            </View>
-            <View style={styles.contextPill}>
-              <Text style={styles.contextPillText}>💰 ₹{userContext.total_spent || 0} Spent</Text>
-            </View>
-            <View style={styles.contextPill}>
-              <Text style={styles.contextPillText}>💪 {userContext.total_protein_g || 0}g Protein</Text>
-            </View>
-          </ScrollView>
-        </View>
-      )}
-
-      {/* Chat Messages */}
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={styles.keyboardAvoid}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
-      >
-        <FlatList
-          ref={flatListRef}
-          data={messages}
-          keyExtractor={(item) => item.id}
-          renderItem={renderMessage}
-          contentContainerStyle={styles.listContent}
-          onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
-          ListFooterComponent={
-            isLoading ? (
-              <View style={styles.loadingRow}>
-                <View style={styles.avatar}>
-                  <Text style={styles.avatarText}>✦</Text>
-                </View>
-                <View style={styles.loadingBubble}>
-                  <ActivityIndicator size="small" color={COLORS.primary} />
-                  <Text style={styles.loadingText}>Analyzing your profile & receipts...</Text>
-                </View>
-              </View>
-            ) : null
-          }
-        />
-
-        {/* Suggestion Chips */}
-        {suggestions.length > 0 && messages.length <= 3 && !isLoading && (
-          <View style={styles.suggestionsContainer}>
-            <Text style={styles.suggestionsTitle}>💡 Suggested Questions:</Text>
+        {/* Connected Context Bar */}
+        {userContext && (
+          <View style={styles.contextBanner}>
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.chipsScroll}
+              contentContainerStyle={styles.contextPillsScroll}
             >
-              {suggestions.map((chip, idx) => (
-                <TouchableOpacity
-                  key={`chip-${idx}`}
-                  style={styles.chip}
-                  onPress={() => handleSend(chip)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.chipText}>{chip}</Text>
-                </TouchableOpacity>
-              ))}
+              <View style={styles.contextPill}>
+                <Feather name="file-text" size={11} color="#7A7265" style={styles.contextPillIcon} />
+                <Text style={styles.contextPillText}>{userContext.total_receipts || 0} Receipts</Text>
+              </View>
+              <View style={styles.contextPill}>
+                <Feather name="credit-card" size={11} color="#7A7265" style={styles.contextPillIcon} />
+                <Text style={styles.contextPillText}>₹{userContext.total_spent || 0} Spent</Text>
+              </View>
+              <View style={styles.contextPill}>
+                <Feather name="activity" size={11} color="#7A7265" style={styles.contextPillIcon} />
+                <Text style={styles.contextPillText}>{userContext.total_protein_g || 0}g Protein</Text>
+              </View>
             </ScrollView>
           </View>
         )}
 
-        {/* Input Bar */}
-        <View style={[styles.inputContainer, { paddingBottom: Math.max(insets.bottom, 10) }]}>
-          <TextInput
-            style={styles.input}
-            placeholder="Ask Gemma about creatine, macros, recipes, bills..."
-            placeholderTextColor="rgba(153, 8, 8, 0.4)"
-            value={inputText}
-            onChangeText={setInputText}
-            multiline
-            maxLength={500}
-            editable={!isLoading}
+        {/* Chat Messages */}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.keyboardAvoid}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+        >
+          <FlatList
+            ref={flatListRef}
+            data={messages}
+            keyExtractor={(item) => item.id}
+            renderItem={renderMessage}
+            contentContainerStyle={styles.listContent}
+            onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+            ListFooterComponent={
+              isLoading ? (
+                <View style={styles.loadingRow}>
+                  <View style={styles.avatar}>
+                    <Text style={styles.avatarText}>P</Text>
+                  </View>
+                  <View style={styles.loadingBubble}>
+                    <ActivityIndicator size="small" color={COLORS.primary} />
+                    <Text style={styles.loadingText}>Analyzing your profile & receipts...</Text>
+                  </View>
+                </View>
+              ) : null
+            }
           />
-          <TouchableOpacity
-            style={[
-              styles.sendButton,
-              (!inputText.trim() || isLoading) && styles.sendButtonDisabled,
-            ]}
-            onPress={() => handleSend()}
-            disabled={!inputText.trim() || isLoading}
-          >
-            <Text style={styles.sendIcon}>➤</Text>
-          </TouchableOpacity>
-        </View>
-      </KeyboardAvoidingView>
+
+          {/* Quick-Reply Suggestion Chips */}
+          {!isLoading && (
+            <View style={styles.suggestionsContainer}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.chipsScroll}
+              >
+                {(suggestions.length > 0 ? suggestions : [
+                  '🥩 Top protein items',
+                  '💸 Weekly spend breakdown',
+                  '🥗 Healthy food swaps',
+                  '🏪 Compare grocery hauls',
+                  '⚠️ Any overspending alerts?',
+                ]).map((chip, idx) => (
+                  <TouchableOpacity
+                    key={`chip-${idx}`}
+                    style={styles.chip}
+                    onPress={() => handleSend(chip)}
+                    activeOpacity={0.75}
+                  >
+                    <Text style={styles.chipText}>{chip}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          )}
+
+          {/* Input Bar */}
+          <View style={[styles.inputContainer, { paddingBottom: Math.max(insets.bottom, 10) }]}>
+            <TextInput
+              style={styles.input}
+              placeholder="Ask about receipts, protein, or spending..."
+              placeholderTextColor="#9A9285"
+              value={inputText}
+              onChangeText={setInputText}
+              multiline
+              maxLength={500}
+              editable={!isLoading}
+            />
+            <TouchableOpacity
+              style={[
+                styles.sendButton,
+                (!inputText.trim() || isLoading) && styles.sendButtonDisabled,
+              ]}
+              onPress={() => handleSend()}
+              disabled={!inputText.trim() || isLoading}
+            >
+              <Feather name="arrow-up" size={18} color="#FFFFFF" />
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
       </View>
 
       {/* AI Provider & API Settings Modal */}
@@ -490,37 +568,15 @@ const styles = StyleSheet.create({
   },
   backButton: {
     padding: 6,
-    marginRight: 8,
-  },
-  backIcon: {
-    fontSize: 22,
-    color: COLORS.primary,
-    fontWeight: 'bold',
+    marginRight: 6,
   },
   headerCenter: {
     flex: 1,
   },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
   headerTitle: {
     fontFamily: FONTS.bold,
-    fontSize: 18,
-    color: '#1a1a1a',
-  },
-  modelTag: {
-    backgroundColor: 'rgba(153, 8, 8, 0.08)',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
-  modelTagText: {
-    fontFamily: FONTS.medium,
-    fontSize: 10,
-    color: COLORS.primary,
-    fontWeight: '700',
+    fontSize: 17,
+    color: '#1A1816',
   },
   statusIndicatorRow: {
     flexDirection: 'row',
@@ -532,48 +588,39 @@ const styles = StyleSheet.create({
     width: 7,
     height: 7,
     borderRadius: 3.5,
-    backgroundColor: '#3b82f6',
+    backgroundColor: '#22c55e',
   },
   headerSubtitle: {
     fontFamily: FONTS.regular,
     fontSize: 11,
-    color: '#666',
+    color: '#7A7265',
   },
   headerRightActions: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
   },
-  iconBtn: {
-    padding: 6,
-  },
-  iconBtnText: {
-    fontSize: 18,
-  },
   clearBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 8,
-    backgroundColor: '#F3EFEA',
+    backgroundColor: '#F4F0E8',
+    borderWidth: 1,
+    borderColor: '#E2D9C8',
   },
   clearBtnText: {
     fontFamily: FONTS.medium,
-    fontSize: 12,
-    color: '#666',
+    fontSize: 11,
+    color: '#554D40',
   },
   contextBanner: {
-    backgroundColor: '#FFF8F6',
+    backgroundColor: '#FAF8F5',
     borderBottomWidth: 1,
-    borderBottomColor: '#F5E6E3',
+    borderBottomColor: '#EAE6DD',
     paddingHorizontal: 16,
     paddingVertical: 8,
-  },
-  contextLabel: {
-    fontFamily: FONTS.bold,
-    fontSize: 9,
-    color: COLORS.primary,
-    letterSpacing: 0.8,
-    marginBottom: 4,
   },
   contextPillsScroll: {
     flexDirection: 'row',
@@ -581,17 +628,22 @@ const styles = StyleSheet.create({
     paddingRight: 16,
   },
   contextPill: {
-    backgroundColor: '#fff',
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F4F0E8',
     borderWidth: 1,
-    borderColor: '#E8D4D0',
+    borderColor: '#E2D9C8',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 14,
   },
+  contextPillIcon: {
+    marginRight: 5,
+  },
   contextPillText: {
-    fontFamily: FONTS.medium,
+    fontFamily: FONTS.semiBold,
     fontSize: 11,
-    color: '#444',
+    color: '#554D40',
   },
   keyboardAvoid: {
     flex: 1,
@@ -628,12 +680,12 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   avatarText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: 'bold',
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontFamily: FONTS.bold,
   },
   bubble: {
-    borderRadius: 18,
+    borderRadius: 16,
     paddingHorizontal: 14,
     paddingVertical: 10,
     flexShrink: 1,
@@ -644,61 +696,92 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-end',
   },
   assistantBubble: {
-    backgroundColor: '#fff',
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#EDE9E3',
+    borderColor: '#E2D9C8',
     borderTopLeftRadius: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 3,
-    elevation: 1,
-  },
-  botBadgeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 6,
-    paddingBottom: 4,
-    borderBottomWidth: 0.5,
-    borderBottomColor: '#f0ece6',
-    gap: 10,
-  },
-  botBadge: {
-    fontFamily: FONTS.bold,
-    fontSize: 9,
-    color: COLORS.primary,
-    letterSpacing: 0.5,
-    flexShrink: 1,
   },
   timeText: {
     fontFamily: FONTS.regular,
-    fontSize: 9,
-    color: '#999',
-  },
-  userTimeText: {
-    fontFamily: FONTS.regular,
-    fontSize: 9,
-    color: 'rgba(255, 255, 255, 0.75)',
+    fontSize: 10,
+    color: '#9A9285',
     marginTop: 4,
     alignSelf: 'flex-end',
+  },
+  userTimeText: {
+    color: 'rgba(255, 255, 255, 0.75)',
   },
   messageText: {
     fontFamily: FONTS.regular,
     fontSize: 14,
     lineHeight: 21,
-    color: '#222',
+    color: '#4A3B32',
+    marginBottom: 6,
   },
   userMessageText: {
-    color: '#fff',
+    color: '#FFFFFF',
+    marginBottom: 0,
   },
   boldText: {
     fontFamily: FONTS.bold,
-    fontWeight: '700',
-    color: '#111',
+    fontWeight: '600',
+    color: '#2A1E17',
   },
   userBoldText: {
-    color: '#fff',
+    color: '#FFFFFF',
+    fontWeight: '600',
+  },
+  italicText: {
+    fontStyle: 'italic',
+    color: '#4A3B32',
+  },
+  userItalicText: {
+    color: 'rgba(255, 255, 255, 0.9)',
+  },
+  bulletRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingLeft: 16,
+    marginTop: 2,
+    marginBottom: 6,
+  },
+  bulletDot: {
+    fontSize: 14,
+    lineHeight: 21,
+    color: '#821414',
+    marginRight: 8,
+    fontWeight: 'bold',
+  },
+  userBulletDot: {
+    color: '#FFFFFF',
+  },
+  numIndex: {
+    fontFamily: FONTS.bold,
+    fontSize: 13,
+    lineHeight: 21,
+    color: '#821414',
+    marginRight: 8,
+  },
+  bulletText: {
+    flex: 1,
+    marginBottom: 0,
+  },
+  actionPillRow: {
+    marginVertical: 6,
+  },
+  actionPill: {
+    backgroundColor: '#F4F0E8',
+    borderWidth: 1,
+    borderColor: '#D9CFC0',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    alignSelf: 'flex-start',
+  },
+  actionPillText: {
+    fontFamily: FONTS.bold,
+    fontSize: 12,
+    color: COLORS.primary,
   },
   loadingRow: {
     flexDirection: 'row',
@@ -711,30 +794,26 @@ const styles = StyleSheet.create({
   loadingBubble: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: '#FFFFFF',
     borderRadius: 16,
     paddingHorizontal: 12,
     paddingVertical: 8,
     gap: 8,
     borderWidth: 1,
-    borderColor: '#ede8e0',
+    borderColor: '#E2D9C8',
     flexShrink: 1,
   },
   loadingText: {
     fontFamily: FONTS.regular,
     fontSize: 12,
-    color: '#777',
+    color: '#7A7265',
   },
   suggestionsContainer: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
     paddingVertical: 8,
-    backgroundColor: '#FAF9F6',
-  },
-  suggestionsTitle: {
-    fontFamily: FONTS.bold,
-    fontSize: 12,
-    color: COLORS.primary,
-    marginBottom: 6,
+    backgroundColor: '#FAF8F5',
+    borderTopWidth: 1,
+    borderTopColor: '#EAE6DD',
   },
   chipsScroll: {
     flexDirection: 'row',
@@ -742,55 +821,53 @@ const styles = StyleSheet.create({
     paddingRight: 16,
   },
   chip: {
-    backgroundColor: '#fff',
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#E8D4D0',
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 16,
+    borderColor: '#E2D9C8',
+    paddingHorizontal: 11,
+    paddingVertical: 6,
+    borderRadius: 14,
   },
   chipText: {
-    fontFamily: FONTS.regular,
-    fontSize: 12,
-    color: COLORS.primary,
+    fontFamily: FONTS.semiBold,
+    fontSize: 11,
+    color: '#554D40',
   },
   inputContainer: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
-    paddingHorizontal: 16,
+    alignItems: 'center',
+    paddingHorizontal: 14,
     paddingTop: 8,
-    backgroundColor: '#fff',
+    backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
-    borderTopColor: '#ede8e0',
+    borderTopColor: '#EAE6DD',
   },
   input: {
     flex: 1,
     minHeight: 40,
-    maxHeight: 100,
-    backgroundColor: '#F4F2EF',
+    maxHeight: 90,
+    backgroundColor: '#F4F0E8',
     borderRadius: 20,
     paddingHorizontal: 16,
-    paddingTop: 10,
-    paddingBottom: 10,
+    paddingTop: 9,
+    paddingBottom: 9,
     fontFamily: FONTS.regular,
-    fontSize: 14,
-    color: '#111',
+    fontSize: 13,
+    color: '#1A1816',
     borderWidth: 1,
-    borderColor: '#ede8e0',
-    marginBottom: 2,
+    borderColor: '#E2D9C8',
   },
   sendButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     backgroundColor: COLORS.primary,
     justifyContent: 'center',
     alignItems: 'center',
     marginLeft: 8,
-    marginBottom: 2,
   },
   sendButtonDisabled: {
-    backgroundColor: '#ccc',
+    backgroundColor: '#D5CFC5',
   },
   sendIcon: {
     color: '#fff',

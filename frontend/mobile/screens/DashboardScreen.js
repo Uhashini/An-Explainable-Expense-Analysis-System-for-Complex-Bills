@@ -6,6 +6,7 @@ import {
 } from 'react-native';
 import ScreenLayout from '../components/ScreenLayout';
 import MonthlyBudgetCard from '../components/MonthlyBudgetCard';
+import { Feather } from '@expo/vector-icons';
 import { getUser } from '../utils/authStorage';
 import { authFetch, API_BASE_URL } from '../utils/apiConfig';
 import { COLORS, FONTS } from '../theme';
@@ -693,7 +694,7 @@ export default function DashboardScreen({ navigation }) {
               Consider buying family packs or healthier alternatives to cut costs.
             </Text>
             <TouchableOpacity style={styles.insightBtn} onPress={() => navigation.navigate('GemmaChat')}>
-              <Text style={styles.insightBtnText}>Ask Gemma for Food Swaps →</Text>
+              <Text style={styles.insightBtnText}>Ask Pantrix for Food Swaps →</Text>
             </TouchableOpacity>
           </View>
 
@@ -706,8 +707,8 @@ export default function DashboardScreen({ navigation }) {
           onPress={() => navigation.navigate('GemmaChat')}
           activeOpacity={0.85}
         >
-          <Text style={styles.fabIcon}>✦</Text>
-          <Text style={styles.fabText}>Ask Gemma</Text>
+          <Feather name="message-circle" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
+          <Text style={styles.fabText}>Ask Pantrix</Text>
         </TouchableOpacity>
       </View>
     </ScreenLayout>
