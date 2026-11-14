@@ -7,12 +7,29 @@ import { getToken, getRefreshToken, saveAuthData, clearUser } from './authStorag
 // Automatically picks the right URL based on environment:
 //   - Expo Web (browser)          → window.location.hostname
 //   - Android / iOS via Expo Go   → auto-detected Metro host IP
-//   - Physical device fallback    → machine's current LAN IP (192.168.29.190)
+//   - Physical device fallback    → machine's current LAN IP (192.168.0.177)
 //
 
-const debuggerHost = Constants?.expoConfig?.hostUri || Constants?.manifest2?.extra?.expoClient?.hostUri || Constants?.manifest?.debuggerHost;
-const detectedIp = debuggerHost ? debuggerHost.split(':')[0] : null;
-const HOST_IP = detectedIp || '192.168.29.190';
+function resolveHostIp() {
+  try {
+    const rawUri =
+      Constants?.expoConfig?.hostUri ||
+      Constants?.manifest2?.extra?.expoClient?.hostUri ||
+      Constants?.manifest?.debuggerHost ||
+      Constants?.experienceUrl;
+    if (rawUri && typeof rawUri === 'string') {
+      const stripped = rawUri.replace(/^[a-zA-Z]+:\/\//, '');
+      const ip = stripped.split(':')[0].split('/')[0];
+      if (ip && ip !== 'localhost' && ip !== '127.0.0.1') {
+        return ip;
+      }
+    }
+  } catch (e) {}
+
+  return '192.168.0.177';
+}
+
+export const HOST_IP = resolveHostIp();
 
 export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? Platform.select({
   web: typeof window !== 'undefined' && window.location?.hostname
@@ -24,6 +41,40 @@ export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? Platform.select({
   ios: `http://${HOST_IP}:8000/api/v1`,
   default: `http://${HOST_IP}:8000/api/v1`,
 });
+
+/**
+ * Fetch wrapper with configurable timeout (default 15s) to prevent requests
+ * from hanging indefinitely when backend is offline or unreachable over Wi-Fi.
+ */
+export async function fetchWithTimeout(url, options = {}, timeoutMs = 15000) {
+  const controller = new AbortController();
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, timeoutMs);
+
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+    return response;
+  } catch (err) {
+    clearTimeout(timer);
+    if (
+      timedOut ||
+      controller.signal.aborted ||
+      err.name === 'AbortError' ||
+      err?.message?.toLowerCase().includes('cancel') ||
+      err?.message?.toLowerCase().includes('abort')
+    ) {
+      throw new Error(`Connection timed out (${timeoutMs / 1000}s). Could not connect to backend at ${url}. Please ensure the backend server is running on port 8000.`);
+    }
+    throw err;
+  }
+}
 
 /**
  * Get headers including Authorization Bearer token if present

@@ -17,15 +17,27 @@ export const STORAGE_BUDGET_KEY = 'PANTRIX_MONTHLY_BUDGET';
 export const DEFAULT_BUDGET = 6000;
 const BUDGET_PRESETS = [3000, 5000, 6000, 8000, 10000];
 
+function safeFmt(n) {
+  try {
+    const num = Number(n);
+    return Number.isFinite(num) ? num.toLocaleString('en-IN') : '0';
+  } catch (e) {
+    return String(n || 0);
+  }
+}
+
 function parseSafeDate(dateStr) {
   if (!dateStr || typeof dateStr !== 'string') return null;
   const trimmed = dateStr.trim();
-  if (trimmed.toLowerCase().includes('unknown')) return null;
+  if (trimmed.toLowerCase().includes('unknown') || trimmed.toLowerCase().includes('tmrw')) return null;
 
-  const d = new Date(trimmed);
+  // Strip timestamp portion if present (e.g. '2025-09-01 23:59:36')
+  const datePart = trimmed.split(' ')[0].split('T')[0];
+
+  const d = new Date(datePart);
   if (!isNaN(d.getTime())) return d;
 
-  const dmyMatch = trimmed.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+  const dmyMatch = datePart.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
   if (dmyMatch) {
     const day = parseInt(dmyMatch[1], 10);
     const month = parseInt(dmyMatch[2], 10) - 1;
@@ -141,14 +153,27 @@ export default function MonthlyBudgetCard({ userId: propUserId, onBudgetChange, 
 
     // From backend analytics
     if (spendingData && spendingData.has_data && spendingData.total_receipts > 0) {
-      const currentSpend = spendingData.this_month_spend ?? spendingData.total_spend ?? 0;
-      const trips = spendingData.this_month_receipts ?? spendingData.total_receipts ?? 0;
+      // If receipts exist in the current calendar month, use that month's spending.
+      // If current month has 0 receipts (e.g. historical data or fresh month), use effective_monthly_spend / total_spend.
+      const currentSpend = (spendingData.this_month_spend && spendingData.this_month_spend > 0)
+        ? spendingData.this_month_spend
+        : (spendingData.effective_monthly_spend || spendingData.latest_month_spend || spendingData.total_spend || 0);
+
+      const trips = (spendingData.this_month_receipts && spendingData.this_month_receipts > 0)
+        ? spendingData.this_month_receipts
+        : (spendingData.latest_month_receipts || spendingData.total_receipts || 0);
+
       const remaining = safeBudget - currentSpend;
       const rawPct = safeBudget > 0 ? (currentSpend / safeBudget) * 100 : 0;
       const clampedPct = Math.min(Math.max(rawPct, 0), 100);
 
-      const dailyBurn = spendingData.daily_burn ?? (trips > 0 ? Math.round(currentSpend / Math.max(1, trips * 4)) : 0);
-      const projected = Math.round(dailyBurn * daysInMonth);
+      const dailyBurn = (spendingData.daily_burn && spendingData.daily_burn > 0)
+        ? spendingData.daily_burn
+        : (trips > 0 ? Math.round(currentSpend / Math.max(daysInMonth, trips * 4)) : 0);
+
+      const projected = (spendingData.projected_month_end && spendingData.projected_month_end > 0)
+        ? spendingData.projected_month_end
+        : Math.round(dailyBurn * daysInMonth);
 
       let statColor = '#2E7D32';
       let statTxt = 'On Track';
@@ -362,10 +387,10 @@ export default function MonthlyBudgetCard({ userId: propUserId, onBudgetChange, 
             <View style={styles.numColLeft}>
               <Text style={styles.numLabel} numberOfLines={1}>SPENT</Text>
               <Text style={styles.numLarge} numberOfLines={1}>
-                ₹{budgetMetrics.currentSpend.toLocaleString('en-IN')}
+                ₹{safeFmt(budgetMetrics.currentSpend)}
               </Text>
               <Text style={styles.numSub} numberOfLines={1}>
-                of ₹{budgetMetrics.monthlyBudget.toLocaleString('en-IN')} limit
+                of ₹{safeFmt(budgetMetrics.monthlyBudget)} limit
               </Text>
             </View>
 
@@ -381,8 +406,8 @@ export default function MonthlyBudgetCard({ userId: propUserId, onBudgetChange, 
                 numberOfLines={1}
               >
                 {budgetMetrics.remaining >= 0
-                  ? `₹${budgetMetrics.remaining.toLocaleString('en-IN')}`
-                  : `-₹${Math.abs(budgetMetrics.remaining).toLocaleString('en-IN')}`}
+                  ? `₹${safeFmt(budgetMetrics.remaining)}`
+                  : `-₹${safeFmt(Math.abs(budgetMetrics.remaining))}`}
               </Text>
               <Text
                 style={[
@@ -402,7 +427,10 @@ export default function MonthlyBudgetCard({ userId: propUserId, onBudgetChange, 
               <View
                 style={[
                   styles.progressFill,
-                  { width: `${budgetMetrics.utilizationPct}%`, backgroundColor: budgetMetrics.statusColor },
+                  {
+                    width: `${Number.isFinite(budgetMetrics.utilizationPct) ? Math.min(Math.max(budgetMetrics.utilizationPct, 0), 100) : 0}%`,
+                    backgroundColor: budgetMetrics.statusColor || '#2E7D32',
+                  },
                 ]}
               />
             </View>
@@ -412,8 +440,8 @@ export default function MonthlyBudgetCard({ userId: propUserId, onBudgetChange, 
               </Text>
               <Text style={styles.metaPace} numberOfLines={1}>
                 {budgetMetrics.projectedMonthEnd > budgetMetrics.monthlyBudget
-                  ? `Proj ₹${budgetMetrics.projectedMonthEnd.toLocaleString('en-IN')} (Over)`
-                  : `Proj ₹${budgetMetrics.projectedMonthEnd.toLocaleString('en-IN')} (Safe)`}
+                  ? `Proj ₹${safeFmt(budgetMetrics.projectedMonthEnd)} (Over)`
+                  : `Proj ₹${safeFmt(budgetMetrics.projectedMonthEnd)} (Safe)`}
               </Text>
             </View>
           </View>
@@ -440,7 +468,7 @@ export default function MonthlyBudgetCard({ userId: propUserId, onBudgetChange, 
         <View style={styles.newUserBudgetNotice}>
           <View style={styles.targetRow}>
             <Text style={styles.targetLabel}>Target Limit:</Text>
-            <Text style={styles.targetValue}>₹{budgetMetrics.monthlyBudget.toLocaleString('en-IN')}</Text>
+            <Text style={styles.targetValue}>₹{safeFmt(budgetMetrics.monthlyBudget)}</Text>
           </View>
           <Text style={styles.targetDesc}>
             Set your monthly grocery spending limit above. As you upload receipts, your real-time spend pace and remaining balance will track here automatically.

@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { COLORS, FONTS } from '../theme';
 
@@ -14,15 +14,19 @@ export default class ErrorBoundary extends React.Component {
   }
 
   componentDidCatch(error, errorInfo) {
-    console.warn('ErrorBoundary caught an error:', error, errorInfo);
+    console.warn('[ErrorBoundary] Caught runtime exception:', error, errorInfo);
   }
 
   resetError = () => {
     this.setState({ hasError: false, error: null });
+    if (this.props.onReset) {
+      try { this.props.onReset(); } catch (e) {}
+    }
   };
 
   render() {
     if (this.state.hasError) {
+      const errorMsg = this.state.error?.message || this.state.error?.toString() || 'An unexpected error occurred.';
       return (
         <View style={styles.container}>
           <View style={styles.card}>
@@ -31,11 +35,18 @@ export default class ErrorBoundary extends React.Component {
             </View>
             <Text style={styles.title}>Something went wrong</Text>
             <Text style={styles.message}>
-              We encountered an issue loading this section. Please try again.
+              {this.props.fallbackMessage || 'We encountered an issue loading this section. Please try again.'}
             </Text>
+            {errorMsg ? (
+              <ScrollView style={styles.errorBox} contentContainerStyle={{ padding: 8 }}>
+                <Text style={styles.errorText} numberOfLines={4}>
+                  {errorMsg}
+                </Text>
+              </ScrollView>
+            ) : null}
             <TouchableOpacity style={styles.retryBtn} onPress={this.resetError} activeOpacity={0.8}>
               <Feather name="refresh-cw" size={15} color="#fff" style={{ marginRight: 6 }} />
-              <Text style={styles.retryBtnText}>Reload Section</Text>
+              <Text style={styles.retryBtnText}>Reload App</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -59,7 +70,7 @@ const styles = StyleSheet.create({
     padding: 24,
     alignItems: 'center',
     width: '100%',
-    maxWidth: 340,
+    maxWidth: 360,
     borderWidth: 1,
     borderColor: '#EDE6DE',
     shadowColor: '#000',
@@ -90,7 +101,22 @@ const styles = StyleSheet.create({
     color: COLORS.mutedText,
     textAlign: 'center',
     lineHeight: 18,
-    marginBottom: 18,
+    marginBottom: 12,
+  },
+  errorBox: {
+    maxHeight: 100,
+    width: '100%',
+    backgroundColor: '#FFF0F0',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#F5C6CB',
+    marginBottom: 16,
+  },
+  errorText: {
+    fontFamily: FONTS.regular,
+    fontSize: 11,
+    color: '#721C24',
+    textAlign: 'center',
   },
   retryBtn: {
     flexDirection: 'row',

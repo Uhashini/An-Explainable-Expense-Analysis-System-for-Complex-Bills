@@ -1,4 +1,7 @@
-import fitz  # PyMuPDF
+try:
+    import fitz  # PyMuPDF
+except ImportError:
+    fitz = None
 from PIL import Image
 import io
 import os
@@ -18,6 +21,9 @@ class PDFProcessor:
         """
         Detects if a PDF has a text layer (native) or is purely image-based.
         """
+        if fitz is None:
+            logger.warning("PyMuPDF (fitz) is not installed; skipping native PDF check.")
+            return False
         try:
             doc = fitz.open(pdf_path)
             for page in doc:
@@ -34,6 +40,9 @@ class PDFProcessor:
         """
         Extracts text, coordinates, and font info from a native PDF.
         """
+        if fitz is None:
+            logger.warning("PyMuPDF (fitz) is not installed; cannot extract native text.")
+            return []
         extracted_data = []
         doc = fitz.open(pdf_path)
         for page_num, page in enumerate(doc):
@@ -56,6 +65,9 @@ class PDFProcessor:
         """
         Converts PDF pages to high-resolution images for OCR.
         """
+        if fitz is None:
+            logger.warning("PyMuPDF (fitz) is not installed; cannot convert PDF to images.")
+            return []
         images = []
         doc = fitz.open(pdf_path)
         for page in doc:

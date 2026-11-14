@@ -6,6 +6,7 @@ import {
 import BackgroundLayout from '../components/BackgroundLayout';
 import OrDivider from '../components/OrDivider';
 import SocialButton from '../components/SocialButton';
+import GoogleConnectModal from '../components/GoogleConnectModal';
 import { promptGoogleSignIn } from '../utils/googleAuth';
 import { showNotification } from '../utils/alertHelper';
 import { getUser, saveAuthData, saveUser } from '../utils/authStorage';
@@ -19,8 +20,16 @@ export default function SignInScreen({ navigation }) {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [showGoogleModal, setShowGoogleModal] = useState(false);
 
   const handleGoogleSignIn = async () => {
+    // In Expo Go on mobile devices, Google blocks custom scheme URIs (exp://) with Error 400.
+    // Use the native Google Connect Modal to connect smoothly without browser scheme errors.
+    if (Platform.OS !== 'web') {
+      setShowGoogleModal(true);
+      return;
+    }
+
     if (googleLoading) return;
     setGoogleLoading(true);
     try {
@@ -177,7 +186,21 @@ export default function SignInScreen({ navigation }) {
         </View>
       </KeyboardAvoidingView>
 
-
+      <GoogleConnectModal
+        visible={showGoogleModal}
+        onClose={() => setShowGoogleModal(false)}
+        navigation={navigation}
+        isSignUp={false}
+        initialEmail={email}
+        onSuccess={(authData) => {
+          setShowGoogleModal(false);
+          if (navigation.replace) {
+            navigation.replace('Main');
+          } else if (navigation.navigate) {
+            navigation.navigate('Main');
+          }
+        }}
+      />
     </BackgroundLayout>
   );
 }

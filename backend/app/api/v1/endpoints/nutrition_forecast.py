@@ -160,9 +160,13 @@ def _parse_date(raw) -> Optional[date]:
     if isinstance(raw, (datetime, date)):
         return raw if isinstance(raw, date) else raw.date()
     raw = str(raw).strip()
+    if not raw or "unknown" in raw.lower() or "tmrw" in raw.lower():
+        return None
+    # Strip timestamp if present (e.g. '2025-09-01 23:59:36')
+    date_part = raw.split(' ')[0].split('T')[0]
     for fmt in ("%Y-%m-%d", "%d-%m-%Y", "%d/%m/%Y", "%Y/%m/%d", "%d %b %Y", "%B %d, %Y"):
         try:
-            return datetime.strptime(raw, fmt).date()
+            return datetime.strptime(date_part, fmt).date()
         except ValueError:
             continue
     return None
@@ -258,17 +262,25 @@ def get_nutrition_forecast(user_id: int, db: Session = Depends(get_db)):
         }
 
     # ── 2. Determine date span for per-day averaging ──────────────────────────
+    today = date.today()
     dates = [_parse_date(r.date) for r in all_receipts]
     dates = [d for d in dates if d is not None]
 
-    today = date.today()
     if dates:
-        earliest = min(dates)
-        span_days = max((today - earliest).days + 1, 1)
+        latest = max(dates)
+        # Filter out extreme multi-year historical outliers (e.g. 10+ year old test receipts)
+        valid_dates = [d for d in dates if (latest - d).days <= 365]
+        if valid_dates:
+            earliest_valid = min(valid_dates)
+            span_days = max((latest - earliest_valid).days + 7, len(valid_dates) * 4)
+        else:
+            span_days = max(len(all_receipts) * 5, 7)
     else:
-        span_days = max(len(all_receipts) * 7, 1)  # assume ~1 receipt/week
+        span_days = max(len(all_receipts) * 5, 7)
 
-    # ── 3. Aggregate nutrition across ALL items ───────────────────────────────
+    span_days = max(span_days, 7)
+
+    # ── 3. Aggregate nutrition across ALL items (batch-queried for speed) ───────
     nutrient_totals: Dict[str, float] = defaultdict(float)
     healthy_count   = 0
     total_count     = 0
@@ -277,86 +289,97 @@ def get_nutrition_forecast(user_id: int, db: Session = Depends(get_db)):
     unhealthy_items : List[str] = []
     category_counts : Dict[str, Dict] = defaultdict(lambda: {"items": 0, "healthy": True})
 
-    for receipt in all_receipts:
-        items = db.query(ReceiptItem).filter(ReceiptItem.receipt_id == receipt.receipt_id).all()
+    receipt_ids = [r.receipt_id for r in all_receipts]
+    all_items = (
+        db.query(ReceiptItem)
+        .filter(ReceiptItem.receipt_id.in_(receipt_ids))
+        .all()
+    ) if receipt_ids else []
 
-        for item in items:
-            total_count += 1
-            item_name   = item.name or ""
-            qty_str     = item.quantity or ""
-            serving_factor = _estimate_serving_factor(item_name, qty_str)
+    # Batch query all matched FoodItems with relationships in a single query
+    matched_food_ids = list({it.matched_food_id for it in all_items if it.matched_food_id})
+    foods_by_id = {}
+    if matched_food_ids:
+        foods = (
+            db.query(FoodItem)
+            .options(
+                joinedload(FoodItem.nutrition),
+                joinedload(FoodItem.health_indicators),
+            )
+            .filter(FoodItem.food_id.in_(matched_food_ids))
+            .all()
+        )
+        foods_by_id = {f.food_id: f for f in foods}
 
-            nutrition_data = None
-            is_healthy     = None
-            item_category  = "Other"
+    for item in all_items:
+        total_count += 1
+        item_name   = item.name or ""
+        qty_str     = item.quantity or ""
+        serving_factor = _estimate_serving_factor(item_name, qty_str)
 
-            # ── Try DB first (works when Neon is up) ──────────────────────
-            if item.matched_food_id:
-                food = (
-                    db.query(FoodItem)
-                    .options(
-                        joinedload(FoodItem.nutrition),
-                        joinedload(FoodItem.health_indicators),
-                    )
-                    .filter(FoodItem.food_id == item.matched_food_id)
-                    .first()
-                )
-                if food and food.nutrition:
-                    n = food.nutrition
-                    nutrition_data = {
-                        "cal":  _safe_float(n.calories_kcal),
-                        "prot": _safe_float(n.protein_g),
-                        "carb": _safe_float(n.carbohydrates_g),
-                        "fat":  _safe_float(n.fat_g),
-                        "fib":  _safe_float(n.fiber_g),
-                        "sug":  _safe_float(n.sugar_g),
-                    }
-                    item_category = food.category or "Other"
-                    if food.health_indicators:
-                        is_healthy = not food.health_indicators.is_processed
-                    data_source = "db"
+        nutrition_data = None
+        is_healthy     = None
+        item_category  = "Other"
 
-            # ── Fallback to built-in knowledge base ───────────────────────
-            if nutrition_data is None:
-                kb = _lookup_nutrition(item_name)
-                if kb:
-                    nutrition_data = {
-                        "cal":  kb["cal"],
-                        "prot": kb["prot"],
-                        "carb": kb["carb"],
-                        "fat":  kb["fat"],
-                        "fib":  kb["fib"],
-                        "sug":  kb["sug"],
-                    }
-                    item_category = kb.get("cat", "Other")
-                    is_healthy    = kb.get("healthy", True)
-                    if data_source != "db":
-                        data_source = "builtin"
+        # ── Try DB first (works when Neon is up) ──────────────────────
+        if item.matched_food_id and item.matched_food_id in foods_by_id:
+            food = foods_by_id[item.matched_food_id]
+            if food and food.nutrition:
+                n = food.nutrition
+                nutrition_data = {
+                    "cal":  _safe_float(n.calories_kcal),
+                    "prot": _safe_float(n.protein_g),
+                    "carb": _safe_float(n.carbohydrates_g),
+                    "fat":  _safe_float(n.fat_g),
+                    "fib":  _safe_float(n.fiber_g),
+                    "sug":  _safe_float(n.sugar_g),
+                }
+                item_category = food.category or "Other"
+                if food.health_indicators:
+                    is_healthy = not food.health_indicators.is_processed
+                data_source = "db"
 
-            if nutrition_data:
-                nutrient_totals["calories_kcal"]   += nutrition_data["cal"]  * serving_factor
-                nutrient_totals["protein_g"]        += nutrition_data["prot"] * serving_factor
-                nutrient_totals["carbohydrates_g"]  += nutrition_data["carb"] * serving_factor
-                nutrient_totals["fat_g"]            += nutrition_data["fat"]  * serving_factor
-                nutrient_totals["fiber_g"]          += nutrition_data["fib"]  * serving_factor
-                nutrient_totals["sugar_g"]          += nutrition_data["sug"]  * serving_factor
+        # ── Fallback to built-in knowledge base ───────────────────────
+        if nutrition_data is None:
+            kb = _lookup_nutrition(item_name)
+            if kb:
+                nutrition_data = {
+                    "cal":  kb["cal"],
+                    "prot": kb["prot"],
+                    "carb": kb["carb"],
+                    "fat":  kb["fat"],
+                    "fib":  kb["fib"],
+                    "sug":  kb["sug"],
+                }
+                item_category = kb.get("cat", "Other")
+                is_healthy    = kb.get("healthy", True)
+                if data_source != "db":
+                    data_source = "builtin"
 
-            # Healthy / unhealthy tracking
-            if is_healthy is True:
-                healthy_count += 1
-                display_name = item_name.title().strip()[:30]
-                if display_name and display_name not in healthy_items:
-                    healthy_items.append(display_name)
-            elif is_healthy is False:
-                display_name = item_name.title().strip()[:30]
-                if display_name and display_name not in unhealthy_items:
-                    unhealthy_items.append(display_name)
+        if nutrition_data:
+            nutrient_totals["calories_kcal"]   += nutrition_data["cal"]  * serving_factor
+            nutrient_totals["protein_g"]        += nutrition_data["prot"] * serving_factor
+            nutrient_totals["carbohydrates_g"]  += nutrition_data["carb"] * serving_factor
+            nutrient_totals["fat_g"]            += nutrition_data["fat"]  * serving_factor
+            nutrient_totals["fiber_g"]          += nutrition_data["fib"]  * serving_factor
+            nutrient_totals["sugar_g"]          += nutrition_data["sug"]  * serving_factor
 
-            # Category tracking
-            cat_key = item_category or "Other"
-            category_counts[cat_key]["items"] += 1
-            if is_healthy is False:
-                category_counts[cat_key]["healthy"] = False
+        # Healthy / unhealthy tracking
+        if is_healthy is True:
+            healthy_count += 1
+            display_name = item_name.title().strip()[:30]
+            if display_name and display_name not in healthy_items:
+                healthy_items.append(display_name)
+        elif is_healthy is False:
+            display_name = item_name.title().strip()[:30]
+            if display_name and display_name not in unhealthy_items:
+                unhealthy_items.append(display_name)
+
+        # Category tracking
+        cat_key = item_category or "Other"
+        category_counts[cat_key]["items"] += 1
+        if is_healthy is False:
+            category_counts[cat_key]["healthy"] = False
 
     # ── 4. Calculate per-day averages ─────────────────────────────────────────
     CATEGORY_COLORS_MAP = {

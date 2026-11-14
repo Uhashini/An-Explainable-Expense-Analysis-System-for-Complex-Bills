@@ -126,10 +126,19 @@ def save_receipt(data: ReceiptCreate, db: Session = Depends(get_db)):
     db.refresh(receipt)
     
     for item in data.items:
+        matched_id = item.matched_food_id
+        if not matched_id and item.name:
+            try:
+                match = product_matcher.match_item(item.name)
+                if match and match.get("food_id"):
+                    matched_id = match["food_id"]
+            except Exception as match_err:
+                logger.warning(f"Failed to auto-match manual item '{item.name}': {match_err}")
+
         db_item = ReceiptItem(
             receipt_id=receipt.receipt_id,
             name=item.name,
-            matched_food_id=item.matched_food_id,
+            matched_food_id=matched_id,
             quantity=item.quantity,
             rate=item.rate,
             price=item.price

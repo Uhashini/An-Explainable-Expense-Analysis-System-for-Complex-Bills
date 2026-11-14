@@ -1,84 +1,16 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { Animated } from 'react-native';
 import {
   View, Text, ScrollView, StyleSheet, TouchableOpacity,
   LayoutAnimation, Platform, UIManager, ActivityIndicator,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import ScreenLayout from '../components/ScreenLayout';
 import MonthlyBudgetCard from '../components/MonthlyBudgetCard';
 import { Feather } from '@expo/vector-icons';
 import { getUser } from '../utils/authStorage';
 import { authFetch, API_BASE_URL } from '../utils/apiConfig';
 import { COLORS, FONTS } from '../theme';
-
-// ─── Mock data ───────────────────────────────────────────────────────────────
-const QUICK_STATS = [
-  {
-    tag:      'SPEND',
-    label:    'Total Spend',
-    value:    '₹6,240',
-    sub:      '+12.5% vs last month',
-    subAlert: true,
-    accent:   COLORS.primary,
-  },
-  {
-    tag:      'KCAL',
-    label:    'Calories Purchased',
-    value:    '18,450',
-    sub:      'kcal this month',
-    subAlert: false,
-    accent:   COLORS.secondary,
-  },
-  {
-    tag:      'PROT',
-    label:    'Protein Purchased',
-    value:    '932 g',
-    sub:      'total protein',
-    subAlert: false,
-    accent:   COLORS.secondary,
-  },
-  {
-    tag:      'SCORE',
-    label:    'Healthy Basket',
-    value:    '72/100',
-    sub:      'Good progress',
-    subAlert: false,
-    accent:   COLORS.accent,
-  },
-];
-
-const GOALS_TOP    = [
-  {
-    tag:      'MONEY',
-    label:    'Save Money',
-    progress: 0.72,
-    detail:   'Monthly Budget: ₹6,000 / ₹8,500',
-    color:    COLORS.accent,
-  },
-];
-
-const GOALS_EAT_HEALTHY = [
-  {
-    tag:      'DIET',
-    label:    'Eat Healthy',
-    progress: 0.80,
-    detail:   'Healthy food purchases increased by 18%.',
-    color:    COLORS.secondary,
-  },
-];
-
-const GOALS_GAIN_MUSCLE = [
-  {
-    tag:      'FIT',
-    label:    'Gain Muscle',
-    progress: 0.65,
-    detail:   'Protein intake is improving steadily.',
-    color:    COLORS.primary,
-  },
-];
-
-
-// ─── Forecast data is fetched live — see useForecast hook below ──────────────
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
 function StatCard({ tag, label, value, sub, subAlert, accent }) {
@@ -97,7 +29,8 @@ function StatCard({ tag, label, value, sub, subAlert, accent }) {
 }
 
 function GoalCard({ tag, label, progress, detail, color, onPress }) {
-  const pct = Math.round(progress * 100);
+  const rawPct = Math.round((Number(progress) || 0) * 100);
+  const safePct = Number.isFinite(rawPct) ? Math.min(Math.max(rawPct, 0), 100) : 0;
   const Container = onPress ? TouchableOpacity : View;
   return (
     <Container style={styles.goalCard} onPress={onPress} activeOpacity={0.85}>
@@ -108,11 +41,11 @@ function GoalCard({ tag, label, progress, detail, color, onPress }) {
           </Text>
         </View>
         <Text style={styles.goalLabel}>{label}</Text>
-        <Text style={styles.goalPct}>{pct}%</Text>
+        <Text style={styles.goalPct}>{safePct}%</Text>
         {onPress && <Text style={{ fontFamily: FONTS.bold, fontSize: 13, color: color, marginLeft: 4 }}>→</Text>}
       </View>
       <View style={styles.goalTrack}>
-        <View style={[styles.goalFill, { width: `${pct}%`, backgroundColor: color }]} />
+        <View style={[styles.goalFill, { width: `${safePct}%`, backgroundColor: color }]} />
       </View>
       <Text style={styles.goalDetail}>{detail}</Text>
     </Container>
@@ -124,9 +57,6 @@ function SpendingForecastCard({ data, loading, error }) {
   const [expanded, setExpanded] = useState(false);
 
   const toggleExpand = () => {
-    if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-      UIManager.setLayoutAnimationEnabledExperimental(true);
-    }
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setExpanded(prev => !prev);
   };
@@ -141,7 +71,7 @@ function SpendingForecastCard({ data, loading, error }) {
         <View style={{ flex: 1 }}>
           <Text style={styles.forecastTitle}>Spending Forecast</Text>
           <Text style={styles.forecastSubtitle}>
-            {data ? `${data.goal} · ${data.month} ${data.year}` : 'SAVE MONEY · THIS MONTH'}
+            {data?.goal ? `${data.goal} · ${data.month || ''} ${data.year || ''}` : 'SAVE MONEY · THIS MONTH'}
           </Text>
         </View>
         {data && (
@@ -195,10 +125,18 @@ function SpendingForecastCard({ data, loading, error }) {
   }
 
   // ── Live data ────────────────────────────────────────────────────────────
-  const overBudget  = data.projectedSpend > data.budget;
-  const diff        = Math.abs(data.projectedSpend - data.budget);
-  const budgetPct   = Math.min((data.budgetUsedPct || 0) * 100, 100);
-  const fmt         = (n) => Number(n).toLocaleString('en-IN', { maximumFractionDigits: 0 });
+  const overBudget  = (data.projectedSpend || 0) > (data.budget || 0);
+  const diff        = Math.abs((data.projectedSpend || 0) - (data.budget || 0));
+  const rawBudgetPct = (data.budgetUsedPct || 0) * 100;
+  const budgetPct   = Number.isFinite(rawBudgetPct) ? Math.min(Math.max(rawBudgetPct, 0), 100) : 0;
+  const fmt         = (n) => {
+    try {
+      const num = Number(n);
+      return Number.isFinite(num) ? num.toLocaleString('en-IN', { maximumFractionDigits: 0 }) : '0';
+    } catch (e) {
+      return String(n || 0);
+    }
+  };
 
   const overBudgetCats = (data.categories || []).filter(c => c.projected > c.budget);
 
@@ -259,9 +197,10 @@ function SpendingForecastCard({ data, loading, error }) {
         <View style={styles.forecastCategories}>
           <Text style={styles.forecastCatTitle}>SPENDING BY CATEGORY</Text>
           {data.categories.map((cat) => {
-            const catPct = cat.budget > 0
-              ? Math.min((cat.projected / cat.budget) * 100, 100)
+            const rawCatPct = cat.budget > 0
+              ? (cat.projected / cat.budget) * 100
               : 100;
+            const catPct = Number.isFinite(rawCatPct) ? Math.min(Math.max(rawCatPct, 0), 100) : 0;
             const catOver = cat.projected > cat.budget && cat.budget > 0;
             return (
               <View key={cat.name} style={styles.forecastCatRow}>
@@ -312,13 +251,15 @@ function SpendingForecastCard({ data, loading, error }) {
   );
 }
 
-// Enable LayoutAnimation on Android
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
+// Enable LayoutAnimation on Android for legacy architecture (no-op on New Architecture)
+if (Platform.OS === 'android' && !global._IS_FABRIC && UIManager.setLayoutAnimationEnabledExperimental) {
+  try {
+    UIManager.setLayoutAnimationEnabledExperimental(true);
+  } catch (e) {}
 }
 
 // ─── Live forecast hooks ──────────────────────────────────────────────────────
-function useForecast(userId) {
+function useForecast(userId, refreshTrigger) {
   const [data, setData]       = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState(null);
@@ -343,12 +284,12 @@ function useForecast(userId) {
       });
 
     return () => { cancelled = true; };
-  }, [userId]);
+  }, [userId, refreshTrigger]);
 
   return { data, loading, error };
 }
 
-function useNutritionForecast(userId) {
+function useNutritionForecast(userId, refreshTrigger) {
   const [data, setData]       = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState(null);
@@ -373,9 +314,36 @@ function useNutritionForecast(userId) {
       });
 
     return () => { cancelled = true; };
-  }, [userId]);
+  }, [userId, refreshTrigger]);
 
   return { data, loading, error };
+}
+
+function useSpendingData(userId, refreshTrigger) {
+  const [data, setData]       = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!userId) return;
+    let cancelled = false;
+    setLoading(true);
+
+    fetch(`${API_BASE_URL}/analytics/spending/${userId}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((json) => {
+        if (!cancelled && json && json.status === 'success') {
+          setData(json);
+        }
+      })
+      .catch((e) => console.log('Error fetching spending for dashboard:', e))
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => { cancelled = true; };
+  }, [userId, refreshTrigger]);
+
+  return { data, loading };
 }
 
 // ─── Nutrition Forecast Card ──────────────────────────────────────────────────
@@ -383,9 +351,6 @@ function NutritionForecastCard({ data, loading, error }) {
   const [expanded, setExpanded] = useState(false);
 
   const toggleExpand = () => {
-    if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-      UIManager.setLayoutAnimationEnabledExperimental(true);
-    }
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setExpanded(prev => !prev);
   };
@@ -399,7 +364,7 @@ function NutritionForecastCard({ data, loading, error }) {
         <View style={{ flex: 1 }}>
           <Text style={styles.nutritionTitle}>Nutrition Forecast</Text>
           <Text style={styles.nutritionSubtitle}>
-            {data ? `EAT HEALTHY · ${data.month} ${data.year}` : 'EAT HEALTHY · THIS MONTH'}
+            {data?.month ? `EAT HEALTHY · ${data.month} ${data.year || ''}` : 'EAT HEALTHY · THIS MONTH'}
           </Text>
         </View>
         {data && data.hasSufficientData && (
@@ -447,9 +412,17 @@ function NutritionForecastCard({ data, loading, error }) {
     );
   }
 
-  const score      = data.healthyBasketScore || 0;
+  const rawScore   = Number(data.healthyBasketScore || 0);
+  const score      = Number.isFinite(rawScore) ? Math.min(Math.max(Math.round(rawScore), 0), 100) : 0;
   const scoreColor = score >= 75 ? '#4CAF50' : score >= 50 ? '#E6A817' : COLORS.primary;
-  const fmt        = (n) => Number(n).toLocaleString('en-IN', { maximumFractionDigits: 1 });
+  const fmt        = (n) => {
+    try {
+      const num = Number(n);
+      return Number.isFinite(num) ? num.toLocaleString('en-IN', { maximumFractionDigits: 1 }) : '0';
+    } catch (e) {
+      return String(n || 0);
+    }
+  };
   const COLLAPSED_NUTRIENTS = ['calories_kcal', 'protein_g', 'fiber_g'];
   const overBudgetCats = (data.categories || []).filter(c => !c.healthy);
 
@@ -477,10 +450,11 @@ function NutritionForecastCard({ data, loading, error }) {
       {/* Key nutrients — collapsed view */}
       <View style={styles.nutritionNutrientList}>
         {COLLAPSED_NUTRIENTS.map((key) => {
-          const n = data.nutrients[key];
+          const n = data.nutrients?.[key];
           if (!n) return null;
-          const pct   = Math.min(n.pct || 0, 100);
-          const isLow = n.pct < 60;
+          const rawPct = Number(n.pct || 0);
+          const pct   = Number.isFinite(rawPct) ? Math.min(Math.max(rawPct, 0), 100) : 0;
+          const isLow = rawPct < 60;
           return (
             <View key={key} style={styles.nutritionNutrientRow}>
               <View style={styles.nutritionNutrientInfo}>
@@ -493,7 +467,7 @@ function NutritionForecastCard({ data, loading, error }) {
               <View style={styles.nutritionNutrientTrack}>
                 <View style={[styles.nutritionNutrientFill, { width: `${pct}%`, backgroundColor: n.color }]} />
               </View>
-              <Text style={styles.nutritionNutrientRda}>{Math.round(n.pct)}% of RDA</Text>
+              <Text style={styles.nutritionNutrientRda}>{Math.round(pct)}% of RDA</Text>
             </View>
           );
         })}
@@ -512,10 +486,11 @@ function NutritionForecastCard({ data, loading, error }) {
       {expanded && (
         <View style={styles.nutritionExpanded}>
           <Text style={styles.nutritionExpandedTitle}>ALL NUTRIENTS (PER DAY AVG)</Text>
-          {Object.entries(data.nutrients).map(([key, n]) => {
-            const pct   = Math.min(n.pct || 0, 100);
-            const isLow = n.pct < 60;
-            const isHigh = n.pct > 130;
+          {Object.entries(data.nutrients || {}).map(([key, n]) => {
+            const rawPct = Number(n.pct || 0);
+            const pct   = Number.isFinite(rawPct) ? Math.min(Math.max(rawPct, 0), 100) : 0;
+            const isLow = rawPct < 60;
+            const isHigh = rawPct > 130;
             return (
               <View key={key} style={styles.nutritionNutrientRow}>
                 <View style={styles.nutritionNutrientInfo}>
@@ -602,18 +577,236 @@ function NutritionForecastCard({ data, loading, error }) {
 export default function DashboardScreen({ navigation }) {
   const [name, setName]     = useState('');
   const [userId, setUserId] = useState(null);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   useEffect(() => {
     let mounted = true;
     getUser().then((user) => {
       if (mounted && user?.name) setName(user.name);
-      if (mounted && user?.id)   setUserId(user.id);
+      if (mounted && (user?.id || user?.user_id)) setUserId(user.id || user.user_id);
     });
     return () => { mounted = false; };
   }, []);
 
-  const { data: forecastData, loading: forecastLoading, error: forecastError } = useForecast(userId);
-  const { data: nutritionData, loading: nutritionLoading, error: nutritionError } = useNutritionForecast(userId);
+  useFocusEffect(
+    useCallback(() => {
+      setRefreshTrigger((prev) => prev + 1);
+    }, [])
+  );
+
+  const { data: forecastData, loading: forecastLoading, error: forecastError } = useForecast(userId, refreshTrigger);
+  const { data: nutritionData, loading: nutritionLoading, error: nutritionError } = useNutritionForecast(userId, refreshTrigger);
+  const { data: spendingData, loading: spendingLoading } = useSpendingData(userId, refreshTrigger);
+
+  // ─── Real Quick Stats Calculation for All Users ────────────────────────────
+  const quickStats = useMemo(() => {
+    const fmt = (n) => {
+      try {
+        const num = Number(n || 0);
+        return Number.isFinite(num) ? num.toLocaleString('en-IN', { maximumFractionDigits: 0 }) : '0';
+      } catch (e) {
+        return String(n || 0);
+      }
+    };
+    const isInitialLoading = (forecastLoading || nutritionLoading || spendingLoading) && !forecastData && !nutritionData && !spendingData;
+
+    // 1. Total Spend (Real spend calculation from actual receipts)
+    let spendVal = '₹0';
+    let spendSub = 'No receipts logged';
+    let spendAlert = false;
+
+    if (isInitialLoading) {
+      spendVal = '...';
+      spendSub = 'Calculating spend…';
+    } else {
+      const realSpend = spendingData?.has_data
+        ? (spendingData.this_month_spend > 0
+            ? spendingData.this_month_spend
+            : (spendingData.effective_monthly_spend || spendingData.latest_month_spend || spendingData.total_spend || 0))
+        : (forecastData?.effectiveSpend || forecastData?.currentSpend || 0);
+      const totalCount = spendingData?.total_receipts ?? forecastData?.totalReceipts ?? 0;
+
+      if (totalCount > 0 || realSpend > 0) {
+        spendVal = `₹${fmt(realSpend)}`;
+        const budget = forecastData?.budget || 0;
+        const proj = forecastData?.projectedSpend || 0;
+        if (budget > 0 && realSpend > 0) {
+          const pct = Math.round((realSpend / budget) * 100);
+          spendSub = `${pct}% of ₹${fmt(budget)} target`;
+          spendAlert = proj > budget;
+        } else if (forecastData?.projectedSpend > 0) {
+          spendSub = `Pacing ₹${fmt(forecastData.projectedSpend)}`;
+        } else {
+          spendSub = `${totalCount} receipt${totalCount !== 1 ? 's' : ''} logged`;
+        }
+      } else {
+        spendVal = '₹0';
+        spendSub = 'No receipts logged';
+      }
+    }
+
+    // 2. Calories Purchased (Real nutrient aggregation from actual food items)
+    let kcalVal = '0';
+    let kcalSub = 'No receipts logged';
+
+    if (isInitialLoading) {
+      kcalVal = '...';
+      kcalSub = 'Analyzing calories…';
+    } else if (nutritionData && nutritionData.hasSufficientData) {
+      const calObj = nutritionData.nutrients?.calories_kcal;
+      const totalKcal = Math.round(calObj?.total || 0);
+      const perDay = Math.round(calObj?.perDay || 0);
+      if (totalKcal > 0) {
+        kcalVal = fmt(totalKcal);
+        kcalSub = perDay > 0 ? `${fmt(perDay)} kcal/day avg` : 'from groceries';
+      } else {
+        kcalVal = '0';
+        kcalSub = '0 kcal logged';
+      }
+    } else {
+      kcalVal = '0';
+      kcalSub = 'No receipts logged';
+    }
+
+    // 3. Protein Purchased (Real nutrient aggregation from actual food items)
+    let protVal = '0 g';
+    let protSub = 'No receipts logged';
+
+    if (isInitialLoading) {
+      protVal = '...';
+      protSub = 'Analyzing protein…';
+    } else if (nutritionData && nutritionData.hasSufficientData) {
+      const protObj = nutritionData.nutrients?.protein_g;
+      const totalProt = Math.round(protObj?.total || 0);
+      const perDay = Math.round(protObj?.perDay || 0);
+      if (totalProt > 0) {
+        protVal = `${fmt(totalProt)} g`;
+        protSub = perDay > 0 ? `${fmt(perDay)} g/day avg` : 'total protein';
+      } else {
+        protVal = '0 g';
+        protSub = '0 g logged';
+      }
+    } else {
+      protVal = '0 g';
+      protSub = 'No receipts logged';
+    }
+
+    // 4. Healthy Basket Score (Real item healthy ratio calculated from receipts)
+    let scoreVal = '--/100';
+    let scoreSub = 'Scan receipt to rate';
+    let scoreAccent = COLORS.accent;
+    let scoreAlert = false;
+
+    if (isInitialLoading) {
+      scoreVal = '...';
+      scoreSub = 'Calculating score…';
+    } else if (nutritionData && nutritionData.hasSufficientData && nutritionData.totalItems > 0) {
+      const score = Math.round(nutritionData.healthyBasketScore || 0);
+      scoreVal = `${score}/100`;
+      if (score >= 75) {
+        scoreSub = 'Healthy basket';
+        scoreAccent = '#4CAF50';
+      } else if (score >= 50) {
+        scoreSub = 'Moderate balance';
+        scoreAccent = COLORS.accent;
+      } else {
+        scoreSub = 'Needs attention';
+        scoreAccent = COLORS.primary;
+        scoreAlert = true;
+      }
+    } else {
+      scoreVal = '--/100';
+      scoreSub = 'Scan receipt to rate';
+    }
+
+    return [
+      {
+        tag: 'SPEND',
+        label: 'Total Spend',
+        value: spendVal,
+        sub: spendSub,
+        subAlert: spendAlert,
+        accent: COLORS.primary,
+      },
+      {
+        tag: 'KCAL',
+        label: 'Calories Purchased',
+        value: kcalVal,
+        sub: kcalSub,
+        subAlert: false,
+        accent: COLORS.secondary,
+      },
+      {
+        tag: 'PROT',
+        label: 'Protein Purchased',
+        value: protVal,
+        sub: protSub,
+        subAlert: false,
+        accent: COLORS.secondary,
+      },
+      {
+        tag: 'SCORE',
+        label: 'Healthy Basket',
+        value: scoreVal,
+        sub: scoreSub,
+        subAlert: scoreAlert,
+        accent: scoreAccent,
+      },
+    ];
+  }, [spendingData, spendingLoading, forecastData, forecastLoading, nutritionData, nutritionLoading]);
+
+  // ─── Real Dynamic Goals ────────────────────────────────────────────────────
+  const eatHealthyGoal = useMemo(() => {
+    if (nutritionData && nutritionData.hasSufficientData && nutritionData.totalItems > 0) {
+      const score = Math.round(nutritionData.healthyBasketScore || 0);
+      const healthyItems = nutritionData.healthyItems || 0;
+      const totalItems = nutritionData.totalItems || 0;
+      return {
+        tag: 'DIET',
+        label: 'Eat Healthy',
+        progress: score / 100,
+        detail: `${healthyItems} of ${totalItems} item${totalItems !== 1 ? 's' : ''} purchased rated wholesome.`,
+        color: COLORS.secondary,
+      };
+    }
+    return {
+      tag: 'DIET',
+      label: 'Eat Healthy',
+      progress: 0,
+      detail: 'Upload receipts to track healthy food purchases.',
+      color: COLORS.secondary,
+    };
+  }, [nutritionData]);
+
+  const gainMuscleGoal = useMemo(() => {
+    if (nutritionData && nutritionData.hasSufficientData) {
+      const prot = Math.round(Number(nutritionData.nutrients?.protein_g?.perDay) || 0);
+      const targetProt = 120;
+      const rawProg = prot / targetProt;
+      const prog = Number.isFinite(rawProg) ? Math.min(Math.max(rawProg, 0), 1) : 0;
+      return {
+        tag: 'FIT',
+        label: 'Gain Muscle',
+        progress: prog,
+        detail: prot > 0 ? `Avg ~${prot}g/day protein from groceries (target: ${targetProt}g).` : 'Track grocery protein intake.',
+        color: COLORS.primary,
+      };
+    }
+    return {
+      tag: 'FIT',
+      label: 'Gain Muscle',
+      progress: 0,
+      detail: 'Upload receipts to track muscle-building protein.',
+      color: COLORS.primary,
+    };
+  }, [nutritionData]);
+
+  const latestInsightText = useMemo(() => {
+    if (spendingData?.ai_tip) return spendingData.ai_tip;
+    if (forecastData?.suggestion) return forecastData.suggestion;
+    if (nutritionData?.suggestion) return nutritionData.suggestion;
+    return 'Scan your grocery receipts to receive customized, real-time AI spending and nutrition insights.';
+  }, [spendingData, forecastData, nutritionData]);
 
   return (
     <ScreenLayout title="Dashboard">
@@ -637,10 +830,10 @@ export default function DashboardScreen({ navigation }) {
             </View>
           </View>
 
-          {/* Quick Stats 2×2 Grid */}
+          {/* Quick Stats 2×2 Grid — 100% Real User Data */}
           <Text style={styles.sectionTitle}>QUICK STATS</Text>
           <View style={styles.statsGrid}>
-            {QUICK_STATS.map((s) => (
+            {quickStats.map((s) => (
               <StatCard key={s.label} {...s} />
             ))}
           </View>
@@ -660,9 +853,7 @@ export default function DashboardScreen({ navigation }) {
             />
 
             {/* Remaining goals — Eat Healthy */}
-            {GOALS_EAT_HEALTHY.map((g) => (
-              <GoalCard key={g.label} {...g} />
-            ))}
+            <GoalCard {...eatHealthyGoal} />
 
             {/* Nutrition Forecast — placed after Eat Healthy per spec */}
             <NutritionForecastCard
@@ -672,13 +863,10 @@ export default function DashboardScreen({ navigation }) {
             />
 
             {/* Gain Muscle goal */}
-            {GOALS_GAIN_MUSCLE.map((g) => (
-              <GoalCard
-                key={g.label}
-                {...g}
-                onPress={() => navigation.navigate('GainMuscle')}
-              />
-            ))}
+            <GoalCard
+              {...gainMuscleGoal}
+              onPress={() => navigation.navigate('GainMuscle')}
+            />
           </View>
 
           {/* AI Insight */}
@@ -690,26 +878,15 @@ export default function DashboardScreen({ navigation }) {
               <Text style={styles.insightTitle}>Latest Insight</Text>
             </View>
             <Text style={styles.insightText}>
-              You're spending ₹350/month more on snacks than similar shoppers.
-              Consider buying family packs or healthier alternatives to cut costs.
+              {latestInsightText}
             </Text>
             <TouchableOpacity style={styles.insightBtn} onPress={() => navigation.navigate('GemmaChat')}>
               <Text style={styles.insightBtnText}>Ask Pantrix for Food Swaps →</Text>
             </TouchableOpacity>
           </View>
 
-          <View style={{ height: 60 }} />
+          <View style={{ height: 20 }} />
         </ScrollView>
-
-        {/* Floating AI Button (FAB) */}
-        <TouchableOpacity
-          style={styles.fab}
-          onPress={() => navigation.navigate('GemmaChat')}
-          activeOpacity={0.85}
-        >
-          <Feather name="message-circle" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
-          <Text style={styles.fabText}>Ask Pantrix</Text>
-        </TouchableOpacity>
       </View>
     </ScreenLayout>
   );

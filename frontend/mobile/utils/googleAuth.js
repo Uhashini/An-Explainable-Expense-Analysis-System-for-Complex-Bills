@@ -128,12 +128,15 @@ function logSafeDiagnostic(resolvedId, resolvedSource) {
   }
 }
 
+const DEFAULT_GOOGLE_CLIENT_ID = '1041758891518-egk6ur8n7nq13plvjh8hej95f97lblhf.apps.googleusercontent.com';
+
 /**
  * Retrieve the Google OAuth Client ID across all supported configuration paths:
  * 1. Metro compile-time inlined direct expression: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID
  * 2. Expo app.json / app.config.js extra configuration: Constants.expoConfig?.extra?.googleClientId
  * 3. Manifest fallbacks: Constants.manifest?.extra?.googleClientId
  * 4. Web runtime fallbacks: window.EXPO_PUBLIC_GOOGLE_CLIENT_ID / localStorage / sessionStorage
+ * 5. Default built-in Client ID
  */
 export function getGoogleClientId() {
   let resolvedId = '';
@@ -180,6 +183,12 @@ export function getGoogleClientId() {
     }
   }
 
+  // 5. Default built-in fallback
+  if (!resolvedId) {
+    resolvedId = DEFAULT_GOOGLE_CLIENT_ID;
+    resolvedSource = 'DEFAULT_GOOGLE_CLIENT_ID';
+  }
+
   // Safe diagnostic: strictly reports presence and lengths, NEVER the client ID
   logSafeDiagnostic(resolvedId, resolvedSource);
 
@@ -215,6 +224,7 @@ async function sendGoogleTokenToBackend({ idToken, accessToken }) {
 export async function promptGoogleSignIn({
   navigation,
   isSignUp = false,
+  openModal,
   onStart,
   onSuccess,
   onError,
@@ -228,6 +238,11 @@ export async function promptGoogleSignIn({
     if (safetyTimeout) clearTimeout(safetyTimeout);
     if (onError) onError(errorMsg);
   };
+
+  if (Platform.OS !== 'web' && typeof openModal === 'function') {
+    openModal();
+    return;
+  }
 
   const finishSuccess = (authData) => {
     if (isDone) return;
@@ -458,6 +473,14 @@ export async function promptGoogleSignIn({
   // ───────────────────────────────────────────────────────────────────────────
   try {
     const redirectUri = Linking.createURL('oauth');
+
+    // Google strictly blocks custom scheme URIs (exp://) for Web client IDs with Error 400.
+    // If running inside Expo Go, report a clear and actionable message instead of showing Google's error page.
+    if (redirectUri.startsWith('exp:') || Constants.appOwnership === 'expo') {
+      finishError('Google OAuth redirects are blocked in Expo Go because Google disallows custom exp:// schemes for Web client IDs. Please use the Google Connect Modal on mobile or test via Expo Web.');
+      return;
+    }
+
     const nonce = Math.random().toString(36).substring(2);
     const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token%20id_token&scope=${encodeURIComponent('openid email profile')}&prompt=select_account&nonce=${nonce}`;
 
