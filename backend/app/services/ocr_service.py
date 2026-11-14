@@ -1,8 +1,15 @@
 from PIL import Image
 import io
 import os
-import cv2
-import numpy as np
+try:
+    import cv2
+except ImportError:
+    cv2 = None
+
+try:
+    import numpy as np
+except ImportError:
+    np = None
 import logging
 import requests
 from typing import Optional, Dict, Any, Union
@@ -233,6 +240,8 @@ class OCRService:
         # ── 2. Local Document Intelligence Pipeline ───────────────────────────
         try:
             # 1. Convert bytes to OpenCV format
+            if cv2 is None or np is None:
+                raise RuntimeError("OpenCV (cv2) or NumPy is not installed for local fallback processing.")
             nparr = np.frombuffer(image_bytes, np.uint8)
             img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
             
