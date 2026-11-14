@@ -42,6 +42,10 @@ class Settings(BaseSettings):
     LAYOUTLMV3_MODEL_PATH: str = "microsoft/layoutlmv3-base"
     LAYOUTLMV3_CHECKPOINT: Optional[str] = None
 
+    # Hugging Face AI Engine Microservice
+    HF_AI_URL: Optional[str] = None
+    HF_TOKEN: Optional[str] = None
+
     # API Configuration
     API_V1_STR: str = "/api/v1"
     CORS_ORIGINS: list = ["*"]

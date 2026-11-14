@@ -1,6 +1,4 @@
-# Backend Dependencies
-# Heavy ML packages (torch, paddlepaddle, paddleocr, numpy, opencv, transformers)
-# are installed as separate Dockerfile layers for better Docker cache reuse.
+--extra-index-url https://download.pytorch.org/whl/cpu
 
 fastapi==0.104.1
 uvicorn==0.24.0
@@ -22,3 +20,4 @@ statsmodels
 scikit-learn
 pandas
 google-auth
+httpx

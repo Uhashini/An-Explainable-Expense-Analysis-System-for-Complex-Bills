@@ -1,8 +1,11 @@
 from PIL import Image
 import io
+import os
 import cv2
 import numpy as np
 import logging
+import requests
+from app.core.config import settings
 from app.services.document_intelligence import (
     PreprocessingService,
     PerspectiveCorrector,
@@ -18,7 +21,7 @@ logger = logging.getLogger(__name__)
 class OCRService:
     """
     Coordinator service that ties together the modular document intelligence pipeline.
-    Replaces the legacy Tesseract implementation.
+    Supports offloading to remote Hugging Face AI microservice (GPU) with local fallback.
     """
     def __init__(self):
         self.classifier = InputClassifier()
@@ -28,16 +31,51 @@ class OCRService:
         self.voting = VotingEngine()
         self.layoutlm = LayoutLMService()
 
-    def extract_structured_data(self, image_bytes: bytes,preprocess=True) -> dict:
+    def extract_structured_data(self, image_bytes: bytes, preprocess: bool = True) -> dict:
         """
-        Full production-grade extraction flow:
-        Classify -> Preprocess -> Correct -> OCR -> Vote -> Semantic Mapping (LayoutLM).
+        Full extraction flow:
+        1. If HF_AI_URL is configured, offload to remote GPU Zero Space.
+        2. Fallback to local CPU/GPU pipeline: Classify -> Preprocess -> Correct -> OCR -> Vote -> LayoutLM.
         """
+        if not image_bytes or len(image_bytes) == 0:
+            raise ValueError("Received empty image bytes (length 0).")
+
+        # ── 1. Remote Hugging Face AI Engine Offload ──────────────────────────
+        hf_url = getattr(settings, "HF_AI_URL", None) or os.getenv("HF_AI_URL")
+        if hf_url:
+            try:
+                logger.info(f"Offloading receipt extraction to remote HF Space: {hf_url}")
+                headers = {}
+                hf_token = getattr(settings, "HF_TOKEN", None) or os.getenv("HF_TOKEN")
+                if hf_token:
+                    headers["Authorization"] = f"Bearer {hf_token}"
+
+                files = {"file": ("receipt.jpg", image_bytes, "image/jpeg")}
+                response = requests.post(hf_url, files=files, headers=headers, timeout=90)
+
+                if response.status_code == 200:
+                    resp_json = response.json()
+                    if isinstance(resp_json, dict):
+                        if "status" in resp_json and "data" in resp_json:
+                            return resp_json
+                        elif "data" in resp_json:
+                            return {"filename": "upload.jpg", "status": "success", "data": resp_json["data"]}
+                        elif "receipt_info" in resp_json:
+                            return {"filename": "upload.jpg", "status": "success", "data": resp_json}
+                        return {"filename": "upload.jpg", "status": "success", "data": resp_json}
+                else:
+                    logger.warning(
+                        f"HF Space returned HTTP {response.status_code}: {response.text[:200]}. "
+                        "Falling back to local OCR pipeline."
+                    )
+            except Exception as hf_err:
+                logger.warning(
+                    f"Remote HF Engine call failed ({hf_err}). Seamlessly falling back to local OCR pipeline."
+                )
+
+        # ── 2. Local Document Intelligence Pipeline ───────────────────────────
         try:
             # 1. Convert bytes to OpenCV format
-            if not image_bytes or len(image_bytes) == 0:
-                raise ValueError("Received empty image bytes (length 0).")
-                
             nparr = np.frombuffer(image_bytes, np.uint8)
             img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
             
@@ -86,7 +124,6 @@ class OCRService:
                 y1 = clip(1000 * tl[1] / new_h)
                 x2 = clip(1000 * br[0] / new_w)
                 y2 = clip(1000 * br[1] / new_h)
-                
                 
                 words.append(text)
                 boxes.append([x1, y1, x2, y2])

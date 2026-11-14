@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: pantrix-backend
+    runtime: python
+    plan: free
+    rootDir: backend
+    buildCommand: "pip install --upgrade pip && pip install -r requirements.txt"
+    startCommand: "uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.10.14
+      - key: HF_AI_URL
+        value: https://uhashini-pantrix-ai-engine.hf.space/extract
+      - key: HF_TOKEN
+        sync: false
+      - key: POSTGRES_URL
+        sync: false
+      - key: JWT_SECRET_KEY
+        value: pantrix-secure-jwt-secret-key-super-safe-2026
+      - key: GEMINI_API_KEY
+        sync: false

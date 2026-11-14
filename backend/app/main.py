@@ -41,11 +41,17 @@ async def startup_warmup():
             await run_in_threadpool(product_matcher.initialize)
         except Exception as e:
             print(f"[Warmup Warning] ProductMatcher warmup: {e}")
-        try:
-            from app.services.ocr_service import ocr_service
-            await run_in_threadpool(ocr_service.ocr._ensure_engine)
-        except Exception as e:
-            print(f"[Warmup Warning] OCREngine warmup: {e}")
+        
+        from app.core.config import settings
+        hf_url = getattr(settings, "HF_AI_URL", None) or os.getenv("HF_AI_URL")
+        if not hf_url:
+            try:
+                from app.services.ocr_service import ocr_service
+                await run_in_threadpool(ocr_service.ocr._ensure_engine)
+            except Exception as e:
+                print(f"[Warmup Warning] OCREngine warmup: {e}")
+        else:
+            print(f"[Info] Hugging Face AI Engine configured ({hf_url}). Skipping local OCR warmup.")
     asyncio.create_task(_do_warmup())
 
 # Include Routers
