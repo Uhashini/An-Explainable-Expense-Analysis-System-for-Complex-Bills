@@ -211,38 +211,69 @@ function MainTabs() {
 // â”€â”€â”€ Root Stack â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export default function App() {
-  const [fontsLoaded] = useFonts({
+  const [fontsLoaded, fontError] = useFonts({
     PlusJakartaSans_400Regular,
     PlusJakartaSans_600SemiBold,
     PlusJakartaSans_700Bold,
-    TheSeasons: require('./assets/the-seasons-regular.ttf'),
   });
 
   const [authChecked, setAuthChecked] = useState(false);
   const [initialRoute, setInitialRoute] = useState('Landing');
+  const [forceReady, setForceReady] = useState(false);
 
   useEffect(() => {
+    // Try to load optional decorative serif font in the background without blocking the app
+    import('expo-font')
+      .then(({ loadAsync }) => {
+        loadAsync({
+          TheSeasons: require('./assets/the-seasons-regular.ttf'),
+        }).catch((err) => {
+          console.warn('[App] Optional font TheSeasons load skipped:', err?.message || err);
+        });
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+
     async function determineInitialRoute() {
       try {
-        const storedUser = await getUser();
-        // If user is already authenticated and has a saved profile, boot directly to Main app
-        if (storedUser && (storedUser.id || storedUser.email)) {
-          setInitialRoute('Main');
-        } else {
-          setInitialRoute('Landing');
+        const storedUser = await Promise.race([
+          getUser(),
+          new Promise((resolve) => setTimeout(() => resolve(null), 1200)),
+        ]);
+        if (active) {
+          if (storedUser && (storedUser.id || storedUser.email)) {
+            setInitialRoute('Main');
+          } else {
+            setInitialRoute('Landing');
+          }
         }
       } catch (err) {
         console.warn('Failed to load initial auth state on boot:', err);
-        setInitialRoute('Landing');
+        if (active) setInitialRoute('Landing');
       } finally {
-        setAuthChecked(true);
+        if (active) setAuthChecked(true);
       }
     }
 
     determineInitialRoute();
+
+    // Safety timeout: Maximum 1.5 seconds splash/spinner duration, guaranteed
+    const timer = setTimeout(() => {
+      if (active) setForceReady(true);
+    }, 1500);
+
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
   }, []);
 
-  if (!fontsLoaded || !authChecked) {
+  const isReady = forceReady || ((fontsLoaded || fontError) && authChecked);
+
+  if (!isReady) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.background }}>
         <ActivityIndicator size="large" color={COLORS.primary} />

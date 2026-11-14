@@ -3,7 +3,7 @@ import { View, StyleSheet, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const STRIPE_SIZE = 24;
-const STRIPE_COUNT = 75;
+const STRIPE_COUNT = 25;
 
 export default function BackgroundLayout({ children }) {
   return (
