@@ -51,7 +51,11 @@
       "expo-web-browser"
     ],
     "extra": {
-      "googleClientId": "1041758891518-egk6ur8n7nq13plvjh8hej95f97lblhf.apps.googleusercontent.com"
-    }
+      "googleClientId": "1041758891518-egk6ur8n7nq13plvjh8hej95f97lblhf.apps.googleusercontent.com",
+      "eas": {
+        "projectId": "458f7fd9-fe77-45ac-8981-ca4868c380f6"
+      }
+    },
+    "owner": "kanishka1259"
   }
 }
