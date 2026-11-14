@@ -44,7 +44,11 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
         }
-      ]
+      ],
+      "expo-font",
+      "expo-image",
+      "expo-status-bar",
+      "expo-web-browser"
     ],
     "extra": {
       "googleClientId": "1041758891518-egk6ur8n7nq13plvjh8hej95f97lblhf.apps.googleusercontent.com"
