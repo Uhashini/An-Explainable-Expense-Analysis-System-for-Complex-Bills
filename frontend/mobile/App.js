@@ -222,19 +222,6 @@ export default function App() {
   const [forceReady, setForceReady] = useState(false);
 
   useEffect(() => {
-    // Try to load optional decorative serif font in the background without blocking the app
-    import('expo-font')
-      .then(({ loadAsync }) => {
-        loadAsync({
-          TheSeasons: require('./assets/the-seasons-regular.ttf'),
-        }).catch((err) => {
-          console.warn('[App] Optional font TheSeasons load skipped:', err?.message || err);
-        });
-      })
-      .catch(() => {});
-  }, []);
-
-  useEffect(() => {
     let active = true;
 
     async function determineInitialRoute() {
@@ -288,7 +275,7 @@ export default function App() {
           fallbackMessage="An error occurred while loading Pantrix. Tap below to reload."
           onResetSession={() => setInitialRoute('Landing')}
         >
-          <NavigationContainer key={initialRoute}>
+          <NavigationContainer>
             <Stack.Navigator
               initialRouteName={initialRoute}
               screenOptions={{

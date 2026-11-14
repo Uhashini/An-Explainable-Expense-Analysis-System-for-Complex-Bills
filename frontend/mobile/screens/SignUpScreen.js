@@ -309,7 +309,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   logo: {
-    fontFamily: 'TheSeasons',
+    fontFamily: FONTS.serif,
     fontSize: 30,
     color: COLORS.primary,
     letterSpacing: 5,
@@ -409,7 +409,7 @@ const styles = StyleSheet.create({
   },
   primaryButtonText: {
     color: '#fff',
-    fontFamily: 'TheSeasons',
+    fontFamily: FONTS.serif,
     fontSize: 13,
     letterSpacing: 2.5,
   },
