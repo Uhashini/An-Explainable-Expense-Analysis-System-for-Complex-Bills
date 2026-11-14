@@ -7,6 +7,7 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import ScreenLayout from '../components/ScreenLayout';
 import MonthlyBudgetCard from '../components/MonthlyBudgetCard';
+import { Feather } from '@expo/vector-icons';
 import { getUser } from '../utils/authStorage';
 import { authFetch, API_BASE_URL } from '../utils/apiConfig';
 import { COLORS, FONTS } from '../theme';
@@ -878,7 +879,7 @@ export default function DashboardScreen({ navigation }) {
               {latestInsightText}
             </Text>
             <TouchableOpacity style={styles.insightBtn} onPress={() => navigation.navigate('GemmaChat')}>
-              <Text style={styles.insightBtnText}>Ask Gemma for Food Swaps →</Text>
+              <Text style={styles.insightBtnText}>Ask Pantrix for Food Swaps →</Text>
             </TouchableOpacity>
           </View>
 

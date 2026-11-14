@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   View,
   Text,
@@ -12,10 +12,12 @@ import {
 } from "react-native";
 import ScreenLayout from "../components/ScreenLayout";
 import { Feather } from "@expo/vector-icons";
+import InsightsIcon from "../assets/icons/insights.svg";
 import { COLORS, FONTS } from "../theme";
 import { API_BASE_URL } from "../utils/apiConfig";
 import { getUser } from "../utils/authStorage";
 import { showConfirm, showNotification } from "../utils/alertHelper";
+import { calculateMetricsFromReceipt } from "../modes/eat_healthy/nutritionUtils";
 
 // ─── Mock receipt data ──────────────────────────────────────────────────────
 const ITEMS = [
@@ -176,6 +178,10 @@ export default function ReceiptDetailsScreen({ route, navigation }) {
   const [extractedItems, setExtractedItems] = useState(initialItems);
   const [foodDetailsLoaded, setFoodDetailsLoaded] = useState(isMock || !!receiptId);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
+
+  const nutritionTotals = useMemo(() => {
+    return calculateMetricsFromReceipt({ items: extractedItems });
+  }, [extractedItems]);
   const [isEditing, setIsEditing] = useState(false);
   // Snapshot of items before editing starts, used for Cancel
   const [itemsSnapshot, setItemsSnapshot] = useState(null);
@@ -506,7 +512,9 @@ export default function ReceiptDetailsScreen({ route, navigation }) {
                   <Text style={styles.storeDate}>{dateStr}</Text>
                 </>
               )}
-              <Text style={styles.receiptId}>Receipt ID: #RF203451</Text>
+              <Text style={styles.receiptId}>
+                {receiptId ? `Receipt ID: #${receiptId}` : "New Scanned Receipt"}
+              </Text>
             </View>
             <View style={styles.totalBadge}>
               <Text style={styles.totalBadgeLabel}>Total</Text>
@@ -692,8 +700,12 @@ export default function ReceiptDetailsScreen({ route, navigation }) {
             {taxes && taxes.length > 0 && taxes.map((t, tidx) => (
               <InfoRow key={tidx} label={t.name || "Tax"} value={`₹${Number(t.amount || 0).toFixed(2)}`} />
             ))}
-            <InfoRow label="Total Calories" value="-" />
-            <InfoRow label="Total Protein" value="-" />
+            {nutritionTotals?.calories > 0 && (
+              <InfoRow label="Total Calories" value={`${nutritionTotals.calories} kcal`} />
+            )}
+            {nutritionTotals?.protein > 0 && (
+              <InfoRow label="Total Protein" value={`${nutritionTotals.protein}g`} />
+            )}
             {validation && validation.is_reconciled !== undefined && (
               <View style={[styles.validationBanner, validation.is_reconciled ? styles.valSuccess : styles.valWarning]}>
                 <Text style={[styles.validationText, validation.is_reconciled ? styles.valTextSuccess : styles.valTextWarning]}>
@@ -713,35 +725,38 @@ export default function ReceiptDetailsScreen({ route, navigation }) {
           {/* ── Action Buttons ── */}
           {!foodDetailsLoaded && (
             <TouchableOpacity
-              style={[styles.primaryButton, { backgroundColor: COLORS.accent }]}
+              style={styles.foodDetailsBtn}
               activeOpacity={0.85}
               onPress={fetchFoodDetails}
               disabled={isLoadingDetails}
             >
               {isLoadingDetails ? (
-                <ActivityIndicator color={COLORS.primary} />
+                <ActivityIndicator color={COLORS.primary} size="small" />
               ) : (
-                <Text
-                  style={[styles.primaryButtonText, { color: COLORS.primary }]}
-                >
-                  Get Food Details
-                </Text>
+                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center" }}>
+                  <Feather name="database" size={14} color={COLORS.primary} style={{ marginRight: 8 }} />
+                  <Text style={styles.foodDetailsBtnText}>
+                    Retrieve Nutrition & Food Details
+                  </Text>
+                </View>
               )}
             </TouchableOpacity>
           )}
 
-          <TouchableOpacity
-            style={styles.primaryButton}
-            activeOpacity={0.85}
-            onPress={handleSaveReceipt}
-            disabled={isSaving}
-          >
-            {isSaving ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.primaryButtonText}>Save Receipt</Text>
-            )}
-          </TouchableOpacity>
+          {!receiptId && !isEditing && (
+            <TouchableOpacity
+              style={styles.primaryButton}
+              activeOpacity={0.85}
+              onPress={handleSaveReceipt}
+              disabled={isSaving}
+            >
+              {isSaving ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.primaryButtonText}>Save Receipt</Text>
+              )}
+            </TouchableOpacity>
+          )}
 
           {/* Save-Changes / Cancel row (only visible when in editing mode) */}
           {isEditing && (
@@ -769,9 +784,9 @@ export default function ReceiptDetailsScreen({ route, navigation }) {
             </View>
           )}
 
-          {/* ── Advanced AI Analytics Button ── */}
+          {/* ── View AI Insights Button with SVG Icon ── */}
           <TouchableOpacity
-            style={[styles.primaryButton, { backgroundColor: '#fff8f0', borderColor: '#f0d8b0', borderWidth: 1, marginTop: 12, marginBottom: 12 }]}
+            style={styles.aiInsightsBtn}
             activeOpacity={0.85}
             onPress={() => navigation.push('AIInsights', {
               receiptId,
@@ -788,9 +803,11 @@ export default function ReceiptDetailsScreen({ route, navigation }) {
               initialMode: 'Save Money',
             })}
           >
-            <Text style={[styles.primaryButtonText, { color: '#7a4800' }]}>
-              View AI Spending Analytics
-            </Text>
+            <View style={styles.aiInsightsIconContainer}>
+              <InsightsIcon width={24} height={24} />
+            </View>
+            <Text style={styles.aiInsightsBtnText}>View AI Insights</Text>
+            <Feather name="arrow-right" size={17} color="#FFFFFF" style={{ marginLeft: 10 }} />
           </TouchableOpacity>
 
 
@@ -1309,6 +1326,61 @@ const styles = StyleSheet.create({
   },
   editCancelBtnText: {
     fontFamily: FONTS.semiBold,
+    fontSize: 13,
+    color: COLORS.primary,
+    letterSpacing: 0.5,
+  },
+  aiInsightsBtn: {
+    width: "100%",
+    minHeight: 54,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 27,
+    backgroundColor: COLORS.primary,
+    marginTop: 8,
+    marginBottom: 16,
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.28,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  aiInsightsIconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  aiInsightsBtnText: {
+    fontFamily: FONTS.bold,
+    fontSize: 15,
+    color: "#FFFFFF",
+    letterSpacing: 0.5,
+  },
+  foodDetailsBtn: {
+    width: "100%",
+    paddingVertical: 13,
+    borderRadius: 50,
+    backgroundColor: "#FFF9EE",
+    borderWidth: 1.5,
+    borderColor: "#F0D7A0",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 10,
+  },
+  foodDetailsBtnText: {
+    fontFamily: FONTS.bold,
     fontSize: 13,
     color: COLORS.primary,
     letterSpacing: 0.5,
