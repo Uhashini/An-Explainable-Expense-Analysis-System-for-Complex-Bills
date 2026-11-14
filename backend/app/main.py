@@ -43,9 +43,12 @@ async def startup_warmup():
             print(f"[Warmup Warning] ProductMatcher warmup: {e}")
         try:
             from app.services.ocr_service import ocr_service
-            await run_in_threadpool(ocr_service.ocr._ensure_engine)
+            if getattr(ocr_service, "use_remote", False):
+                await run_in_threadpool(ocr_service._get_hf_client)
+            elif hasattr(ocr_service, "ocr") and ocr_service.ocr:
+                await run_in_threadpool(ocr_service.ocr._ensure_engine)
         except Exception as e:
-            print(f"[Warmup Warning] OCREngine warmup: {e}")
+            print(f"[Warmup Warning] OCR warmup: {e}")
     asyncio.create_task(_do_warmup())
 
 # Include Routers
