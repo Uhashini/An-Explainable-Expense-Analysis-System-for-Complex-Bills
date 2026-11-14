@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import ScreenLayout from "../components/ScreenLayout";
 import { Feather } from "@expo/vector-icons";
+import InsightsIcon from "../assets/icons/insights.svg";
 import { COLORS, FONTS } from "../theme";
 import { API_BASE_URL } from "../utils/apiConfig";
 import { getUser } from "../utils/authStorage";
@@ -730,18 +731,20 @@ export default function ReceiptDetailsScreen({ route, navigation }) {
             </TouchableOpacity>
           )}
 
-          <TouchableOpacity
-            style={styles.primaryButton}
-            activeOpacity={0.85}
-            onPress={handleSaveReceipt}
-            disabled={isSaving}
-          >
-            {isSaving ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.primaryButtonText}>Save Receipt</Text>
-            )}
-          </TouchableOpacity>
+          {!receiptId && !isEditing && (
+            <TouchableOpacity
+              style={styles.primaryButton}
+              activeOpacity={0.85}
+              onPress={handleSaveReceipt}
+              disabled={isSaving}
+            >
+              {isSaving ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.primaryButtonText}>Save Receipt</Text>
+              )}
+            </TouchableOpacity>
+          )}
 
           {/* Save-Changes / Cancel row (only visible when in editing mode) */}
           {isEditing && (
@@ -769,9 +772,9 @@ export default function ReceiptDetailsScreen({ route, navigation }) {
             </View>
           )}
 
-          {/* ── Advanced AI Analytics Button ── */}
+          {/* ── View AI Insights Button with SVG Icon ── */}
           <TouchableOpacity
-            style={[styles.primaryButton, { backgroundColor: '#fff8f0', borderColor: '#f0d8b0', borderWidth: 1, marginTop: 12, marginBottom: 12 }]}
+            style={styles.aiInsightsBtn}
             activeOpacity={0.85}
             onPress={() => navigation.push('AIInsights', {
               receiptId,
@@ -788,9 +791,11 @@ export default function ReceiptDetailsScreen({ route, navigation }) {
               initialMode: 'Save Money',
             })}
           >
-            <Text style={[styles.primaryButtonText, { color: '#7a4800' }]}>
-              View AI Spending Analytics
-            </Text>
+            <View style={styles.aiInsightsIconContainer}>
+              <InsightsIcon width={22} height={22} />
+            </View>
+            <Text style={styles.aiInsightsBtnText}>View AI Insights</Text>
+            <Feather name="arrow-right" size={16} color="#FFFFFF" style={{ marginLeft: 8 }} />
           </TouchableOpacity>
 
 
@@ -1311,6 +1316,37 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.semiBold,
     fontSize: 13,
     color: COLORS.primary,
+    letterSpacing: 0.5,
+  },
+  aiInsightsBtn: {
+    width: "100%",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 50,
+    backgroundColor: COLORS.primary,
+    marginTop: 8,
+    marginBottom: 16,
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.28,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  aiInsightsIconContainer: {
+    width: 26,
+    height: 26,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 10,
+  },
+  aiInsightsBtnText: {
+    fontFamily: FONTS.bold,
+    fontSize: 14,
+    color: "#FFFFFF",
     letterSpacing: 0.5,
   },
 });
