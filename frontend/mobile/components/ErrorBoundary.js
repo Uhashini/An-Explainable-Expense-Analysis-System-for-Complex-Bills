@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { COLORS, FONTS } from '../theme';
+import { clearUser } from '../utils/authStorage';
 
 export default class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -20,6 +21,18 @@ export default class ErrorBoundary extends React.Component {
   resetError = () => {
     this.setState({ hasError: false, error: null });
     if (this.props.onReset) {
+      try { this.props.onReset(); } catch (e) {}
+    }
+  };
+
+  resetSession = async () => {
+    try {
+      await clearUser();
+    } catch (e) {}
+    this.setState({ hasError: false, error: null });
+    if (this.props.onResetSession) {
+      try { this.props.onResetSession(); } catch (e) {}
+    } else if (this.props.onReset) {
       try { this.props.onReset(); } catch (e) {}
     }
   };
@@ -47,6 +60,10 @@ export default class ErrorBoundary extends React.Component {
             <TouchableOpacity style={styles.retryBtn} onPress={this.resetError} activeOpacity={0.8}>
               <Feather name="refresh-cw" size={15} color="#fff" style={{ marginRight: 6 }} />
               <Text style={styles.retryBtnText}>Reload App</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.resetSessionBtn} onPress={this.resetSession} activeOpacity={0.8}>
+              <Feather name="log-out" size={14} color={COLORS.primary} style={{ marginRight: 6 }} />
+              <Text style={styles.resetSessionBtnText}>Reset Session & Sign In</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -132,5 +149,23 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.bold,
     fontSize: 14,
     color: '#fff',
+  },
+  resetSessionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FAF6F1',
+    borderWidth: 1,
+    borderColor: '#E2D9CE',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
+    width: '100%',
+    marginTop: 10,
+  },
+  resetSessionBtnText: {
+    fontFamily: FONTS.semiBold,
+    fontSize: 13,
+    color: COLORS.primary,
   },
 });

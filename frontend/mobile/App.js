@@ -82,7 +82,7 @@ function CustomTabBar({ state, descriptors, navigation }) {
               onPress={onPress}
               activeOpacity={0.8}
             >
-              <Icon width={20} height={20} fill="#fff" />
+              {Icon ? <Icon width={20} height={20} fill="#fff" /> : null}
               <Text style={tabStyles.scanLabel}>Scan</Text>
             </TouchableOpacity>
           );
@@ -97,7 +97,7 @@ function CustomTabBar({ state, descriptors, navigation }) {
             activeOpacity={0.7}
           >
             {isFocused && <View style={tabStyles.activeDot} />}
-            <Icon width={30} height={30} fill={isFocused ? COLORS.primary : '#94B6EF'} style={tabStyles.tabIcon} />
+            {Icon ? <Icon width={30} height={30} fill={isFocused ? COLORS.primary : '#94B6EF'} style={tabStyles.tabIcon} /> : null}
             <Text style={[tabStyles.tabLabel, isFocused && tabStyles.tabLabelActive]}>
               {route.name}
             </Text>
@@ -211,38 +211,56 @@ function MainTabs() {
 // â”€â”€â”€ Root Stack â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export default function App() {
-  const [fontsLoaded] = useFonts({
+  const [fontsLoaded, fontError] = useFonts({
     PlusJakartaSans_400Regular,
     PlusJakartaSans_600SemiBold,
     PlusJakartaSans_700Bold,
-    TheSeasons: require('./assets/the-seasons-regular.ttf'),
   });
 
   const [authChecked, setAuthChecked] = useState(false);
   const [initialRoute, setInitialRoute] = useState('Landing');
+  const [forceReady, setForceReady] = useState(false);
 
   useEffect(() => {
+    let active = true;
+
     async function determineInitialRoute() {
       try {
-        const storedUser = await getUser();
-        // If user is already authenticated and has a saved profile, boot directly to Main app
-        if (storedUser && (storedUser.id || storedUser.email)) {
-          setInitialRoute('Main');
-        } else {
-          setInitialRoute('Landing');
+        const storedUser = await Promise.race([
+          getUser(),
+          new Promise((resolve) => setTimeout(() => resolve(null), 1200)),
+        ]);
+        if (active) {
+          if (storedUser && (storedUser.id || storedUser.email)) {
+            setInitialRoute('Main');
+          } else {
+            setInitialRoute('Landing');
+          }
         }
       } catch (err) {
         console.warn('Failed to load initial auth state on boot:', err);
-        setInitialRoute('Landing');
+        if (active) setInitialRoute('Landing');
       } finally {
-        setAuthChecked(true);
+        if (active) setAuthChecked(true);
       }
     }
 
     determineInitialRoute();
+
+    // Safety timeout: Maximum 1.5 seconds splash/spinner duration, guaranteed
+    const timer = setTimeout(() => {
+      if (active) setForceReady(true);
+    }, 1500);
+
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
   }, []);
 
-  if (!fontsLoaded || !authChecked) {
+  const isReady = forceReady || ((fontsLoaded || fontError) && authChecked);
+
+  if (!isReady) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.background }}>
         <ActivityIndicator size="large" color={COLORS.primary} />
@@ -253,7 +271,10 @@ export default function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <ErrorBoundary fallbackMessage="An error occurred while loading Pantrix. Tap below to reload.">
+        <ErrorBoundary
+          fallbackMessage="An error occurred while loading Pantrix. Tap below to reload."
+          onResetSession={() => setInitialRoute('Landing')}
+        >
           <NavigationContainer>
             <Stack.Navigator
               initialRouteName={initialRoute}

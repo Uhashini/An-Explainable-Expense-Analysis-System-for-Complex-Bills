@@ -1,3 +1,5 @@
+import { Platform } from 'react-native';
+
 // Shared theme constants for Pantrix app
 // Brand palette: Red #990808 | Blue #94B6EF | White/Bg #F4F2EF | Yellow #E6E279
 
@@ -24,4 +26,5 @@ export const FONTS = {
   bold:     'PlusJakartaSans_700Bold',
   semiBold: 'PlusJakartaSans_600SemiBold',
   regular:  'PlusJakartaSans_400Regular',
+  serif:    Platform.select({ ios: 'Georgia', android: 'serif', default: 'serif' }),
 };

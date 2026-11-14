@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, Image, StyleSheet, TouchableOpacity } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import BackgroundLayout from '../components/BackgroundLayout';
+import { FONTS } from '../theme';
 
 export default function LandingScreen({ navigation }) {
   return (
@@ -45,7 +46,7 @@ export default function LandingScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   title: {
-    fontFamily: 'TheSeasons',
+    fontFamily: FONTS.serif,
     fontSize: 52,
     color: '#8B1A1A',
     letterSpacing: 6,
@@ -83,7 +84,7 @@ const styles = StyleSheet.create({
   },
   primaryButtonText: {
     color: '#fff',
-    fontFamily: 'TheSeasons',
+    fontFamily: FONTS.serif,
     fontSize: 14,
     letterSpacing: 2.5,
   },
