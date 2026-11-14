@@ -35,9 +35,13 @@ def _parse_date(raw) -> Optional[date]:
     if isinstance(raw, (datetime, date)):
         return raw if isinstance(raw, date) else raw.date()
     raw = str(raw).strip()
+    if not raw or "unknown" in raw.lower() or "tmrw" in raw.lower():
+        return None
+    # Strip timestamp if present (e.g. '2025-09-01 23:59:36')
+    date_part = raw.split(' ')[0].split('T')[0]
     for fmt in ("%Y-%m-%d", "%d-%m-%Y", "%d/%m/%Y", "%Y/%m/%d", "%d %b %Y", "%B %d, %Y"):
         try:
-            return datetime.strptime(raw, fmt).date()
+            return datetime.strptime(date_part, fmt).date()
         except ValueError:
             continue
     return None
@@ -242,26 +246,37 @@ def get_spending_forecast(user_id: int, db: Session = Depends(get_db)):
 
     budget_used_pct = round(projected_spend / budget, 4) if budget > 0 else 0.0
 
-    # ── 5. Category breakdown from actual receipt items ───────────────────────
+    # ── 5. Category breakdown from actual receipt items (batch queried) ──────
     # Use current-month receipts if available, otherwise fall back to all receipts
     receipts_for_categories = current_month_receipts if current_month_receipts else all_receipts
     category_spend: dict = defaultdict(float)
 
-    for r in receipts_for_categories:
-        items = db.query(ReceiptItem).filter(ReceiptItem.receipt_id == r.receipt_id).all()
-        for item in items:
-            item_price = _safe_float(item.price)
-            if item_price == 0.0:
-                item_price = _safe_float(item.rate)
+    receipt_ids = [r.receipt_id for r in receipts_for_categories]
+    all_items = (
+        db.query(ReceiptItem)
+        .filter(ReceiptItem.receipt_id.in_(receipt_ids))
+        .all()
+    ) if receipt_ids else []
 
-            # Resolve category from matched FoodItem
-            category = "Other"
-            if item.matched_food_id:
-                food = db.query(FoodItem).filter(FoodItem.food_id == item.matched_food_id).first()
-                if food and food.category:
-                    category = _normalise_category(food.category)
+    food_ids = list({it.matched_food_id for it in all_items if it.matched_food_id})
+    foods_by_id = {}
+    if food_ids:
+        foods = db.query(FoodItem).filter(FoodItem.food_id.in_(food_ids)).all()
+        foods_by_id = {f.food_id: f for f in foods}
 
-            category_spend[category] += item_price
+    for item in all_items:
+        item_price = _safe_float(item.price)
+        if item_price == 0.0:
+            item_price = _safe_float(item.rate)
+
+        # Resolve category from matched FoodItem
+        category = "Other"
+        if item.matched_food_id and item.matched_food_id in foods_by_id:
+            food = foods_by_id[item.matched_food_id]
+            if food and food.category:
+                category = _normalise_category(food.category)
+
+        category_spend[category] += item_price
 
     # Project each category to end-of-month using the same daily-rate multiplier
     projection_multiplier = days_in_month / days_elapsed if days_elapsed > 0 else 1.0
@@ -308,6 +323,12 @@ def get_spending_forecast(user_id: int, db: Session = Depends(get_db)):
     else:
         suggestion = "Your spending looks balanced this month. Keep tracking receipts for more accurate insights."
 
+    sorted_hist_months = sorted(historical_by_month.keys())
+    latest_hist_month = sorted_hist_months[-1] if sorted_hist_months else None
+    total_all_spend = round(sum(_safe_float(r.total_amount) for r in all_receipts), 2)
+    latest_month_spend = round(historical_by_month[latest_hist_month], 2) if latest_hist_month else total_all_spend
+    effective_spend = round(current_month_total, 2) if current_month_total > 0 else latest_month_spend
+
     month_name = today.strftime("%B").upper()
 
     return {
@@ -316,6 +337,9 @@ def get_spending_forecast(user_id: int, db: Session = Depends(get_db)):
         "goal":                     primary_goal,
         "goals":                    user_goals_raw,
         "currentSpend":             round(current_month_total, 2),
+        "effectiveSpend":           effective_spend,
+        "latestMonthSpend":         latest_month_spend,
+        "totalSpend":               total_all_spend,
         "projectedSpend":           projected_spend,
         "budget":                   budget,
         "declaredBudget":           declared_budget,

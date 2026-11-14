@@ -620,8 +620,10 @@ export default function DashboardScreen({ navigation }) {
       spendSub = 'Calculating spend…';
     } else {
       const realSpend = spendingData?.has_data
-        ? (spendingData.this_month_spend > 0 ? spendingData.this_month_spend : spendingData.total_spend)
-        : (forecastData?.currentSpend ?? 0);
+        ? (spendingData.this_month_spend > 0
+            ? spendingData.this_month_spend
+            : (spendingData.effective_monthly_spend || spendingData.latest_month_spend || spendingData.total_spend || 0))
+        : (forecastData?.effectiveSpend || forecastData?.currentSpend || 0);
       const totalCount = spendingData?.total_receipts ?? forecastData?.totalReceipts ?? 0;
 
       if (totalCount > 0 || realSpend > 0) {

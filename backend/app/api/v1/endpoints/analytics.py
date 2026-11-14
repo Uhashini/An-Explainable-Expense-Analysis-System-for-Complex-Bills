@@ -188,11 +188,13 @@ def _parse_safe_date(raw) -> Optional[date]:
     if isinstance(raw, (datetime, date)):
         return raw if isinstance(raw, date) else raw.date()
     raw_str = str(raw).strip()
-    if not raw_str or "unknown" in raw_str.lower():
+    if not raw_str or "unknown" in raw_str.lower() or "tmrw" in raw_str.lower():
         return None
+    # Strip timestamp if present (e.g. '2025-09-01 23:59:36' or '2025-09-01T23:59:36')
+    date_part = raw_str.split(' ')[0].split('T')[0]
     for fmt in ("%Y-%m-%d", "%d-%m-%Y", "%d/%m/%Y", "%Y/%m/%d", "%d %b %Y", "%B %d, %Y"):
         try:
-            return datetime.strptime(raw_str, fmt).date()
+            return datetime.strptime(date_part, fmt).date()
         except ValueError:
             continue
     return None
@@ -298,6 +300,8 @@ def get_user_spending_analytics(user_id: int, db: Session = Depends(get_db)):
     rolling_all = 0.0
     rolling_month = 0.0
     this_month_count = 0
+    monthly_totals = defaultdict(float)
+    monthly_counts = defaultdict(int)
 
     for idx, r in enumerate(sorted_receipts):
         amt = r["total_amount"]
@@ -305,6 +309,11 @@ def get_user_spending_analytics(user_id: int, db: Session = Depends(get_db)):
         total_spend += amt
 
         d = r["date_obj"]
+        if d:
+            m_key = f"{d.year}-{d.month:02d}"
+            monthly_totals[m_key] += amt
+            monthly_counts[m_key] += 1
+
         is_this_month = False
         date_label = d.strftime("%d %b") if d else f"Trip {idx + 1}"
 
@@ -379,8 +388,20 @@ def get_user_spending_analytics(user_id: int, db: Session = Depends(get_db)):
     categories_all = format_categories(cat_totals_all, total_spend)
     categories_this_month = format_categories(cat_totals_month, this_month_spend) if this_month_spend > 0 else categories_all
 
-    daily_burn = round(this_month_spend / days_elapsed, 2)
-    projected = round(daily_burn * days_in_month, 2)
+    sorted_m_keys = sorted(monthly_totals.keys())
+    latest_m_key = sorted_m_keys[-1] if sorted_m_keys else None
+    latest_month_spend = round(monthly_totals[latest_m_key], 2) if latest_m_key else round(total_spend, 2)
+    latest_month_receipts = monthly_counts[latest_m_key] if latest_m_key else len(sorted_receipts)
+
+    if this_month_spend > 0:
+        effective_monthly_spend = this_month_spend
+        daily_burn = round(this_month_spend / days_elapsed, 2)
+        projected = round(daily_burn * days_in_month, 2)
+    else:
+        effective_monthly_spend = latest_month_spend
+        daily_burn = round(effective_monthly_spend / days_in_month, 2)
+        projected = effective_monthly_spend
+
     avg_basket = round(total_spend / max(1, len(sorted_receipts)), 2)
 
     top_cat = categories_all[0]["label"] if categories_all else "Grocery"
@@ -392,8 +413,11 @@ def get_user_spending_analytics(user_id: int, db: Session = Depends(get_db)):
         "has_data": True,
         "total_spend": round(total_spend, 2),
         "this_month_spend": round(this_month_spend, 2),
+        "latest_month_spend": latest_month_spend,
+        "effective_monthly_spend": effective_monthly_spend,
         "total_receipts": len(sorted_receipts),
         "this_month_receipts": this_month_count,
+        "latest_month_receipts": latest_month_receipts,
         "avg_basket": avg_basket,
         "daily_burn": daily_burn,
         "projected_month_end": projected,

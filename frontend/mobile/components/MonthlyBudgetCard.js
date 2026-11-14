@@ -29,12 +29,15 @@ function safeFmt(n) {
 function parseSafeDate(dateStr) {
   if (!dateStr || typeof dateStr !== 'string') return null;
   const trimmed = dateStr.trim();
-  if (trimmed.toLowerCase().includes('unknown')) return null;
+  if (trimmed.toLowerCase().includes('unknown') || trimmed.toLowerCase().includes('tmrw')) return null;
 
-  const d = new Date(trimmed);
+  // Strip timestamp portion if present (e.g. '2025-09-01 23:59:36')
+  const datePart = trimmed.split(' ')[0].split('T')[0];
+
+  const d = new Date(datePart);
   if (!isNaN(d.getTime())) return d;
 
-  const dmyMatch = trimmed.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+  const dmyMatch = datePart.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
   if (dmyMatch) {
     const day = parseInt(dmyMatch[1], 10);
     const month = parseInt(dmyMatch[2], 10) - 1;
@@ -150,14 +153,27 @@ export default function MonthlyBudgetCard({ userId: propUserId, onBudgetChange, 
 
     // From backend analytics
     if (spendingData && spendingData.has_data && spendingData.total_receipts > 0) {
-      const currentSpend = spendingData.this_month_spend ?? spendingData.total_spend ?? 0;
-      const trips = spendingData.this_month_receipts ?? spendingData.total_receipts ?? 0;
+      // If receipts exist in the current calendar month, use that month's spending.
+      // If current month has 0 receipts (e.g. historical data or fresh month), use effective_monthly_spend / total_spend.
+      const currentSpend = (spendingData.this_month_spend && spendingData.this_month_spend > 0)
+        ? spendingData.this_month_spend
+        : (spendingData.effective_monthly_spend || spendingData.latest_month_spend || spendingData.total_spend || 0);
+
+      const trips = (spendingData.this_month_receipts && spendingData.this_month_receipts > 0)
+        ? spendingData.this_month_receipts
+        : (spendingData.latest_month_receipts || spendingData.total_receipts || 0);
+
       const remaining = safeBudget - currentSpend;
       const rawPct = safeBudget > 0 ? (currentSpend / safeBudget) * 100 : 0;
       const clampedPct = Math.min(Math.max(rawPct, 0), 100);
 
-      const dailyBurn = spendingData.daily_burn ?? (trips > 0 ? Math.round(currentSpend / Math.max(1, trips * 4)) : 0);
-      const projected = Math.round(dailyBurn * daysInMonth);
+      const dailyBurn = (spendingData.daily_burn && spendingData.daily_burn > 0)
+        ? spendingData.daily_burn
+        : (trips > 0 ? Math.round(currentSpend / Math.max(daysInMonth, trips * 4)) : 0);
+
+      const projected = (spendingData.projected_month_end && spendingData.projected_month_end > 0)
+        ? spendingData.projected_month_end
+        : Math.round(dailyBurn * daysInMonth);
 
       let statColor = '#2E7D32';
       let statTxt = 'On Track';

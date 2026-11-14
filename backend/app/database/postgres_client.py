@@ -1,8 +1,12 @@
 import os
+from pathlib import Path
 from sqlalchemy import create_engine, Column, Integer, BigInteger, String, Boolean, Float, Numeric, Text, ForeignKey
 from sqlalchemy.orm import declarative_base, sessionmaker, relationship
 from dotenv import load_dotenv
 
+_backend_env = Path(__file__).resolve().parent.parent.parent / ".env"
+if _backend_env.exists():
+    load_dotenv(dotenv_path=_backend_env)
 load_dotenv()
 POSTGRES_URL = os.environ.get("POSTGRES_URL", "sqlite:///./pantrix.db")
 
