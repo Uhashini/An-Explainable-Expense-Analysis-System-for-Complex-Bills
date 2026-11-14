@@ -7,12 +7,12 @@ import { getToken, getRefreshToken, saveAuthData, clearUser } from './authStorag
 // Automatically picks the right URL based on environment:
 //   - Expo Web (browser)          → window.location.hostname
 //   - Android / iOS via Expo Go   → auto-detected Metro host IP
-//   - Physical device fallback    → machine's current LAN IP (192.168.116.124)
+//   - Physical device fallback    → machine's current LAN IP (192.168.29.190)
 //
 
 const debuggerHost = Constants?.expoConfig?.hostUri || Constants?.manifest2?.extra?.expoClient?.hostUri || Constants?.manifest?.debuggerHost;
 const detectedIp = debuggerHost ? debuggerHost.split(':')[0] : null;
-const HOST_IP = detectedIp || '192.168.116.124';
+const HOST_IP = detectedIp || '192.168.29.190';
 
 export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? Platform.select({
   web: typeof window !== 'undefined' && window.location?.hostname

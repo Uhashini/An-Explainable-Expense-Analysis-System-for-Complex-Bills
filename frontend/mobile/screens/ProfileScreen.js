@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import ScreenLayout from '../components/ScreenLayout';
-import { getUser, getGoogleAccount } from '../utils/authStorage';
+import { getUser, getGoogleAccount, clearUser } from '../utils/authStorage';
 import { COLORS, FONTS } from '../theme';
 import { useEffect, useState } from 'react';
 
@@ -112,7 +112,13 @@ export default function ProfileScreen({ navigation }) {
         <TouchableOpacity
           style={styles.signOutBtn}
           activeOpacity={0.8}
-          onPress={() => navigation.replace('Landing')}
+          onPress={async () => {
+            await clearUser();
+            navigation.reset({
+              index: 0,
+              routes: [{ name: 'Landing' }],
+            });
+          }}
         >
           <Text style={styles.signOutText}>Sign Out</Text>
         </TouchableOpacity>
