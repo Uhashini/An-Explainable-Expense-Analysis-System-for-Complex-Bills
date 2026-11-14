@@ -8,15 +8,27 @@
     "scheme": "pantrix",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/expo.icon",
+      "bundleIdentifier": "com.pantrix.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Pantrix uses your camera to scan and parse grocery receipts for expense and nutrition analysis.",
+        "NSPhotoLibraryUsageDescription": "Pantrix accesses your photo library so you can select and upload receipt images."
+      }
     },
     "android": {
+      "package": "com.pantrix.app",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#F4F2EF",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_IMAGES"
+      ],
       "predictiveBackGestureEnabled": false
     },
     "web": {

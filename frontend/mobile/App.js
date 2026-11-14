@@ -1,16 +1,18 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import 'react-native-gesture-handler';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Platform, ActivityIndicator } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ActivityIndicator } from 'react-native';
 import HomeIcon from './assets/icons/home.svg';
 import ReceiptIcon from './assets/icons/receipt.svg';
 import CameraIcon from './assets/icons/camera.svg';
 import ChatbotIcon from './assets/icons/chatbot.svg';
 import ProfileIcon from './assets/icons/profile.svg';
 import { useFonts, PlusJakartaSans_400Regular, PlusJakartaSans_600SemiBold, PlusJakartaSans_700Bold } from '@expo-google-fonts/plus-jakarta-sans';
+import { getUser } from './utils/authStorage';
 
 // ─── Auth Screens ────────────────────────────────────────────────────────────
 import LandingScreen from './screens/LandingScreen';
@@ -216,7 +218,31 @@ export default function App() {
     TheSeasons: require('./assets/the-seasons-regular.ttf'),
   });
 
-  if (!fontsLoaded) {
+  const [authChecked, setAuthChecked] = useState(false);
+  const [initialRoute, setInitialRoute] = useState('Landing');
+
+  useEffect(() => {
+    async function determineInitialRoute() {
+      try {
+        const storedUser = await getUser();
+        // If user is already authenticated and has a saved profile, boot directly to Main app
+        if (storedUser && (storedUser.id || storedUser.email)) {
+          setInitialRoute('Main');
+        } else {
+          setInitialRoute('Landing');
+        }
+      } catch (err) {
+        console.warn('Failed to load initial auth state on boot:', err);
+        setInitialRoute('Landing');
+      } finally {
+        setAuthChecked(true);
+      }
+    }
+
+    determineInitialRoute();
+  }, []);
+
+  if (!fontsLoaded || !authChecked) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.background }}>
         <ActivityIndicator size="large" color={COLORS.primary} />
@@ -225,75 +251,77 @@ export default function App() {
   }
 
   return (
-    <SafeAreaProvider>
-      <ErrorBoundary fallbackMessage="An error occurred while loading Pantrix. Tap below to reload.">
-        <NavigationContainer>
-          <Stack.Navigator
-          initialRouteName="Landing"
-          screenOptions={{
-            headerShown: false,
-            animation: 'fade',
-            contentStyle: { flex: 1 },
-          }}
-        >
-          {/* â”€â”€ Auth â”€â”€ */}
-          <Stack.Screen name="Landing" component={LandingScreen} />
-          <Stack.Screen name="SignIn" component={SignInScreen} />
-          <Stack.Screen name="SignUp" component={SignUpScreen} />
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <ErrorBoundary fallbackMessage="An error occurred while loading Pantrix. Tap below to reload.">
+          <NavigationContainer>
+            <Stack.Navigator
+              initialRouteName={initialRoute}
+              screenOptions={{
+                headerShown: false,
+                animation: 'fade',
+                contentStyle: { flex: 1 },
+              }}
+            >
+              {/* ── Auth ── */}
+              <Stack.Screen name="Landing" component={LandingScreen} />
+              <Stack.Screen name="SignIn" component={SignInScreen} />
+              <Stack.Screen name="SignUp" component={SignUpScreen} />
 
-          {/* â”€â”€ Onboarding â”€â”€ */}
-          <Stack.Screen name="PersonalInfo" component={PersonalInfoScreen} />
-          {/* Goals route redirects to OnboardingFlowScreen — the dead GoalsScreen prototype is no longer used */}
-          <Stack.Screen name="Goals" component={PersonalInfoScreen} />
-          <Stack.Screen name="EditGoals" component={EditGoalsScreen} />
-          <Stack.Screen name="PersonalInformation" component={PersonalInformationScreen} />
-          <Stack.Screen name="HealthProfile" component={HealthProfileScreen} />
-          <Stack.Screen name="ShoppingPreferences" component={ShoppingPreferencesScreen} />
-          <Stack.Screen name="Settings" component={SettingsScreen} />
+              {/* ── Onboarding ── */}
+              <Stack.Screen name="PersonalInfo" component={PersonalInfoScreen} />
+              {/* Goals route redirects to OnboardingFlowScreen — the dead GoalsScreen prototype is no longer used */}
+              <Stack.Screen name="Goals" component={PersonalInfoScreen} />
+              <Stack.Screen name="EditGoals" component={EditGoalsScreen} />
+              <Stack.Screen name="PersonalInformation" component={PersonalInformationScreen} />
+              <Stack.Screen name="HealthProfile" component={HealthProfileScreen} />
+              <Stack.Screen name="ShoppingPreferences" component={ShoppingPreferencesScreen} />
+              <Stack.Screen name="Settings" component={SettingsScreen} />
 
-          {/* ——— Main App (Tab Navigator) ——— */}
-          <Stack.Screen name="Main" component={MainTabs} />
+              {/* ——— Main App (Tab Navigator) ——— */}
+              <Stack.Screen name="Main" component={MainTabs} />
 
-          {/* ——— Detail screens pushed on top of tabs ——— */}
-          <Stack.Screen
-            name="ReceiptDetails"
-            component={ReceiptDetailsScreen}
-            options={{ animation: 'slide_from_right' }}
-          />
-          <Stack.Screen
-            name="AIInsights"
-            component={AIInsightsScreen}
-            options={{ animation: 'slide_from_right' }}
-          />
-          <Stack.Screen
-            name="FoodItemDetails"
-            component={FoodItemDetailsScreen}
-            options={{ animation: 'slide_from_right' }}
-          />
-          <Stack.Screen
-            name="GainMuscle"
-            component={GainMuscleScreen}
-            options={{ animation: 'slide_from_right' }}
-          />
-          <Stack.Screen
-            name="Insights"
-            component={SpendingAnalyticsScreen}
-            options={{ animation: 'slide_from_right' }}
-          />
-          <Stack.Screen
-            name="SpendingAnalytics"
-            component={SpendingAnalyticsScreen}
-            options={{ animation: 'slide_from_right' }}
-          />
-          <Stack.Screen
-            name="GemmaChat"
-            component={GemmaChatScreen}
-            options={{ animation: 'slide_from_right' }}
-          />
-        </Stack.Navigator>
-      </NavigationContainer>
-    </ErrorBoundary>
-  </SafeAreaProvider>
-);
+              {/* ——— Detail screens pushed on top of tabs ——— */}
+              <Stack.Screen
+                name="ReceiptDetails"
+                component={ReceiptDetailsScreen}
+                options={{ animation: 'slide_from_right' }}
+              />
+              <Stack.Screen
+                name="AIInsights"
+                component={AIInsightsScreen}
+                options={{ animation: 'slide_from_right' }}
+              />
+              <Stack.Screen
+                name="FoodItemDetails"
+                component={FoodItemDetailsScreen}
+                options={{ animation: 'slide_from_right' }}
+              />
+              <Stack.Screen
+                name="GainMuscle"
+                component={GainMuscleScreen}
+                options={{ animation: 'slide_from_right' }}
+              />
+              <Stack.Screen
+                name="Insights"
+                component={SpendingAnalyticsScreen}
+                options={{ animation: 'slide_from_right' }}
+              />
+              <Stack.Screen
+                name="SpendingAnalytics"
+                component={SpendingAnalyticsScreen}
+                options={{ animation: 'slide_from_right' }}
+              />
+              <Stack.Screen
+                name="GemmaChat"
+                component={GemmaChatScreen}
+                options={{ animation: 'slide_from_right' }}
+              />
+            </Stack.Navigator>
+          </NavigationContainer>
+        </ErrorBoundary>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
+  );
 }
 
