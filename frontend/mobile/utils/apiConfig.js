@@ -31,16 +31,22 @@ function resolveHostIp() {
 
 export const HOST_IP = resolveHostIp();
 
-export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? Platform.select({
-  web: typeof window !== 'undefined' && window.location?.hostname
-    ? (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-        ? 'http://127.0.0.1:8000/api/v1'
-        : `http://${window.location.hostname}:8000/api/v1`)
-    : 'http://127.0.0.1:8000/api/v1',
-  android: `http://${HOST_IP}:8000/api/v1`,
-  ios: `http://${HOST_IP}:8000/api/v1`,
-  default: `http://${HOST_IP}:8000/api/v1`,
-});
+export const PRODUCTION_API_URL = 'https://pantrix-backend-12aa.onrender.com/api/v1';
+
+export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? (
+  typeof __DEV__ !== 'undefined' && __DEV__
+    ? Platform.select({
+        web: typeof window !== 'undefined' && window.location?.hostname
+          ? (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+              ? 'http://127.0.0.1:8000/api/v1'
+              : `http://${window.location.hostname}:8000/api/v1`)
+          : 'http://127.0.0.1:8000/api/v1',
+        android: `http://${HOST_IP}:8000/api/v1`,
+        ios: `http://${HOST_IP}:8000/api/v1`,
+        default: `http://${HOST_IP}:8000/api/v1`,
+      })
+    : PRODUCTION_API_URL
+);
 
 /**
  * Fetch wrapper with configurable timeout (default 15s) to prevent requests
