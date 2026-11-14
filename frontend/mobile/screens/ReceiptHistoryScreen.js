@@ -4,6 +4,7 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import ScreenLayout from '../components/ScreenLayout';
+import ManualReceiptModal from '../components/ManualReceiptModal';
 import { COLORS, FONTS } from '../theme';
 import { API_BASE_URL } from '../utils/apiConfig';
 import { getUser } from '../utils/authStorage';
@@ -45,6 +46,7 @@ export default function ReceiptHistoryScreen({ navigation }) {
   const [search, setSearch] = useState('');
   const [receipts, setReceipts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showManualModal, setShowManualModal] = useState(false);
 
   useEffect(() => {
     const fetchReceipts = async () => {
@@ -119,7 +121,20 @@ export default function ReceiptHistoryScreen({ navigation }) {
   );
 
   return (
-    <ScreenLayout title="Receipt History">
+    <ScreenLayout
+      title="Receipt History"
+      rightAction={
+        <TouchableOpacity
+          style={styles.addReceiptBtn}
+          onPress={() => setShowManualModal(true)}
+          activeOpacity={0.7}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          accessibilityLabel="Add receipt manually"
+        >
+          <Feather name="plus" size={20} color={COLORS.primary} />
+        </TouchableOpacity>
+      }
+    >
       <View style={styles.container}>
         {/* Search Bar */}
         <View style={styles.searchRow}>
@@ -163,13 +178,30 @@ export default function ReceiptHistoryScreen({ navigation }) {
               </View>
               <Text style={styles.emptyTitle}>No receipts found.</Text>
               <Text style={styles.emptyText}>
-                Start scanning receipts to build your shopping history.
+                Start scanning receipts or tap below to add one manually.
               </Text>
+              <TouchableOpacity
+                style={styles.emptyAddBtn}
+                onPress={() => setShowManualModal(true)}
+                activeOpacity={0.8}
+              >
+                <Feather name="plus-circle" size={16} color="#fff" style={{ marginRight: 6 }} />
+                <Text style={styles.emptyAddBtnText}>Type Receipt Manually</Text>
+              </TouchableOpacity>
             </View>
           )}
           <View style={{ height: 24 }} />
         </ScrollView>
       </View>
+
+      {/* Manual Receipt Modal */}
+      <ManualReceiptModal
+        visible={showManualModal}
+        onClose={() => setShowManualModal(false)}
+        onReceiptAdded={(newReceipt) => {
+          setReceipts((prev) => [newReceipt, ...prev]);
+        }}
+      />
     </ScreenLayout>
   );
 }
@@ -335,5 +367,34 @@ const styles = StyleSheet.create({
     color: COLORS.mutedText,
     textAlign: 'center',
     lineHeight: 20,
+    marginBottom: 16,
+  },
+  emptyAddBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 20,
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  emptyAddBtnText: {
+    fontFamily: FONTS.bold,
+    fontSize: 13,
+    color: '#fff',
+  },
+
+  // Header Add Receipt Button
+  addReceiptBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: 'rgba(153, 8, 8, 0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
