@@ -213,7 +213,7 @@ export function computeLocalHealthIntelligence(rawItems = [], user = {}, onboard
             matched_trigger: match,
             confidence: 'Inferred from Food Name',
             severity: 'CRITICAL_TRIGGER',
-            message: `⚠️ Contains ${alkey.toUpperCase()} (${match}), which matches your declared allergy profile!`,
+            message: `Contains ${alkey.toUpperCase()} (${match}), which matches your declared allergy profile!`,
           });
         }
       }
@@ -228,7 +228,7 @@ export function computeLocalHealthIntelligence(rawItems = [], user = {}, onboard
           matched_trigger: nvMatch,
           confidence: 'Name Classification',
           severity: 'PREFERENCE_MISMATCH',
-          message: `🚫 Non-Vegetarian item ('${it.name}') detected, conflicting with your declared Vegetarian diet.`,
+          message: `Non-Vegetarian item ('${it.name}') detected, conflicting with your declared Vegetarian diet.`,
         });
       }
     }

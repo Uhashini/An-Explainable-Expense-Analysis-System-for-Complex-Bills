@@ -15,6 +15,7 @@ import { API_BASE_URL } from '../../utils/apiConfig';
 import { getUser } from '../../utils/authStorage';
 import { computeLocalHealthIntelligence } from './healthIntelligenceUtils';
 import styles from './eatHealthyStyles';
+import SpinachIcon from '../../assets/icons/spinach.svg';
 
 const SECTION_TABS = [
   { id: 'all', label: 'All Insights', icon: 'grid' },
@@ -162,20 +163,24 @@ export default function HealthIntelligenceSection({
           {/* User Context Chips */}
           <View style={localStyles.contextChipsRow}>
             <View style={localStyles.contextChip}>
-              <Text style={localStyles.contextChipLabel}>🎯 Goal:</Text>
+              <Feather name="target" size={11} color={COLORS.mutedText} style={{ marginRight: 4 }} />
+              <Text style={localStyles.contextChipLabel}>Goal:</Text>
               <Text style={localStyles.contextChipValue}>{userCtx.goals || 'Eat Healthy'}</Text>
             </View>
             <View style={localStyles.contextChip}>
-              <Text style={localStyles.contextChipLabel}>🥗 Diet:</Text>
+              <SpinachIcon width={12} height={12} style={{ marginRight: 4 }} />
+              <Text style={localStyles.contextChipLabel}>Diet:</Text>
               <Text style={localStyles.contextChipValue}>{userCtx.food_preference || 'Standard'}</Text>
             </View>
             <View style={localStyles.contextChip}>
-              <Text style={localStyles.contextChipLabel}>🛡️ Allergies:</Text>
+              <Feather name="shield" size={11} color={COLORS.mutedText} style={{ marginRight: 4 }} />
+              <Text style={localStyles.contextChipLabel}>Allergies:</Text>
               <Text style={localStyles.contextChipValue}>{userCtx.allergies || 'None'}</Text>
             </View>
             {userCtx.medical_conditions && userCtx.medical_conditions !== 'None declared' && (
               <View style={[localStyles.contextChip, { borderColor: '#FFCDD2', backgroundColor: '#FFEBEE' }]}>
-                <Text style={[localStyles.contextChipLabel, { color: '#C62828' }]}>❤️ Condition:</Text>
+                <Feather name="heart" size={11} color="#C62828" style={{ marginRight: 4 }} />
+                <Text style={[localStyles.contextChipLabel, { color: '#C62828' }]}>Condition:</Text>
                 <Text style={[localStyles.contextChipValue, { color: '#C62828' }]}>{userCtx.medical_conditions}</Text>
               </View>
             )}
@@ -228,20 +233,25 @@ export default function HealthIntelligenceSection({
             onPress={() => toggleSection('glycemic')}
             style={localStyles.sectionHeaderTouchable}
           >
-            <View style={localStyles.sectionTitleGroup}>
-              <View style={[localStyles.iconBadge, { backgroundColor: '#FFEBEE' }]}>
-                <Text style={localStyles.iconBadgeText}>🩸</Text>
+            <View style={localStyles.headerMetaRow}>
+              <View style={localStyles.headerTagPill}>
+                <Feather name="activity" size={12} color={glycemic.status_color || '#C2185B'} style={{ marginRight: 5 }} />
+                <Text style={[localStyles.headerTagText, { color: glycemic.status_color || '#C2185B' }]}>
+                  GLYCEMIC STABILITY
+                </Text>
               </View>
-              <View>
-                <Text style={styles.cardHeaderTitle}>Glycemic Impact & Glucose Stability</Text>
-                <Text style={localStyles.sectionSub}>Carbohydrate quality & postprandial glucose spike analysis</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <View style={[localStyles.statusBadge, { backgroundColor: (glycemic.status_color || '#2E7D32') + '15', borderColor: glycemic.status_color || '#2E7D32' }]}>
+                  <Text style={[localStyles.statusBadgeText, { color: glycemic.status_color || '#2E7D32' }]}>
+                    {glycemic.status_badge || 'Low Impact'}
+                  </Text>
+                </View>
+                <Feather name={expandedSections.glycemic ? 'chevron-up' : 'chevron-down'} size={16} color="#7A7265" />
               </View>
             </View>
-            <View style={[localStyles.statusBadge, { backgroundColor: glycemic.status_color + '15', borderColor: glycemic.status_color }]}>
-              <Text style={[localStyles.statusBadgeText, { color: glycemic.status_color }]}>
-                {glycemic.status_badge || 'Low Impact'}
-              </Text>
-            </View>
+
+            <Text style={localStyles.sectionMainTitle}>Glycemic Impact & Glucose Stability</Text>
+            <Text style={localStyles.sectionSub}>Carbohydrate quality & postprandial glucose spike analysis</Text>
           </TouchableOpacity>
 
           {expandedSections.glycemic && (
@@ -308,7 +318,10 @@ export default function HealthIntelligenceSection({
               {/* Actionable Alternatives */}
               {glycemic.alternatives && glycemic.alternatives.length > 0 && (
                 <View style={localStyles.alternativesBox}>
-                  <Text style={localStyles.alternativesHeading}>💡 Healthier Glycemic Swaps:</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                    <Feather name="refresh-cw" size={12} color="#1565C0" style={{ marginRight: 5 }} />
+                    <Text style={[localStyles.alternativesHeading, { marginBottom: 0 }]}>Healthier Glycemic Swaps:</Text>
+                  </View>
                   {glycemic.alternatives.map((alt, idx) => (
                     <Text key={idx} style={localStyles.alternativeBullet}>
                       • {alt}
@@ -329,20 +342,25 @@ export default function HealthIntelligenceSection({
             onPress={() => toggleSection('sodium')}
             style={localStyles.sectionHeaderTouchable}
           >
-            <View style={localStyles.sectionTitleGroup}>
-              <View style={[localStyles.iconBadge, { backgroundColor: '#FFEBEE' }]}>
-                <Text style={localStyles.iconBadgeText}>❤️</Text>
+            <View style={localStyles.headerMetaRow}>
+              <View style={localStyles.headerTagPill}>
+                <Feather name="heart" size={12} color={sodium.status_color || '#D32F2F'} style={{ marginRight: 5 }} />
+                <Text style={[localStyles.headerTagText, { color: sodium.status_color || '#D32F2F' }]}>
+                  CARDIOVASCULAR HEALTH
+                </Text>
               </View>
-              <View>
-                <Text style={styles.cardHeaderTitle}>Sodium & Cardiovascular Risk Flag</Text>
-                <Text style={localStyles.sectionSub}>Estimated sodium intake against AHA / WHO reference values</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <View style={[localStyles.statusBadge, { backgroundColor: (sodium.status_color || '#2E7D32') + '15', borderColor: sodium.status_color || '#2E7D32' }]}>
+                  <Text style={[localStyles.statusBadgeText, { color: sodium.status_color || '#2E7D32' }]}>
+                    {sodium.status_badge || 'Optimal'}
+                  </Text>
+                </View>
+                <Feather name={expandedSections.sodium ? 'chevron-up' : 'chevron-down'} size={16} color="#7A7265" />
               </View>
             </View>
-            <View style={[localStyles.statusBadge, { backgroundColor: sodium.status_color + '15', borderColor: sodium.status_color }]}>
-              <Text style={[localStyles.statusBadgeText, { color: sodium.status_color }]}>
-                {sodium.status_badge || 'Optimal'}
-              </Text>
-            </View>
+
+            <Text style={localStyles.sectionMainTitle}>Sodium & Cardiovascular Risk Flag</Text>
+            <Text style={localStyles.sectionSub}>Estimated sodium intake against AHA / WHO reference values</Text>
           </TouchableOpacity>
 
           {expandedSections.sodium && (
@@ -350,12 +368,17 @@ export default function HealthIntelligenceSection({
               {/* Sodium Progress Bar */}
               <View style={localStyles.sodiumProgressContainer}>
                 <View style={localStyles.sodiumProgressHeader}>
-                  <Text style={localStyles.sodiumCurrentText}>
-                    {sodium.total_sodium_mg ?? 0} mg <Text style={localStyles.sodiumSubText}>estimated sodium</Text>
-                  </Text>
-                  <Text style={localStyles.sodiumLimitText}>
-                    Limit: {sodium.daily_limit_mg ?? 2000} mg/day
-                  </Text>
+                  <View>
+                    <Text style={localStyles.sodiumCurrentText}>
+                      {sodium.total_sodium_mg ?? 0} <Text style={localStyles.sodiumUnitText}>mg</Text>
+                    </Text>
+                    <Text style={localStyles.sodiumSubText}>estimated sodium in receipt</Text>
+                  </View>
+                  <View style={localStyles.sodiumLimitBadge}>
+                    <Text style={localStyles.sodiumLimitText}>
+                      Limit: {sodium.daily_limit_mg ?? 2000} mg/day
+                    </Text>
+                  </View>
                 </View>
 
                 {/* Progress bar line */}
@@ -372,32 +395,57 @@ export default function HealthIntelligenceSection({
                 </View>
                 <View style={localStyles.progressLegend}>
                   <Text style={localStyles.legendText}>{sodium.sodium_percentage || 0}% of daily reference ceiling</Text>
-                  <Text style={localStyles.legendText}>{sodium.overall_level} Tier</Text>
+                  <Text style={[localStyles.legendTierText, { color: sodium.status_color || '#D32F2F' }]}>
+                    {sodium.overall_level} Tier
+                  </Text>
                 </View>
               </View>
 
-              {/* Clinical Explanation */}
-              <View style={localStyles.explanationBox}>
-                <Feather name="heart" size={14} color="#C2185B" style={{ marginRight: 8, marginTop: 2 }} />
-                <Text style={localStyles.explanationText}>{sodium.summary}</Text>
-              </View>
+              {/* Clinical Explanation & Personalized Alert */}
+              {(() => {
+                const parts = (sodium.summary || '').split('[Personalized Alert]');
+                const mainTxt = parts[0].trim();
+                const alertTxt = parts.length > 1 ? parts[1].trim() : null;
+                return (
+                  <View style={localStyles.explanationCard}>
+                    <View style={localStyles.explanationHeaderRow}>
+                      <Feather name="heart" size={14} color="#C2185B" style={{ marginRight: 8, marginTop: 2 }} />
+                      <Text style={localStyles.explanationText}>{mainTxt}</Text>
+                    </View>
+                    {alertTxt && (
+                      <View style={localStyles.personalizedAlertRow}>
+                        <View style={localStyles.personalizedAlertBadge}>
+                          <Feather name="user-check" size={11} color="#990808" style={{ marginRight: 4 }} />
+                          <Text style={localStyles.personalizedAlertBadgeText}>PERSONALIZED PROFILE ALERT</Text>
+                        </View>
+                        <Text style={localStyles.personalizedAlertText}>{alertTxt}</Text>
+                      </View>
+                    )}
+                  </View>
+                );
+              })()}
 
               {/* High Sodium Items List */}
               {sodium.high_sodium_items && sodium.high_sodium_items.length > 0 ? (
                 <View style={localStyles.itemsCalloutContainer}>
-                  <Text style={localStyles.calloutTitle}>Items with Elevated Sodium (&gt; 400 mg):</Text>
+                  <View style={localStyles.calloutHeaderRow}>
+                    <Feather name="alert-triangle" size={13} color="#D32F2F" style={{ marginRight: 6 }} />
+                    <Text style={localStyles.calloutTitle}>Items with Elevated Sodium (&gt; 400 mg):</Text>
+                  </View>
                   {sodium.high_sodium_items.map((it, idx) => (
-                    <View key={idx} style={localStyles.itemCalloutRow}>
-                      <Feather name="alert-triangle" size={13} color="#FB8C00" style={{ marginRight: 6 }} />
+                    <View key={idx} style={[localStyles.itemCalloutRow, idx > 0 && localStyles.itemDivider]}>
                       <Text style={localStyles.itemCalloutName}>{it.name}</Text>
-                      <Text style={localStyles.itemCalloutDetail}>{it.sodium_mg} mg ({it.pct_daily_limit}% limit)</Text>
+                      <View style={localStyles.itemPillBadge}>
+                        <Text style={localStyles.itemCalloutDetail}>{it.sodium_mg} mg ({it.pct_daily_limit}% limit)</Text>
+                      </View>
                     </View>
                   ))}
                 </View>
               ) : (
-                <View style={[localStyles.itemsCalloutContainer, { backgroundColor: '#E8F5E9', borderColor: '#C8E6C9' }]}>
-                  <Text style={[localStyles.calloutTitle, { color: '#2E7D32' }]}>
-                    ✓ No individual items exceed 400 mg sodium threshold.
+                <View style={[localStyles.itemsCalloutContainer, localStyles.itemsCalloutSafe, { flexDirection: 'row', alignItems: 'center' }]}>
+                  <Feather name="check-circle" size={13} color="#2E7D32" style={{ marginRight: 6 }} />
+                  <Text style={[localStyles.calloutTitle, { color: '#2E7D32', marginBottom: 0 }]}>
+                    No individual items exceed the 400 mg sodium threshold.
                   </Text>
                 </View>
               )}
@@ -405,11 +453,15 @@ export default function HealthIntelligenceSection({
               {/* Cardiovascular Guidance */}
               {sodium.alternatives && sodium.alternatives.length > 0 && (
                 <View style={localStyles.alternativesBox}>
-                  <Text style={localStyles.alternativesHeading}>🌿 Heart-Healthy Seasoning Guidance:</Text>
+                  <View style={localStyles.alternativesHeaderRow}>
+                    <Feather name="shield" size={13} color="#1B5E20" style={{ marginRight: 6 }} />
+                    <Text style={localStyles.alternativesHeading}>Heart-Healthy Seasoning Guidance</Text>
+                  </View>
                   {sodium.alternatives.map((alt, idx) => (
-                    <Text key={idx} style={localStyles.alternativeBullet}>
-                      • {alt}
-                    </Text>
+                    <View key={idx} style={localStyles.alternativeBulletRow}>
+                      <Text style={localStyles.alternativeBulletDot}>•</Text>
+                      <Text style={localStyles.alternativeBulletText}>{alt}</Text>
+                    </View>
                   ))}
                 </View>
               )}
@@ -426,20 +478,25 @@ export default function HealthIntelligenceSection({
             onPress={() => toggleSection('allergen')}
             style={localStyles.sectionHeaderTouchable}
           >
-            <View style={localStyles.sectionTitleGroup}>
-              <View style={[localStyles.iconBadge, { backgroundColor: '#E3F2FD' }]}>
-                <Text style={localStyles.iconBadgeText}>🛡️</Text>
+            <View style={localStyles.headerMetaRow}>
+              <View style={localStyles.headerTagPill}>
+                <Feather name="shield" size={12} color={allergen.status_color || '#1976D2'} style={{ marginRight: 5 }} />
+                <Text style={[localStyles.headerTagText, { color: allergen.status_color || '#1976D2' }]}>
+                  ALLERGEN SCREENING
+                </Text>
               </View>
-              <View>
-                <Text style={styles.cardHeaderTitle}>Allergen & Dietary Restrictions Check</Text>
-                <Text style={localStyles.sectionSub}>Screened against declared allergies & vegetarian/vegan lifestyle</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <View style={[localStyles.statusBadge, { backgroundColor: (allergen.status_color || '#2E7D32') + '15', borderColor: allergen.status_color || '#2E7D32' }]}>
+                  <Text style={[localStyles.statusBadgeText, { color: allergen.status_color || '#2E7D32' }]}>
+                    {allergen.status_badge || 'Allergens Clean'}
+                  </Text>
+                </View>
+                <Feather name={expandedSections.allergen ? 'chevron-up' : 'chevron-down'} size={16} color="#7A7265" />
               </View>
             </View>
-            <View style={[localStyles.statusBadge, { backgroundColor: allergen.status_color + '15', borderColor: allergen.status_color }]}>
-              <Text style={[localStyles.statusBadgeText, { color: allergen.status_color }]}>
-                {allergen.status_badge || 'Allergens Clean'}
-              </Text>
-            </View>
+
+            <Text style={localStyles.sectionMainTitle}>Allergen & Dietary Restrictions Check</Text>
+            <Text style={localStyles.sectionSub}>Screened against declared allergies & vegetarian/vegan lifestyle</Text>
           </TouchableOpacity>
 
           {expandedSections.allergen && (
@@ -541,20 +598,25 @@ export default function HealthIntelligenceSection({
             onPress={() => toggleSection('balance')}
             style={localStyles.sectionHeaderTouchable}
           >
-            <View style={localStyles.sectionTitleGroup}>
-              <View style={[localStyles.iconBadge, { backgroundColor: '#EDE7F6' }]}>
-                <Text style={localStyles.iconBadgeText}>🥗</Text>
+            <View style={localStyles.headerMetaRow}>
+              <View style={localStyles.headerTagPill}>
+                <Feather name="pie-chart" size={12} color="#7B1FA2" style={{ marginRight: 5 }} />
+                <Text style={[localStyles.headerTagText, { color: '#7B1FA2' }]}>
+                  NUTRITIONAL BALANCE
+                </Text>
               </View>
-              <View>
-                <Text style={styles.cardHeaderTitle}>Nutritional Balance & Macro Gaps</Text>
-                <Text style={localStyles.sectionSub}>Macronutrient ratio distribution, strengths, and dietary balance</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <View style={[styles.gradePill, { backgroundColor: '#E8F5E9' }]}>
+                  <Text style={[styles.gradePillText, { color: '#2E7D32' }]}>
+                    Score {balance.balance_score || 85}/100
+                  </Text>
+                </View>
+                <Feather name={expandedSections.balance ? 'chevron-up' : 'chevron-down'} size={16} color="#7A7265" />
               </View>
             </View>
-            <View style={[styles.gradePill, { backgroundColor: '#E8F5E9' }]}>
-              <Text style={[styles.gradePillText, { color: '#2E7D32' }]}>
-                Score {balance.balance_score || 85}/100
-              </Text>
-            </View>
+
+            <Text style={localStyles.sectionMainTitle}>Nutritional Balance & Macro Gaps</Text>
+            <Text style={localStyles.sectionSub}>Macronutrient ratio distribution, strengths, and dietary balance</Text>
           </TouchableOpacity>
 
           {expandedSections.balance && (
@@ -619,7 +681,10 @@ export default function HealthIntelligenceSection({
               <View style={localStyles.strengthsGapsRow}>
                 {/* Strengths */}
                 <View style={localStyles.strengthsCol}>
-                  <Text style={localStyles.colHeadingText}>✓ Nutritional Strengths:</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                    <Feather name="check-circle" size={12} color="#2E7D32" style={{ marginRight: 5 }} />
+                    <Text style={[localStyles.colHeadingText, { marginBottom: 0 }]}>Nutritional Strengths:</Text>
+                  </View>
                   {balance.strengths?.map((s, idx) => (
                     <Text key={idx} style={localStyles.strengthItemText}>• {s}</Text>
                   ))}
@@ -627,7 +692,10 @@ export default function HealthIntelligenceSection({
 
                 {/* Gaps */}
                 <View style={localStyles.gapsCol}>
-                  <Text style={localStyles.colHeadingText}>⚠️ Nutritional Gaps:</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                    <Feather name="alert-triangle" size={12} color="#E65100" style={{ marginRight: 5 }} />
+                    <Text style={[localStyles.colHeadingText, { marginBottom: 0 }]}>Nutritional Gaps:</Text>
+                  </View>
                   {balance.gaps?.map((g, idx) => (
                     <Text key={idx} style={localStyles.gapItemText}>• {g}</Text>
                   ))}
@@ -661,20 +729,25 @@ export default function HealthIntelligenceSection({
             onPress={() => toggleSection('recs')}
             style={localStyles.sectionHeaderTouchable}
           >
-            <View style={localStyles.sectionTitleGroup}>
-              <View style={[localStyles.iconBadge, { backgroundColor: '#FFF8E1' }]}>
-                <Text style={localStyles.iconBadgeText}>💡</Text>
+            <View style={localStyles.headerMetaRow}>
+              <View style={localStyles.headerTagPill}>
+                <Feather name="award" size={12} color="#E65100" style={{ marginRight: 5 }} />
+                <Text style={[localStyles.headerTagText, { color: '#E65100' }]}>
+                  SMART RECOMMENDATIONS
+                </Text>
               </View>
-              <View>
-                <Text style={styles.cardHeaderTitle}>Personalized Health Recommendations</Text>
-                <Text style={localStyles.sectionSub}>Customized action items for {userCtx.goals || 'your goals'}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <View style={[styles.gradePill, { backgroundColor: '#FFF3E0' }]}>
+                  <Text style={[styles.gradePillText, { color: '#E65100' }]}>
+                    {recs.length} Action Items
+                  </Text>
+                </View>
+                <Feather name={expandedSections.recs ? 'chevron-up' : 'chevron-down'} size={16} color="#7A7265" />
               </View>
             </View>
-            <View style={[styles.gradePill, { backgroundColor: '#FFF3E0' }]}>
-              <Text style={[styles.gradePillText, { color: '#E65100' }]}>
-                {recs.length} Action Items
-              </Text>
-            </View>
+
+            <Text style={localStyles.sectionMainTitle}>Personalized Health Recommendations</Text>
+            <Text style={localStyles.sectionSub}>Customized action items for {userCtx.goals || 'your goals'}</Text>
           </TouchableOpacity>
 
           {expandedSections.recs && (
@@ -810,35 +883,32 @@ const localStyles = StyleSheet.create({
     color: COLORS.mutedText,
   },
   sectionHeaderTouchable: {
+    paddingBottom: 2,
+  },
+  headerMetaRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 8,
   },
-  sectionTitleGroup: {
+  headerTagPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    flex: 1,
+    backgroundColor: '#FAF7F2',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#EFEAE1',
   },
-  iconBadge: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 10,
-  },
-  iconBadgeText: {
-    fontSize: 18,
-  },
-  sectionSub: {
-    fontFamily: FONTS.regular,
-    fontSize: 11,
-    color: COLORS.mutedText,
-    marginTop: 1,
+  headerTagText: {
+    fontFamily: FONTS.bold,
+    fontSize: 10,
+    letterSpacing: 0.6,
   },
   statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingHorizontal: 9,
+    paddingVertical: 3.5,
     borderRadius: 10,
     borderWidth: 1,
   },
@@ -846,8 +916,21 @@ const localStyles = StyleSheet.create({
     fontFamily: FONTS.bold,
     fontSize: 10,
   },
+  sectionMainTitle: {
+    fontFamily: FONTS.bold,
+    fontSize: 17,
+    color: '#1A1816',
+    lineHeight: 22,
+    marginBottom: 4,
+  },
+  sectionSub: {
+    fontFamily: FONTS.regular,
+    fontSize: 12,
+    color: '#7A7265',
+    lineHeight: 16,
+  },
   sectionBody: {
-    marginTop: 16,
+    marginTop: 14,
     borderTopWidth: 1,
     borderTopColor: '#F0EBE6',
     paddingTop: 14,
@@ -884,102 +967,188 @@ const localStyles = StyleSheet.create({
     color: '#8D6E63',
     marginTop: 1,
   },
-  explanationBox: {
+  explanationCard: {
+    backgroundColor: '#FAF8F5',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#ECE7E1',
+  },
+  explanationHeaderRow: {
     flexDirection: 'row',
-    backgroundColor: '#FFF8F0',
-    borderRadius: 10,
-    padding: 10,
-    marginBottom: 10,
-    borderLeftWidth: 4,
-    borderLeftColor: '#FB8C00',
+    alignItems: 'flex-start',
   },
   explanationText: {
     fontFamily: FONTS.regular,
-    fontSize: 12,
+    fontSize: 12.5,
     color: '#3E2723',
-    lineHeight: 17,
+    lineHeight: 18,
     flex: 1,
   },
+  personalizedAlertRow: {
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#ECE7E1',
+  },
+  personalizedAlertBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(153, 8, 8, 0.08)',
+    paddingHorizontal: 7,
+    paddingVertical: 2.5,
+    borderRadius: 6,
+    alignSelf: 'flex-start',
+    marginBottom: 5,
+  },
+  personalizedAlertBadgeText: {
+    fontFamily: FONTS.bold,
+    fontSize: 9.5,
+    color: '#990808',
+    letterSpacing: 0.5,
+  },
+  personalizedAlertText: {
+    fontFamily: FONTS.semiBold,
+    fontSize: 12,
+    color: '#5A1B1B',
+    lineHeight: 17,
+  },
   itemsCalloutContainer: {
-    backgroundColor: '#FFEBEE',
-    borderRadius: 10,
-    padding: 10,
-    marginBottom: 10,
+    backgroundColor: '#FDF8F7',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#FFCDD2',
+    borderColor: '#F2DCDA',
+  },
+  itemsCalloutSafe: {
+    backgroundColor: '#F6FAF6',
+    borderColor: '#D7E7D8',
+  },
+  calloutHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
   },
   calloutTitle: {
     fontFamily: FONTS.bold,
-    fontSize: 11,
-    color: '#C62828',
-    marginBottom: 6,
+    fontSize: 12,
+    color: '#990808',
   },
   itemCalloutRow: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 3,
+    paddingVertical: 6,
+  },
+  itemDivider: {
+    borderTopWidth: 1,
+    borderTopColor: '#F2E8E6',
   },
   itemCalloutName: {
     fontFamily: FONTS.semiBold,
-    fontSize: 11,
-    color: '#37474F',
+    fontSize: 12.5,
+    color: '#2A1E17',
     flex: 1,
   },
+  itemPillBadge: {
+    backgroundColor: '#F7E7E5',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
   itemCalloutDetail: {
-    fontFamily: FONTS.regular,
-    fontSize: 10,
-    color: '#78909C',
+    fontFamily: FONTS.bold,
+    fontSize: 11,
+    color: '#990808',
   },
   alternativesBox: {
-    backgroundColor: '#F1F8E9',
-    borderRadius: 10,
-    padding: 10,
+    backgroundColor: '#F9FAF7',
+    borderRadius: 12,
+    padding: 12,
     borderWidth: 1,
-    borderColor: '#DCEDC8',
+    borderColor: '#E2EBE2',
+  },
+  alternativesHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
   },
   alternativesHeading: {
     fontFamily: FONTS.bold,
-    fontSize: 11,
-    color: '#33691E',
-    marginBottom: 4,
+    fontSize: 12,
+    color: '#1B5E20',
   },
-  alternativeBullet: {
-    fontFamily: FONTS.regular,
-    fontSize: 11,
+  alternativeBulletRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 5,
+  },
+  alternativeBulletDot: {
+    fontSize: 13,
+    lineHeight: 17,
     color: '#2E7D32',
-    lineHeight: 16,
-    marginBottom: 3,
+    marginRight: 6,
+    fontWeight: 'bold',
+  },
+  alternativeBulletText: {
+    fontFamily: FONTS.regular,
+    fontSize: 12,
+    color: '#2A3B2A',
+    lineHeight: 17,
+    flex: 1,
   },
   sodiumProgressContainer: {
-    marginBottom: 14,
+    backgroundColor: '#FAF8F5',
+    borderRadius: 14,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#ECE7E1',
+    marginBottom: 12,
   },
   sodiumProgressHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'baseline',
-    marginBottom: 6,
+    alignItems: 'flex-start',
+    marginBottom: 10,
   },
   sodiumCurrentText: {
     fontFamily: FONTS.bold,
-    fontSize: 16,
-    color: COLORS.primary,
+    fontSize: 22,
+    color: '#1A1816',
+    lineHeight: 26,
+  },
+  sodiumUnitText: {
+    fontFamily: FONTS.semiBold,
+    fontSize: 14,
+    color: '#7A7265',
   },
   sodiumSubText: {
     fontFamily: FONTS.regular,
     fontSize: 11,
-    color: COLORS.mutedText,
+    color: '#7A7265',
+    marginTop: 1,
+  },
+  sodiumLimitBadge: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2D9C8',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
   },
   sodiumLimitText: {
-    fontFamily: FONTS.semiBold,
+    fontFamily: FONTS.bold,
     fontSize: 11,
-    color: COLORS.mutedText,
+    color: '#554D40',
   },
   progressBarTrack: {
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#ECE7E1',
+    backgroundColor: '#E5DFD7',
     overflow: 'hidden',
-    marginBottom: 4,
+    marginBottom: 6,
   },
   progressBarFill: {
     height: '100%',
@@ -988,11 +1157,16 @@ const localStyles = StyleSheet.create({
   progressLegend: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
   },
   legendText: {
     fontFamily: FONTS.regular,
-    fontSize: 10,
-    color: COLORS.mutedText,
+    fontSize: 11,
+    color: '#7A7265',
+  },
+  legendTierText: {
+    fontFamily: FONTS.bold,
+    fontSize: 11,
   },
   allergenProfileRow: {
     flexDirection: 'row',

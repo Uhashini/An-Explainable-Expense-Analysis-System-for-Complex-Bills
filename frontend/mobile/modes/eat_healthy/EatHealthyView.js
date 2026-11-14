@@ -34,7 +34,6 @@ export default function EatHealthyView({
       <StoryQuestionBanner
         question="Was this a good grocery haul overall?"
         category="Basket Health & Quality"
-        categoryIcon="🥗"
         themeColor="#2E7D32"
       />
       <BasicNutritionSection
@@ -51,7 +50,6 @@ export default function EatHealthyView({
       <StoryQuestionBanner
         question="Did I get enough protein, fiber, and balanced fuel?"
         category="Macro Fuel & Energy"
-        categoryIcon="🥗"
         themeColor="#2E7D32"
       />
       <BasicNutritionSection
@@ -68,7 +66,6 @@ export default function EatHealthyView({
       <StoryQuestionBanner
         question="How does this haul compare to my previous grocery trips?"
         category="Items & History Trend"
-        categoryIcon="🥗"
         themeColor="#2E7D32"
       />
       <BasicNutritionSection
@@ -85,7 +82,6 @@ export default function EatHealthyView({
       <StoryQuestionBanner
         question="Will these foods spike my blood sugar or cause energy crashes?"
         category="Glycemic Impact & Glucose Stability"
-        categoryIcon="🧬"
         themeColor="#C2185B"
       />
       <HealthIntelligenceSection
@@ -103,7 +99,6 @@ export default function EatHealthyView({
       <StoryQuestionBanner
         question="Is the sodium level safe for my heart health?"
         category="Sodium & Cardiovascular Health"
-        categoryIcon="🧬"
         themeColor="#D32F2F"
       />
       <HealthIntelligenceSection
@@ -121,7 +116,6 @@ export default function EatHealthyView({
       <StoryQuestionBanner
         question="Are there any ingredients that trigger my allergies or violate my diet?"
         category="Allergen & Dietary Restrictions"
-        categoryIcon="🧬"
         themeColor="#1976D2"
       />
       <HealthIntelligenceSection
@@ -139,7 +133,6 @@ export default function EatHealthyView({
       <StoryQuestionBanner
         question="What vital food groups or nutrients is my pantry missing?"
         category="Nutritional Balance & Gaps"
-        categoryIcon="🧬"
         themeColor="#7B1FA2"
       />
       <HealthIntelligenceSection
@@ -157,7 +150,6 @@ export default function EatHealthyView({
       <StoryQuestionBanner
         question="What smart food swaps should I make on my next trip?"
         category="Personalized AI Recommendations"
-        categoryIcon="🧬"
         themeColor="#E65100"
       />
       <HealthIntelligenceSection
@@ -209,13 +201,19 @@ export default function EatHealthyView({
             onPress={() => deckRef.current?.goToCard(0)}
             activeOpacity={0.8}
           >
+            <Feather
+              name="activity"
+              size={13}
+              color={activeDeckIndex < 3 ? '#2E7D32' : '#7A7265'}
+              style={{ marginRight: 6 }}
+            />
             <Text
               style={[
                 viewStyles.chapterBtnText,
                 activeDeckIndex < 3 && viewStyles.chapterBtnBasicTextActive,
               ]}
             >
-              🥗 Basic Nutrition (1–3)
+              Basic Nutrition (1–3)
             </Text>
           </TouchableOpacity>
 
@@ -227,13 +225,19 @@ export default function EatHealthyView({
             onPress={() => deckRef.current?.goToCard(3)}
             activeOpacity={0.8}
           >
+            <Feather
+              name="shield"
+              size={13}
+              color={activeDeckIndex >= 3 ? '#990808' : '#7A7265'}
+              style={{ marginRight: 6 }}
+            />
             <Text
               style={[
                 viewStyles.chapterBtnText,
                 activeDeckIndex >= 3 && viewStyles.chapterBtnIntelTextActive,
               ]}
             >
-              🧬 Health Intelligence (4–8)
+              Health Intelligence (4–8)
             </Text>
           </TouchableOpacity>
         </View>
@@ -339,6 +343,8 @@ const viewStyles = StyleSheet.create({
     paddingHorizontal: 8,
   },
   chapterBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingVertical: 7,
     paddingHorizontal: 14,
     borderRadius: 20,

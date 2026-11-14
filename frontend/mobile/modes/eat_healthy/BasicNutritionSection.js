@@ -5,6 +5,12 @@ import { Feather } from '@expo/vector-icons';
 import { COLORS, FONTS } from '../../theme';
 import { getDefaultNutritionData } from './nutritionUtils';
 import styles from './eatHealthyStyles';
+import LightningIcon from '../../assets/icons/lightning.svg';
+import MeatIcon from '../../assets/icons/meat.svg';
+import BreadIcon from '../../assets/icons/bread.svg';
+import AvocadoIcon from '../../assets/icons/avacado.svg';
+import SpinachIcon from '../../assets/icons/spinach.svg';
+import ToffeeIcon from '../../assets/icons/toffee.svg';
 
 export default function BasicNutritionSection({
   data: propData,
@@ -134,11 +140,14 @@ export default function BasicNutritionSection({
 
             {/* ── Key AI Nutrition Insights Highlights ── */}
             <View style={styles.card}>
-              <Text style={styles.cardHeaderTitle}>💡 Key AI Nutrition Insights</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 14 }}>
+                <Feather name="zap" size={17} color={COLORS.primary} style={{ marginRight: 8 }} />
+                <Text style={[styles.cardHeaderTitle, { marginBottom: 0 }]}>Key AI Nutrition Insights</Text>
+              </View>
 
               <View style={[styles.insightHighlightBox, { backgroundColor: '#FFF3E0', borderColor: '#FFE0B2' }]}>
                 <View style={[styles.insightIconCircle, { backgroundColor: '#FFE0B2' }]}>
-                  <Text style={styles.insightHighlightIcon}>📈</Text>
+                  <Feather name="trending-up" size={18} color="#E65100" />
                 </View>
                 <View style={styles.insightHighlightText}>
                   <Text style={[styles.insightHighlightTitle, { color: '#E65100' }]}>
@@ -152,7 +161,7 @@ export default function BasicNutritionSection({
 
               <View style={[styles.insightHighlightBox, { backgroundColor: '#E8F5E9', borderColor: '#C8E6C9' }]}>
                 <View style={[styles.insightIconCircle, { backgroundColor: '#C8E6C9' }]}>
-                  <Text style={styles.insightHighlightIcon}>📉</Text>
+                  <Feather name="shield" size={18} color="#2E7D32" />
                 </View>
                 <View style={styles.insightHighlightText}>
                   <Text style={[styles.insightHighlightTitle, { color: '#2E7D32' }]}>
@@ -177,7 +186,7 @@ export default function BasicNutritionSection({
               <View style={[styles.metricCard, { borderTopColor: '#F57C00' }]}>
                 <View style={styles.metricCardTop}>
                   <View style={[styles.metricIconBg, { backgroundColor: '#FFF3E0' }]}>
-                    <Text style={styles.metricIcon}>⚡</Text>
+                    <LightningIcon width={22} height={22} />
                   </View>
                   <Text style={styles.rdiBadge}>{Math.round((data.calories / 2000) * 100)}% RDI</Text>
                 </View>
@@ -192,7 +201,7 @@ export default function BasicNutritionSection({
               <View style={[styles.metricCard, { borderTopColor: '#D32F2F' }]}>
                 <View style={styles.metricCardTop}>
                   <View style={[styles.metricIconBg, { backgroundColor: '#FFEBEE' }]}>
-                    <Text style={styles.metricIcon}>🥩</Text>
+                    <MeatIcon width={24} height={24} />
                   </View>
                   <Text style={[styles.rdiBadge, { color: '#D32F2F', backgroundColor: '#FFEBEE' }]}>{data.proteinRdiPct}% RDI</Text>
                 </View>
@@ -207,7 +216,7 @@ export default function BasicNutritionSection({
               <View style={[styles.metricCard, { borderTopColor: '#1976D2' }]}>
                 <View style={styles.metricCardTop}>
                   <View style={[styles.metricIconBg, { backgroundColor: '#E3F2FD' }]}>
-                    <Text style={styles.metricIcon}>🍞</Text>
+                    <BreadIcon width={24} height={24} />
                   </View>
                   <Text style={[styles.rdiBadge, { color: '#1976D2', backgroundColor: '#E3F2FD' }]}>{data.carbsRdiPct}% RDI</Text>
                 </View>
@@ -222,7 +231,7 @@ export default function BasicNutritionSection({
               <View style={[styles.metricCard, { borderTopColor: '#388E3C' }]}>
                 <View style={styles.metricCardTop}>
                   <View style={[styles.metricIconBg, { backgroundColor: '#E8F5E9' }]}>
-                    <Text style={styles.metricIcon}>🥑</Text>
+                    <AvocadoIcon width={22} height={22} stroke="#388E3C" />
                   </View>
                   <Text style={[styles.rdiBadge, { color: '#388E3C', backgroundColor: '#E8F5E9' }]}>{data.fatRdiPct}% RDI</Text>
                 </View>
@@ -237,7 +246,7 @@ export default function BasicNutritionSection({
               <View style={[styles.metricCard, { borderTopColor: '#00796B' }]}>
                 <View style={styles.metricCardTop}>
                   <View style={[styles.metricIconBg, { backgroundColor: '#E0F2F1' }]}>
-                    <Text style={styles.metricIcon}>🌿</Text>
+                    <SpinachIcon width={24} height={24} />
                   </View>
                   <Text style={[styles.rdiBadge, { color: '#00796B', backgroundColor: '#E0F2F1' }]}>{data.fiberRdiPct}% RDI</Text>
                 </View>
@@ -252,7 +261,7 @@ export default function BasicNutritionSection({
               <View style={[styles.metricCard, { borderTopColor: '#C2185B' }]}>
                 <View style={styles.metricCardTop}>
                   <View style={[styles.metricIconBg, { backgroundColor: '#FCE4EC' }]}>
-                    <Text style={styles.metricIcon}>🍬</Text>
+                    <ToffeeIcon width={22} height={22} />
                   </View>
                   <Text style={[styles.rdiBadge, { color: '#C2185B', backgroundColor: '#FCE4EC' }]}>{data.sugarRdiPct}% Cap</Text>
                 </View>
@@ -429,13 +438,29 @@ export default function BasicNutritionSection({
                   style={[styles.viewModeBtn, comparisonViewMode === 'Cards' && styles.viewModeBtnActive]}
                   onPress={() => setComparisonViewMode('Cards')}
                 >
-                  <Text style={[styles.viewModeText, comparisonViewMode === 'Cards' && styles.viewModeTextActive]}>🎴 Cards</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Feather
+                      name="layers"
+                      size={12}
+                      color={comparisonViewMode === 'Cards' ? '#FFFFFF' : '#5D4037'}
+                      style={{ marginRight: 5 }}
+                    />
+                    <Text style={[styles.viewModeText, comparisonViewMode === 'Cards' && styles.viewModeTextActive]}>Cards</Text>
+                  </View>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.viewModeBtn, comparisonViewMode === 'Chart' && styles.viewModeBtnActive]}
                   onPress={() => setComparisonViewMode('Chart')}
                 >
-                  <Text style={[styles.viewModeText, comparisonViewMode === 'Chart' && styles.viewModeTextActive]}>📊 Chart</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Feather
+                      name="bar-chart-2"
+                      size={12}
+                      color={comparisonViewMode === 'Chart' ? '#FFFFFF' : '#5D4037'}
+                      style={{ marginRight: 5 }}
+                    />
+                    <Text style={[styles.viewModeText, comparisonViewMode === 'Chart' && styles.viewModeTextActive]}>Chart</Text>
+                  </View>
                 </TouchableOpacity>
               </View>
             )}
@@ -449,9 +474,21 @@ export default function BasicNutritionSection({
               scoreDiff < 0 && { backgroundColor: '#FFF3E0', borderColor: '#FFE0B2' },
               scoreDiff === 0 && { backgroundColor: '#E3F2FD', borderColor: '#BBDEFB' },
             ]}>
-              <Text style={styles.growthSummaryIcon}>
-                {scoreDiff > 0 ? '📈' : scoreDiff < 0 ? '📉' : '➡️'}
-              </Text>
+              <View style={{
+                width: 32,
+                height: 32,
+                borderRadius: 16,
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginRight: 10,
+                backgroundColor: scoreDiff > 0 ? '#C8E6C9' : scoreDiff < 0 ? '#FFE0B2' : '#BBDEFB',
+              }}>
+                <Feather
+                  name={scoreDiff > 0 ? 'trending-up' : scoreDiff < 0 ? 'trending-down' : 'arrow-right'}
+                  size={16}
+                  color={scoreDiff > 0 ? '#2E7D32' : scoreDiff < 0 ? '#E65100' : '#1976D2'}
+                />
+              </View>
               <View style={{ flex: 1 }}>
                 <Text style={[
                   styles.growthSummaryTitle,
@@ -480,7 +517,17 @@ export default function BasicNutritionSection({
             </View>
           ) : (
             <View style={[styles.growthSummaryBanner, { backgroundColor: '#E3F2FD', borderColor: '#BBDEFB' }]}>
-              <Text style={styles.growthSummaryIcon}>🧾</Text>
+              <View style={{
+                width: 32,
+                height: 32,
+                borderRadius: 16,
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginRight: 10,
+                backgroundColor: '#BBDEFB',
+              }}>
+                <Feather name="file-text" size={16} color="#1976D2" />
+              </View>
               <View style={{ flex: 1 }}>
                 <Text style={[styles.growthSummaryTitle, { color: '#1976D2' }]}>
                   Single Receipt Registered ({latestScore}/100 Score)
@@ -507,8 +554,11 @@ export default function BasicNutritionSection({
                   {/* Top Badge Row */}
                   <View style={styles.rcTopRow}>
                     <View style={[styles.rcHeaderBadge, rc.isLatest && styles.rcHeaderBadgeLatest]}>
+                      {rc.isLatest && (
+                        <Feather name="award" size={10} color={COLORS.primary} style={{ marginRight: 4 }} />
+                      )}
                       <Text style={[styles.rcIconText, rc.isLatest && styles.rcIconTextLatest]}>
-                        {rc.isLatest ? '✨ CURRENT HAUL' : `HAUL #${rc.number}`}
+                        {rc.isLatest ? 'CURRENT HAUL' : `HAUL #${rc.number}`}
                       </Text>
                     </View>
                     <View style={[styles.rcGradePill, { backgroundColor: rc.gradeBg }]}>
@@ -566,11 +616,13 @@ export default function BasicNutritionSection({
 
                   {/* Chips: Whole Foods & Protein */}
                   <View style={styles.rcChipsRow}>
-                    <View style={styles.rcChip}>
-                      <Text style={styles.rcChipText}>🥗 {rc.wholeFoodsPct}% Whole Foods</Text>
+                    <View style={[styles.rcChip, { flexDirection: 'row', alignItems: 'center' }]}>
+                      <SpinachIcon width={13} height={13} style={{ marginRight: 5 }} />
+                      <Text style={styles.rcChipText}>{rc.wholeFoodsPct}% Whole Foods</Text>
                     </View>
-                    <View style={styles.rcChip}>
-                      <Text style={styles.rcChipText}>🥩 {rc.proteinYield}g Protein</Text>
+                    <View style={[styles.rcChip, { flexDirection: 'row', alignItems: 'center' }]}>
+                      <MeatIcon width={13} height={13} style={{ marginRight: 5 }} />
+                      <Text style={styles.rcChipText}>{rc.proteinYield}g Protein</Text>
                     </View>
                   </View>
                 </View>
@@ -601,7 +653,9 @@ export default function BasicNutritionSection({
 
           {/* Dynamic Suggestion 1: Fiber & Greens */}
           <View style={styles.recommendationRow}>
-            <Text style={styles.recIcon}>🥗</Text>
+            <View style={{ width: 28, height: 28, alignItems: 'center', justifyContent: 'center', marginRight: 12, marginTop: 2 }}>
+              <SpinachIcon width={24} height={24} />
+            </View>
             <View style={styles.recTextCol}>
               <Text style={styles.recTitle}>
                 {data.fiber < 15 ? 'Boost Micronutrient & Fiber Density' : 'Optimal Fiber Yield Achieved'}
@@ -616,7 +670,13 @@ export default function BasicNutritionSection({
 
           {/* Dynamic Suggestion 2: Sugar & Processed Swaps */}
           <View style={[styles.recommendationRow, { backgroundColor: data.sugar > 20 ? '#FFF3E0' : '#F5F8FF', borderColor: data.sugar > 20 ? '#FFE0B2' : '#D0E1FD' }]}>
-            <Text style={styles.recIcon}>{data.sugar > 20 ? '🍬' : '🥑'}</Text>
+            <View style={{ width: 28, height: 28, alignItems: 'center', justifyContent: 'center', marginRight: 12, marginTop: 2 }}>
+              {data.sugar > 20 ? (
+                <ToffeeIcon width={24} height={24} />
+              ) : (
+                <AvocadoIcon width={22} height={22} stroke="#1976D2" />
+              )}
+            </View>
             <View style={styles.recTextCol}>
               <Text style={[styles.recTitle, { color: data.sugar > 20 ? '#E65100' : COLORS.primary }]}>
                 {data.sugar > 20 ? 'Healthy Sugar & Snack Swap' : 'Essential Fatty Acid Optimization'}
@@ -631,7 +691,9 @@ export default function BasicNutritionSection({
 
           {/* Dynamic Suggestion 3: Protein Synthesis */}
           <View style={[styles.recommendationRow, { backgroundColor: '#E8F5E9', borderColor: '#C8E6C9' }]}>
-            <Text style={styles.recIcon}>🥩</Text>
+            <View style={{ width: 28, height: 28, alignItems: 'center', justifyContent: 'center', marginRight: 12, marginTop: 2 }}>
+              <MeatIcon width={24} height={24} />
+            </View>
             <View style={styles.recTextCol}>
               <Text style={[styles.recTitle, { color: '#2E7D32' }]}>
                 {data.protein >= 30 ? 'High Protein Yield Basket' : 'Protein Density Opportunity'}
