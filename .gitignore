@@ -100,3 +100,6 @@ backend/layoutlmv3/
 **/layoutlmv3/
 *.safetensors
 *.bin
+
+# Hugging Face deployment repo
+huggingface_deployment/

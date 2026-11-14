@@ -21,3 +21,4 @@ scikit-learn
 pandas
 google-auth
 httpx
+gradio_client
