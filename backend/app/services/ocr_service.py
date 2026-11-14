@@ -5,6 +5,7 @@ import cv2
 import numpy as np
 import logging
 import requests
+from typing import Optional, Dict, Any, Union
 from app.core.config import settings
 from app.services.document_intelligence import (
     PreprocessingService,
@@ -21,7 +22,8 @@ logger = logging.getLogger(__name__)
 class OCRService:
     """
     Coordinator service that ties together the modular document intelligence pipeline.
-    Supports offloading to remote Hugging Face AI microservice (GPU) with local fallback.
+    Supports offloading to remote Hugging Face AI microservice (ZeroGPU) via Gradio Client / REST,
+    with automatic fallback to the local pipeline.
     """
     def __init__(self):
         self.classifier = InputClassifier()
@@ -30,11 +32,106 @@ class OCRService:
         self.ocr = OCREngine(lang='en')
         self.voting = VotingEngine()
         self.layoutlm = LayoutLMService()
+        self._hf_client = None
+
+    def _get_hf_space_id(self, hf_url: str) -> str:
+        """Derive the HF Space identifier (e.g., 'Uhashini/pantrix-ai-engine') from URL or ID."""
+        if not hf_url:
+            return "Uhashini/pantrix-ai-engine"
+        clean = hf_url.replace("https://", "").replace("http://", "").split("/extract")[0].split("/")[0]
+        if "hf.space" in clean:
+            # Converts 'uhashini-pantrix-ai-engine.hf.space' -> 'Uhashini/pantrix-ai-engine'
+            subdomain = clean.replace(".hf.space", "")
+            parts = subdomain.split("-", 1)
+            if len(parts) == 2:
+                return f"{parts[0]}/{parts[1]}"
+        return "Uhashini/pantrix-ai-engine"
+
+    def _extract_via_gradio(self, image_bytes: bytes, hf_url: str, hf_token: Optional[str]) -> Optional[dict]:
+        """Extract receipt data using the official Gradio Client for ZeroGPU Spaces."""
+        import tempfile
+        import os
+        import json
+        try:
+            from gradio_client import Client, handle_file
+        except ImportError:
+            logger.debug("gradio_client not installed; skipping Gradio client route.")
+            return None
+
+        space_id = self._get_hf_space_id(hf_url)
+        try:
+            if self._hf_client is None:
+                logger.info(f"Initializing Gradio Client for Space: {space_id}")
+                self._hf_client = Client(space_id, hf_token=hf_token)
+
+            with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as f:
+                f.write(image_bytes)
+                tmp_path = f.name
+
+            try:
+                result = None
+                # Gradio spaces may register the prediction function under /extract, /predict, or default
+                for api_target in ["/extract", "/predict", None]:
+                    try:
+                        logger.info(f"Calling Gradio Space endpoint (api_name={api_target})...")
+                        if api_target:
+                            result = self._hf_client.predict(handle_file(tmp_path), api_name=api_target)
+                        else:
+                            result = self._hf_client.predict(handle_file(tmp_path))
+                        if result is not None:
+                            break
+                    except Exception as call_err:
+                        logger.debug(f"Gradio prediction with api_name={api_target} failed: {call_err}")
+                        continue
+
+                if result is None:
+                    return None
+
+                resp_json = None
+                if isinstance(result, str):
+                    if os.path.isfile(result):
+                        with open(result, "r", encoding="utf-8") as rf:
+                            resp_json = json.load(rf)
+                    else:
+                        try:
+                            resp_json = json.loads(result)
+                        except Exception:
+                            resp_json = {"raw_output": result}
+                elif isinstance(result, (list, tuple)) and len(result) > 0:
+                    first = result[0]
+                    if isinstance(first, str) and os.path.isfile(first):
+                        with open(first, "r", encoding="utf-8") as rf:
+                            resp_json = json.load(rf)
+                    elif isinstance(first, dict):
+                        resp_json = first
+                    else:
+                        resp_json = {"data": result}
+                elif isinstance(result, dict):
+                    resp_json = result
+
+                if resp_json:
+                    if "status" in resp_json and "data" in resp_json:
+                        return resp_json
+                    elif "data" in resp_json:
+                        return {"filename": "upload.jpg", "status": "success", "data": resp_json["data"]}
+                    elif "receipt_info" in resp_json:
+                        return {"filename": "upload.jpg", "status": "success", "data": resp_json}
+                    return {"filename": "upload.jpg", "status": "success", "data": resp_json}
+
+            finally:
+                if os.path.exists(tmp_path):
+                    try:
+                        os.remove(tmp_path)
+                    except Exception:
+                        pass
+        except Exception as e:
+            logger.warning(f"Gradio Space client call failed ({e}).")
+        return None
 
     def extract_structured_data(self, image_bytes: bytes, preprocess: bool = True) -> dict:
         """
         Full extraction flow:
-        1. If HF_AI_URL is configured, offload to remote GPU Zero Space.
+        1. If HF_AI_URL is configured, offload to remote GPU Space (via Gradio Client or REST).
         2. Fallback to local CPU/GPU pipeline: Classify -> Preprocess -> Correct -> OCR -> Vote -> LayoutLM.
         """
         if not image_bytes or len(image_bytes) == 0:
@@ -42,61 +139,53 @@ class OCRService:
 
         # ── 1. Remote Hugging Face AI Engine Offload ──────────────────────────
         hf_url = getattr(settings, "HF_AI_URL", None) or os.getenv("HF_AI_URL")
-        if hf_url:
-            try:
-                logger.info(f"Offloading receipt extraction to remote HF Space: {hf_url}")
-                hf_token = getattr(settings, "HF_TOKEN", None) or os.getenv("HF_TOKEN")
+        hf_token = getattr(settings, "HF_TOKEN", None) or os.getenv("HF_TOKEN")
 
-                # Parse origin to satisfy Starlette / Gradio CSRF origin verification
+        if hf_url:
+            # 1a. Attempt Gradio Client (best for Gradio / ZeroGPU spaces)
+            gradio_res = self._extract_via_gradio(image_bytes, hf_url, hf_token)
+            if gradio_res:
+                return gradio_res
+
+            # 1b. Fallback to direct REST HTTP
+            try:
+                logger.info(f"Attempting direct REST POST to HF Space: {hf_url}")
                 parsed_origin = hf_url.split("/extract")[0].rstrip("/") if "/extract" in hf_url else hf_url.rstrip("/")
                 headers = {
                     "Origin": parsed_origin,
                     "Referer": f"{parsed_origin}/",
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
                 }
                 if hf_token:
                     headers["Authorization"] = f"Bearer {hf_token}"
 
-                files = {"file": ("receipt.jpg", image_bytes, "image/jpeg")}
-                response = requests.post(hf_url, files=files, headers=headers, timeout=90)
+                # Try standard REST endpoints if space mounts FastAPI
+                endpoints_to_try = [hf_url]
+                if "/extract" in hf_url:
+                    base_url = hf_url.split("/extract")[0].rstrip("/")
+                    endpoints_to_try.append(f"{base_url}/gradio_api/call/extract")
 
-                # If CSRF protection blocks multipart form, retry with JSON payload or alternative field
-                if response.status_code == 403 and "Cross-site POST" in response.text:
-                    logger.info("Multipart form submission blocked by CSRF; retrying with JSON base64 payload...")
-                    import base64
-                    b64_img = base64.b64encode(image_bytes).decode("utf-8")
-                    json_headers = {
-                        "Content-Type": "application/json",
-                        "Origin": parsed_origin,
-                        "Referer": f"{parsed_origin}/",
-                    }
-                    if hf_token:
-                        json_headers["Authorization"] = f"Bearer {hf_token}"
-                    response = requests.post(
-                        hf_url,
-                        json={"image": b64_img, "image_bytes": b64_img, "file": b64_img},
-                        headers=json_headers,
-                        timeout=90
-                    )
+                for ep in endpoints_to_try:
+                    files = {"file": ("receipt.jpg", image_bytes, "image/jpeg")}
+                    response = requests.post(ep, files=files, headers=headers, timeout=90)
 
-                if response.status_code == 200:
-                    resp_json = response.json()
-                    if isinstance(resp_json, dict):
-                        if "status" in resp_json and "data" in resp_json:
-                            return resp_json
-                        elif "data" in resp_json:
-                            return {"filename": "upload.jpg", "status": "success", "data": resp_json["data"]}
-                        elif "receipt_info" in resp_json:
+                    if response.status_code == 200:
+                        resp_json = response.json()
+                        if isinstance(resp_json, dict):
+                            if "status" in resp_json and "data" in resp_json:
+                                return resp_json
+                            elif "data" in resp_json:
+                                return {"filename": "upload.jpg", "status": "success", "data": resp_json["data"]}
+                            elif "receipt_info" in resp_json:
+                                return {"filename": "upload.jpg", "status": "success", "data": resp_json}
                             return {"filename": "upload.jpg", "status": "success", "data": resp_json}
-                        return {"filename": "upload.jpg", "status": "success", "data": resp_json}
-                else:
-                    logger.warning(
-                        f"HF Space returned HTTP {response.status_code}: {response.text[:200]}. "
-                        "Falling back to local OCR pipeline."
-                    )
+                    else:
+                        logger.warning(
+                            f"HF endpoint {ep} returned HTTP {response.status_code}: {response.text[:200]}."
+                        )
             except Exception as hf_err:
                 logger.warning(
-                    f"Remote HF Engine call failed ({hf_err}). Seamlessly falling back to local OCR pipeline."
+                    f"Direct REST call to HF Engine failed ({hf_err}). Seamlessly falling back to local OCR pipeline."
                 )
 
         # ── 2. Local Document Intelligence Pipeline ───────────────────────────
