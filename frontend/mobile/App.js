@@ -82,7 +82,7 @@ function CustomTabBar({ state, descriptors, navigation }) {
               onPress={onPress}
               activeOpacity={0.8}
             >
-              <Icon width={20} height={20} fill="#fff" />
+              {Icon ? <Icon width={20} height={20} fill="#fff" /> : null}
               <Text style={tabStyles.scanLabel}>Scan</Text>
             </TouchableOpacity>
           );
@@ -97,7 +97,7 @@ function CustomTabBar({ state, descriptors, navigation }) {
             activeOpacity={0.7}
           >
             {isFocused && <View style={tabStyles.activeDot} />}
-            <Icon width={30} height={30} fill={isFocused ? COLORS.primary : '#94B6EF'} style={tabStyles.tabIcon} />
+            {Icon ? <Icon width={30} height={30} fill={isFocused ? COLORS.primary : '#94B6EF'} style={tabStyles.tabIcon} /> : null}
             <Text style={[tabStyles.tabLabel, isFocused && tabStyles.tabLabelActive]}>
               {route.name}
             </Text>
@@ -253,8 +253,11 @@ export default function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <ErrorBoundary fallbackMessage="An error occurred while loading Pantrix. Tap below to reload.">
-          <NavigationContainer>
+        <ErrorBoundary
+          fallbackMessage="An error occurred while loading Pantrix. Tap below to reload."
+          onResetSession={() => setInitialRoute('Landing')}
+        >
+          <NavigationContainer key={initialRoute}>
             <Stack.Navigator
               initialRouteName={initialRoute}
               screenOptions={{
