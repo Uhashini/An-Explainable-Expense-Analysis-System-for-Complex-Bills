@@ -76,6 +76,8 @@ backend/test_image/ocr_output.json
 *.jpeg
 *.jpg
 *.png
+!frontend/mobile/assets/**
+!frontend/mobile/assets/**/*
 ocr_summary.md.resolved
 fix.js
 fix_trendline.js

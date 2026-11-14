@@ -1,0 +1,11 @@
+backend/
+docs/
+logs/
+.venv/
+node_modules/
+.expo/
+*.db
+*.pyc
+__pycache__/
+frontend/mobile/inspect-output/
+inspect-output/
