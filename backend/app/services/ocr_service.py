@@ -45,13 +45,39 @@ class OCRService:
         if hf_url:
             try:
                 logger.info(f"Offloading receipt extraction to remote HF Space: {hf_url}")
-                headers = {}
                 hf_token = getattr(settings, "HF_TOKEN", None) or os.getenv("HF_TOKEN")
+
+                # Parse origin to satisfy Starlette / Gradio CSRF origin verification
+                parsed_origin = hf_url.split("/extract")[0].rstrip("/") if "/extract" in hf_url else hf_url.rstrip("/")
+                headers = {
+                    "Origin": parsed_origin,
+                    "Referer": f"{parsed_origin}/",
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                }
                 if hf_token:
                     headers["Authorization"] = f"Bearer {hf_token}"
 
                 files = {"file": ("receipt.jpg", image_bytes, "image/jpeg")}
                 response = requests.post(hf_url, files=files, headers=headers, timeout=90)
+
+                # If CSRF protection blocks multipart form, retry with JSON payload or alternative field
+                if response.status_code == 403 and "Cross-site POST" in response.text:
+                    logger.info("Multipart form submission blocked by CSRF; retrying with JSON base64 payload...")
+                    import base64
+                    b64_img = base64.b64encode(image_bytes).decode("utf-8")
+                    json_headers = {
+                        "Content-Type": "application/json",
+                        "Origin": parsed_origin,
+                        "Referer": f"{parsed_origin}/",
+                    }
+                    if hf_token:
+                        json_headers["Authorization"] = f"Bearer {hf_token}"
+                    response = requests.post(
+                        hf_url,
+                        json={"image": b64_img, "image_bytes": b64_img, "file": b64_img},
+                        headers=json_headers,
+                        timeout=90
+                    )
 
                 if response.status_code == 200:
                     resp_json = response.json()

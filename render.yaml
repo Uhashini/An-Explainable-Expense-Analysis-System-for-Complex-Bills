@@ -21,3 +21,4 @@ services:
         value: pantrix-secure-jwt-secret-key-super-safe-2026
       - key: GEMINI_API_KEY
         sync: false
+
