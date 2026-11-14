@@ -42,13 +42,7 @@ class OCREngine:
             self.engine = PaddleOCR(
                 use_angle_cls=self.use_angle_cls,
                 lang=self.lang,
-                enable_mkldnn=False,
-                det_limit_side_len=960,
-                det_db_thresh=0.15,
-                det_db_box_thresh=0.3,
-                det_db_unclip_ratio=1.8,
-                use_dilation=False,
-                drop_score=0.5,
+                enable_mkldnn=False
             )
             logger.info(f"PaddleOCR initialized with language: {self.lang}")
         except ImportError:
@@ -152,22 +146,60 @@ class OCREngine:
                         image = cv2.resize(img_loaded, None, fx=scale, fy=scale,
                                            interpolation=cv2.INTER_CUBIC)
 
-            result = self.engine.ocr(image, cls=self.use_angle_cls)
+            try:
+                result = self.engine.ocr(image, cls=self.use_angle_cls)
+            except TypeError:
+                result = self.engine.ocr(image)
 
             if not result or result[0] is None:
                 return []
 
             structured_results = []
-            for line in result[0]:
-                bbox = [[point[0] / scale, point[1] / scale] for point in line[0]]
-                text, confidence = line[1]
-                structured_results.append({
-                    "text":       text,
-                    "confidence": float(confidence),
-                    "bbox":       bbox,
-                    "width":      abs(bbox[1][0] - bbox[0][0]),
-                    "height":     abs(bbox[2][1] - bbox[0][1]),
-                })
+            first_obj = result[0]
+            res_dict = first_obj.res if hasattr(first_obj, "res") else first_obj
+
+            # 1. PaddleOCR 3.0 / PaddleX format
+            if isinstance(res_dict, dict) and ("rec_texts" in res_dict or "dt_polys" in res_dict):
+                polys = res_dict.get("dt_polys") or res_dict.get("rec_polys", [])
+                texts = res_dict.get("rec_texts", [])
+                scores = res_dict.get("rec_scores", [1.0] * len(texts))
+                for poly, txt, sc in zip(polys, texts, scores):
+                    bbox = []
+                    for pt in poly:
+                        try:
+                            bbox.append([float(pt[0]) / scale, float(pt[1]) / scale])
+                        except Exception:
+                            pass
+                    if len(bbox) >= 4:
+                        structured_results.append({
+                            "text": str(txt).strip(),
+                            "confidence": float(sc),
+                            "bbox": bbox,
+                            "width": abs(bbox[1][0] - bbox[0][0]),
+                            "height": abs(bbox[2][1] - bbox[0][1]),
+                        })
+
+            # 2. PaddleOCR 2.x format
+            elif isinstance(first_obj, (list, tuple)):
+                for item in first_obj:
+                    if isinstance(item, (list, tuple)) and len(item) == 2:
+                        raw_bbox, text_conf = item
+                        if isinstance(raw_bbox, (list, tuple)) and isinstance(text_conf, (list, tuple)):
+                            text, conf = text_conf[0], float(text_conf[1])
+                            bbox = []
+                            for pt in raw_bbox:
+                                try:
+                                    bbox.append([float(pt[0]) / scale, float(pt[1]) / scale])
+                                except Exception:
+                                    pass
+                            if len(bbox) >= 4:
+                                structured_results.append({
+                                    "text": str(text).strip(),
+                                    "confidence": conf,
+                                    "bbox": bbox,
+                                    "width": abs(bbox[1][0] - bbox[0][0]),
+                                    "height": abs(bbox[2][1] - bbox[0][1]),
+                                })
 
             structured_results.sort(key=lambda x: (x["bbox"][0][1], x["bbox"][0][0]))
             return structured_results
