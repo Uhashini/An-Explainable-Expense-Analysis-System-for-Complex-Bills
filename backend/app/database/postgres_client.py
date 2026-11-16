@@ -20,14 +20,14 @@ def _create_engine_with_fallback():
                 pool_recycle=300,       # Recycle connections every 5 minutes
                 pool_size=5,
                 max_overflow=10,
-                connect_args={"connect_timeout": 5},
+                connect_args={"connect_timeout": 15},
             )
             with eng.connect() as conn:
                 pass
             print("[DB Info] Connected successfully to Cloud PostgreSQL (Neon).")
             return eng
         except Exception as e:
-            print(f"[DB Warning] Cloud PostgreSQL connection refused/unavailable. Falling back to local SQLite (pantrix.db).")
+            print(f"[DB Warning] Cloud PostgreSQL connection refused/unavailable ({e}). Falling back to local SQLite (pantrix.db).")
 
     print("[DB Info] Connected to Local SQLite Database (pantrix.db).")
     return create_engine("sqlite:///./pantrix.db", connect_args={"check_same_thread": False})
