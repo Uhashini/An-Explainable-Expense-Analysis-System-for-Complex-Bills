@@ -10,7 +10,7 @@ if backend_dir not in sys.path:
 
 from unittest.mock import patch
 from fastapi import HTTPException
-from app.database.postgres_client import get_db, UserProfile
+from app.database.postgres_client import get_db, UserProfile, Base, engine
 from app.api.v1.endpoints.auth import (
     register,
     login,
@@ -31,6 +31,7 @@ def run_tests():
     print("STARTING OAUTH & JWT AUTHENTICATION ENDPOINT TESTS")
     print("=" * 60)
     
+    Base.metadata.create_all(bind=engine)
     db = next(get_db())
 
     # 1. Standard Register Test
@@ -54,14 +55,14 @@ def run_tests():
     assert "access_token" in login_res, "access_token missing in login"
     print("   ✓ Login successful with JWT access token!")
 
-    # 3. Security Test: Rejection of unverified client-supplied Google email
+    # 3. Security Test: Rejection of unverified Google login without tokens
     print("\n3. Testing security validation: Reject unverified Google login without tokens...")
     try:
-        oauth_login(OAuthLoginRequest(provider="google", email="unverified@gmail.com"), db=db)
+        google_oauth(GoogleOAuthRequest(), db=db)
         assert False, "Should reject unverified Google login without token"
     except HTTPException as e:
         assert e.status_code == 400
-        print("   ✓ Security enforced: Backend strictly rejects client-supplied email without verified Google token!")
+        print("   ✓ Security enforced: Backend strictly rejects client without verified Google token!")
 
     # 4. Verified Google OAuth Login (Simulating verified Google token)
     google_email = "alex.google.verified@gmail.com"

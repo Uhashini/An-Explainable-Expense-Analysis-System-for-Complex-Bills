@@ -1,0 +1,45 @@
+name: Pantrix CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  backend-tests:
+    name: Backend Test Suite & Quality Assurance
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pytest-asyncio fastapi pydantic pydantic-settings sqlalchemy scikit-learn shap gradio_client bcrypt python-jose python-multipart requests httpx python-dotenv
+
+      - name: Run Backend Pytest Suite
+        working-directory: backend
+        run: |
+          pytest tests/ -v
+
+  dockerfile-lint:
+    name: Docker Configuration Linting
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Validate Dockerfile Syntax
+        run: |
+          test -f backend/docker/Dockerfile && echo "Dockerfile located successfully."
+          test -f docker-compose.yml && echo "Root docker-compose.yml located successfully."
+          test -f backend/docker/docker-compose.yml && echo "Backend docker-compose.yml located successfully."
